@@ -1051,7 +1051,7 @@ j9gc_initialize_parse_gc_colon(J9JavaVM *javaVM, char **scan_start)
 		j9nls_printf(PORTLIB, J9NLS_ERROR, J9NLS_GC_OPTION_FVTEST_UNKNOWN_TYPE, *scan_start);
 		goto _error;
 	}
-	
+
 #if defined(J9VM_GC_MODRON_SCAVENGER)
 	if (try_scan(scan_start, "scanCacheSize=")) {
 		/* Read in restricted scan cache size */
@@ -1122,6 +1122,17 @@ j9gc_initialize_parse_gc_colon(J9JavaVM *javaVM, char **scan_start)
 		goto _exit;
 	}
 	
+	if (try_scan(scan_start, "bufferedLoggingSize=")) {
+		if (!scan_udata_helper(javaVM, scan_start, &extensions->bufferedLoggingSize, "bufferedLoggingSize=")) {
+			goto _error;
+		}
+		if (2 > extensions->bufferedLoggingSize) {
+			j9nls_printf(PORTLIB, J9NLS_ERROR, J9NLS_GC_OPTIONS_VALUE_MUST_BE_ABOVE, "bufferedLoggingSize=", (UDATA)1);
+			goto _error;
+		}
+		goto _exit;
+	}
+
 	if (try_scan(scan_start, "bufferedLogging")) {
 		extensions->bufferedLogging = true;
 		goto _exit;
