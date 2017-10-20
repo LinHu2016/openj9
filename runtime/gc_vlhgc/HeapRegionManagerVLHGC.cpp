@@ -217,5 +217,29 @@ MM_HeapRegionManagerVLHGC::getHeapMemorySnapshot(MM_GCExtensionsBase *extensions
 	snapshot->_totalRegionReservedSize -= (snapshot->_totalRegionEdenSize - allocateEdenTotal);
 	snapshot->_freeRegionEdenSize += (snapshot->_totalRegionEdenSize - allocateEdenTotal);
 	snapshot->_freeRegionReservedSize = snapshot->_totalRegionReservedSize;
+
+
+	if ((snapshot->_totalRegionEdenSize > extensions->tarokIdealEdenMaximumBytes) ||
+		(snapshot->_totalRegionOldSize >= extensions->memoryMax) ||
+		(snapshot->_totalRegionSurvivorSize  >= extensions->memoryMax) ||
+		(snapshot->_totalRegionReservedSize  >= extensions->memoryMax)) {
+
+		PORT_ACCESS_FROM_JAVAVM((J9JavaVM *)extensions->getOmrVM()->_language_vm);
+		UDATA numaNodes = extensions->_numaManager.getAffinityLeaderCount();
+		j9tty_printf(PORTLIB, "HeapMemorySnapshot gcEnd=%zu, numaNodes=%zu, TotalOld=%zu, FreeOld=%zu, TotalEden=%zu, FreeEden=%zu, TotalSurvior=%zu, FreeSurvior=%zu, TotalReserved=%zu, FreeReserved=%zu, memoryMax=%zu, tarokIdealEdenMaximumBytes=%zu\n",
+		gcEnd,
+			numaNodes,
+			snapshot->_totalRegionOldSize,
+			snapshot->_freeRegionOldSize,
+			snapshot->_totalRegionEdenSize,
+			snapshot->_freeRegionEdenSize,
+			snapshot->_totalRegionSurvivorSize,
+			snapshot->_freeRegionSurvivorSize,
+			snapshot->_totalRegionReservedSize,
+			snapshot->_freeRegionReservedSize,
+			extensions->memoryMax,
+			extensions->tarokIdealEdenMaximumBytes);
+	}
+
 	return snapshot;
 }
