@@ -1228,6 +1228,11 @@ MM_IncrementalGenerationalGC::partialGarbageCollect(MM_EnvironmentVLHGC *env, MM
 
 		double optimalEmptinessRegionThreshold = _reclaimDelegate.calculateOptimalEmptinessRegionThreshold(env, regionConsumptionRate, avgSurvivorRegions, avgCopyForwardRate, scanTimeCostPerGMP);
 		_schedulingDelegate.setAutomaticDefragmentEmptinessThreshold(optimalEmptinessRegionThreshold);
+
+		/* recalculate ratios due to sweep */
+		_schedulingDelegate.calculatePGCCompactionRate(env, _schedulingDelegate.getCurrentEdenSizeInRegions(env) * _regionManager->getRegionSize());
+		_schedulingDelegate.calculateHeapOccupancyTrend(env);
+		_schedulingDelegate.calculateScannableBytesRatio(env);
 	}
 
 	if (env->_cycleState->_shouldRunCopyForward) {
@@ -1668,6 +1673,9 @@ MM_IncrementalGenerationalGC::setRegionAgesToMax(MM_EnvironmentVLHGC *env)
 				region->_allocateData._owningContext = commonContext;
 				owner->migrateRegionToAllocationContext(region, commonContext);
 			}
+		} else if (region->isArrayletLeaf()) {
+			/* adjust age for arraylet leaves */
+			region->setAge(_extensions->tarokMaximumAgeInBytes, _extensions->tarokRegionMaxAge);
 		}
 	}
 }

@@ -341,11 +341,11 @@ public:
 	/**
 	 * @return true if it is first PGC after GMP completed (so we can calculate compact-bytes/free-bytes ratio, etc.)
 	 */
-	bool isFirstPGCAfterGMP();
+//	bool isFirstPGCAfterGMP();
 	/**
 	 * clear the flag that indicate this was the first PGC after GMP completed
 	 */
-	void firstPGCAfterGMPCompleted();
+//	void firstPGCAfterGMPCompleted();
 
 	/**
 	 * return whether the following PGC is required to do global sweep (typically, first PGC after GMP completed)
