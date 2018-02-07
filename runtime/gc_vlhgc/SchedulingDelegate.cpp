@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2017 IBM Corp. and others
+ * Copyright (c) 1991, 2018 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -284,10 +284,11 @@ MM_SchedulingDelegate::partialGarbageCollectCompleted(MM_EnvironmentVLHGC *env, 
 		/* measure scan rate in PGC, only if we did M/S/C collect */
 		measureScanRate(env, measureScanRateHistoricWeightForPGC);
 	}
+
 	measureConsumptionForPartialGC(env, reclaimableRegions, defragmentReclaimableRegions);
 	calculateAutomaticGMPIntermission(env);
 	calculateEdenSize(env);
-
+	
 	estimateMacroDefragmentationWork(env);
 	
 	/* Calculate the time spent in the current Partial GC */
@@ -669,6 +670,18 @@ MM_SchedulingDelegate::calculateScannableBytesRatio(MM_EnvironmentVLHGC *env)
 	}
 }
 
+void
+MM_SchedulingDelegate::recalculateRatesOnFirstPGCAfterGMP(MM_EnvironmentVLHGC *env)
+{
+	if (isFirstPGCAfterGMP()) {
+		calculatePGCCompactionRate(env, getCurrentEdenSizeInRegions(env) * _regionManager->getRegionSize());
+		calculateHeapOccupancyTrend(env);
+		calculateScannableBytesRatio(env);
+
+		firstPGCAfterGMPCompleted();
+	}
+}
+
 double
 MM_SchedulingDelegate::getAverageEmptinessOfCopyForwardedRegions()
 {
@@ -778,7 +791,6 @@ MM_SchedulingDelegate::getDesiredCompactWork()
 	return desiredCompactWork;
 }
 
-/*
 bool
 MM_SchedulingDelegate::isFirstPGCAfterGMP()
 {
@@ -790,7 +802,6 @@ MM_SchedulingDelegate::firstPGCAfterGMPCompleted()
 {
 	_didGMPCompleteSinceLastReclaim = false;
 }
-*/
 
 void
 MM_SchedulingDelegate::copyForwardCompleted(MM_EnvironmentVLHGC *env)
