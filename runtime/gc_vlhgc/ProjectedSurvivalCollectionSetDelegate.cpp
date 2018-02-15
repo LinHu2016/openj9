@@ -163,6 +163,10 @@ MM_ProjectedSurvivalCollectionSetDelegate::createNurseryCollectionSet(MM_Environ
 
 	UDATA nurseryRegionCount = 0;
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "createNurseryCollectionSet start\n");
+	UDATA regionIndex = 0;
+
 	/* Calculate the core "required" collection set for the Partial GC, which constitutes all regions that are equal to
 	 * or below the nursery age.
 	 */
@@ -172,6 +176,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::createNurseryCollectionSet(MM_Environ
 		Assert_MM_true(MM_RegionValidator(region).validate(env));
 		Assert_MM_false(region->_markData._shouldMark);
 		Assert_MM_false(region->_reclaimData._shouldReclaim);
+		regionIndex++;
 		if (region->containsObjects()) {
 			bool regionHasCriticalRegions = (0 != region->_criticalRegionsInUse);
 			bool isSelectionForCopyForward = env->_cycleState->_shouldRunCopyForward;
@@ -181,6 +186,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::createNurseryCollectionSet(MM_Environ
 					/* sweep/compact flags are set in ReclaimDelegate */
 					selectRegion(env, region);
 					nurseryRegionCount += 1;
+					j9tty_printf(PORTLIB, "eden region(%zu-%p, age=%zu, type=%zu)\n", regionIndex, region, region->getLogicalAge(), region->getRegionType());
 				} else {
 					Assert_MM_true(!region->isEden());
 				}
@@ -195,6 +201,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::createNurseryCollectionSet(MM_Environ
 			}
 		}
 	}
+	j9tty_printf(PORTLIB, "createNurseryCollectionSet end nurseryRegionCount=%zu\n", nurseryRegionCount);
 
 	Trc_MM_CollectionSetDelegate_createNurseryCollectionSet_Exit(env->getLanguageVMThread(), nurseryRegionCount);
 	return nurseryRegionCount;
@@ -227,6 +234,10 @@ MM_ProjectedSurvivalCollectionSetDelegate::selectRegionsForBudget(MM_Environment
 	Trc_MM_CollectionSetDelegate_selectRegionsForBudget_Entry(env->getLanguageVMThread(), ageGroupBudget);
 	UDATA ageGroupBudgetRemaining = ageGroupBudget;
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "selectRegionsForBudget start ageGroupBudget=%zu\n", ageGroupBudget);
+
+
 	/* Walk the rate of return age group using a remainder skip-system to select the appropriate % of regions to collect (based on budget) */
 	UDATA regionSelectionIndex = 0;
 	UDATA regionSelectionIncrement = ageGroupBudget;
@@ -238,6 +249,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::selectRegionsForBudget(MM_Environment
 			/* The region is to be selected as part of the dynamic set */
 			selectRegion(env, regionSelectionPtr);
 			ageGroupBudgetRemaining -= 1;
+			j9tty_printf(PORTLIB, "budget region(%zu-%p, age=%zu, type=%zu)\n", regionSelectionIndex, regionSelectionPtr, regionSelectionPtr->getLogicalAge(), regionSelectionPtr->getRegionType());
 
 		}
 		regionSelectionIndex %= regionSelectionThreshold;
@@ -247,12 +259,17 @@ MM_ProjectedSurvivalCollectionSetDelegate::selectRegionsForBudget(MM_Environment
 
 	Assert_MM_true(ageGroupBudgetRemaining <= ageGroupBudget);
 	Trc_MM_CollectionSetDelegate_selectRegionsForBudget_Exit(env->getLanguageVMThread(), ageGroupBudget - ageGroupBudgetRemaining);
+	j9tty_printf(PORTLIB, "selectRegionsForBudget end regionForBudget=%zu\n", ageGroupBudget - ageGroupBudgetRemaining);
 	return ageGroupBudgetRemaining;
 }
 
 void
 MM_ProjectedSurvivalCollectionSetDelegate::createRateOfReturnCollectionSet(MM_EnvironmentVLHGC *env, UDATA nurseryRegionCount)
 {
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "createRateOfReturnCollectionSet start\n");
+
 	/* Build and sort the rate of return list into budget consumption priority order */
 	UDATA sortListSize = 0;
 	MM_HeapRegionManager *regionManager = _extensions->heapRegionManager;
@@ -299,6 +316,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::createRateOfReturnCollectionSet(MM_En
 
 		if (projectedReclaimableBytesFraction > _extensions->tarokCopyForwardFragmentationTarget) {
 			selectRegion(env, region);
+			j9tty_printf(PORTLIB, "dynamicSelectionRegion(%zu-%p, age=%zu, type=%zu)\n", regionIndex, region, region->getLogicalAge(), region->getRegionType());
 			_setSelectionDataTable[compactGroup]._dynamicSelectionThisCycle = true;
 			regionBudget -= 1;
 		} else {
@@ -307,6 +325,8 @@ MM_ProjectedSurvivalCollectionSetDelegate::createRateOfReturnCollectionSet(MM_En
 		}
 		regionIndex += 1;
 	}
+
+	j9tty_printf(PORTLIB, "createRateOfReturnCollectionSet end regionBudget=%zu\n", regionBudget);
 
 	Trc_MM_CollectionSetDelegate_createRegionCollectionSetForPartialGC_dynamicRegionSelectionBudgetRemaining(
 		env->getLanguageVMThread(),
@@ -317,6 +337,9 @@ MM_ProjectedSurvivalCollectionSetDelegate::createRateOfReturnCollectionSet(MM_En
 void
 MM_ProjectedSurvivalCollectionSetDelegate::createCoreSamplingCollectionSet(MM_EnvironmentVLHGC *env, UDATA nurseryRegionCount)
 {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "createCoreSamplingCollectionSet start\n");
+
 	/* Collect and sort all regions into the core sample buckets so that we can find them quickly (this is an optimization) */
 	UDATA totalCoreSampleRegions = 0;
 	UDATA sortListSize = 0;
@@ -389,6 +412,8 @@ MM_ProjectedSurvivalCollectionSetDelegate::createCoreSamplingCollectionSet(MM_En
 
 		coreSampleIndex += 1;
 	}
+
+	j9tty_printf(PORTLIB, "createCoreSamplingCollectionSet end regionBudget=%zu\n", regionBudget);
 
 	Trc_MM_CollectionSetDelegate_createRegionCollectionSetForPartialGC_coreSamplingBudgetRemaining(
 		env->getLanguageVMThread(),

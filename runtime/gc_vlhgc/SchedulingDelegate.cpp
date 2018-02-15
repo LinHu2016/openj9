@@ -721,28 +721,53 @@ MM_SchedulingDelegate::calculatePGCCompactionRate(MM_EnvironmentVLHGC *env, UDAT
 	const double defragmentEmptinessThreshold = getDefragmentEmptinessThreshold(env);
 	Assert_MM_true( (defragmentEmptinessThreshold >= 0.0) && (defragmentEmptinessThreshold <= 1.0) );
 	const UDATA regionSize = _regionManager->getRegionSize();
-	UDATA totalFreeMemory = 0;
-	UDATA totalLiveData = 0;
+
+	UDATA totalLiveDataInCollectableRegions = 0;
+	UDATA totalLiveDataInNonCollectibleRegions = 0;
 	UDATA fullyCompactedData = 0;
+
+	UDATA freeMemoryInCollectibleRegions = 0;
+	UDATA freeMemoryInNonCollectibleRegions = 0;
+	UDATA freeMemoryInFullyCompactedRegions = 0;
 	UDATA freeRegionMemory = 0;
+
+	UDATA collectibleRegions = 0;
+	UDATA nonCollectibleRegions = 0;
+	UDATA freeRegions = 0;
+	UDATA fullyCompactedRegions = 0;
+
+	UDATA estimatedFreeMemory = 0;
 	UDATA defragmentedMemory = 0;
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "calculatePGCCompactionRate start\n");
 	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	UDATA regionIndex = 0;
+
 	while (NULL != (region = regionIterator.nextRegion())) {
+		regionIndex++;
 		region->_defragmentationTarget = false;
+		MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+		j9tty_printf(PORTLIB, "region(%zu-%p, age=%zu, type=%zu) - ", regionIndex, region, region->getLogicalAge(), region->getRegionType());
 		if (region->containsObjects()) {
 			Assert_MM_true(region->_sweepData._alreadySwept);
+			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
 			if (!region->getRememberedSetCardList()->isAccurate()) {
 				/* Overflowed regions or those that RSCL is being rebuilt will not be be compacted */
+				nonCollectibleRegions += 1;
+				freeMemoryInNonCollectibleRegions += freeMemory;
+				totalLiveDataInNonCollectibleRegions += (regionSize - freeMemory);
+				j9tty_printf(PORTLIB, "nonCollectableRegion freeMemory=%zu, totalLiveDataInNonCollectibleRegions(+)=%zu\n", freeMemory, totalLiveDataInNonCollectibleRegions);
 			} else {
-				MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
-				UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
 				double emptiness = (double)freeMemory / (double)regionSize;
 				Assert_MM_true( (emptiness >= 0.0) && (emptiness <= 1.0) );
 
+				j9tty_printf(PORTLIB, "freeMemory=%zu(ActualFreeMemorySize=%zu, DarkMatterBytes=%zu, AllocatableBytes=%zu), emptiness=%lf", freeMemory, memoryPool->getActualFreeMemorySize(), memoryPool->getDarkMatterBytes(), memoryPool->getAllocatableBytes(), emptiness);
 				/* Only consider regions which are likely to become more dense if we copy-and-forward them */
 				if (emptiness > defragmentEmptinessThreshold) {
+					collectibleRegions += 1;
+					freeMemoryInCollectibleRegions += freeMemory;
 					/* see ReclaimDelegate::deriveCompactScore() for an explanation of potentialWastedWork */
 					UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 					double weightedSurvivalRate = MM_GCExtensions::getExtensions(env)->compactGroupPersistentStats[compactGroup]._weightedSurvivalRate;
@@ -750,33 +775,197 @@ MM_SchedulingDelegate::calculatePGCCompactionRate(MM_EnvironmentVLHGC *env, UDAT
 
 					/* the probability that we'll recover the free memory is determined by the potential gainful work, so use that determine how much memory we're likely to actually compact */
 					defragmentedMemory += (UDATA)((double)freeMemory * (1.0 - potentialWastedWork));
-					totalLiveData += (UDATA)((double)(regionSize - freeMemory) * (1.0 - potentialWastedWork));
+					totalLiveDataInCollectableRegions += (UDATA)((double)(regionSize - freeMemory) * (1.0 - potentialWastedWork));
 					region->_defragmentationTarget = true;
+
+					j9tty_printf(PORTLIB, ", weightedSurvivalRate=%lf, potentialWastedWork=%lf, defragmentedMemory(+)=%zu, totalLiveDataInCollectableRegions(+)=%zu\n", weightedSurvivalRate, potentialWastedWork, defragmentedMemory, totalLiveDataInCollectableRegions);
 				} else {
+					/* if method calculatePGCCompactionRate() is called right after the sweep before PGC(the first PGC after GMP), half of Eden regions were allocated after the final GMP, those Eden regions didn't have been marked, they would be showed as fullyCompacted regions */
+					fullyCompactedRegions += 1;
+					freeMemoryInFullyCompactedRegions += freeMemory;
 					fullyCompactedData += (regionSize - freeMemory);
+					j9tty_printf(PORTLIB, ", fullyCompactedData(+)=%zu\n", fullyCompactedData);
 				}
 			}
 		} else if (region->isFreeOrIdle()) {
+			freeRegions += 1;
 			freeRegionMemory += regionSize;
+			j9tty_printf(PORTLIB, "FreeOrIdle region freeRegionMemory(+)=%zu\n", freeRegionMemory);
 		}
 	}
 
-	/* Adjust totalFreeMemory - we are only interested in area that shortfall can be fed from.
+	/* Adjust estimatedFreeMemory - we are only interested in area that shortfall can be fed from.
 	 * Thus exclude Eden and Survivor size. Survivor space needs to accommodate for Nursery set, Dynamic collection set and Compaction set
 	 */
 	UDATA surivivorSize = (UDATA)(regionSize * (_averageSurvivorSetRegionCount + _extensions->tarokKickoffHeadroomRegionCount));
 	UDATA reservedFreeMemory = edenSizeInBytes + surivivorSize;
-	totalFreeMemory = MM_Math::saturatingSubtract(defragmentedMemory + freeRegionMemory, reservedFreeMemory);
+	estimatedFreeMemory = MM_Math::saturatingSubtract(defragmentedMemory + freeRegionMemory, reservedFreeMemory);
 	double bytesDiscardedPerByteCopied = (_averageCopyForwardBytesCopied > 0.0) ? (_averageCopyForwardBytesDiscarded / _averageCopyForwardBytesCopied) : 0.0;
-	double estimatedFreeMemoryDiscarded = (double)totalLiveData * bytesDiscardedPerByteCopied;
-	double recoverableFreeMemory = (double)totalFreeMemory - estimatedFreeMemoryDiscarded;
+	double estimatedFreeMemoryDiscarded = (double)totalLiveDataInCollectableRegions * bytesDiscardedPerByteCopied;
+	double recoverableFreeMemory = (double)estimatedFreeMemory - estimatedFreeMemoryDiscarded;
 
 	if (0.0 < recoverableFreeMemory) {
-		_bytesCompactedToFreeBytesRatio = ((double)totalLiveData)/recoverableFreeMemory;
+		_bytesCompactedToFreeBytesRatio = ((double)totalLiveDataInCollectableRegions)/recoverableFreeMemory;
 	} else {
 		_bytesCompactedToFreeBytesRatio = (double)(_regionManager->getTableRegionCount() + 1);
 	}
-	Trc_MM_SchedulingDelegate_calculatePGCCompactionRate_liveToFreeRatio(env->getLanguageVMThread(), _bytesCompactedToFreeBytesRatio, totalLiveData, totalFreeMemory, fullyCompactedData, reservedFreeMemory, defragmentEmptinessThreshold, surivivorSize, defragmentedMemory, freeRegionMemory, edenSizeInBytes);
+
+	j9tty_printf(PORTLIB, "totalLiveData=%zu(totalLiveDataInCollectableRegions=%zu, totalLiveDataInNonCollectibleRegions=%zu, fullyCompactedData=%zu)\n",
+			(totalLiveDataInCollectableRegions + totalLiveDataInNonCollectibleRegions + fullyCompactedData),
+			totalLiveDataInCollectableRegions,
+			totalLiveDataInNonCollectibleRegions,
+			fullyCompactedData);
+	j9tty_printf(PORTLIB, "totalFreeMemory=%zu(freeMemoryInCollectibleRegions=%zu, freeMemoryInNonCollectibleRegions=%zu, freeRegionMemory=%zu, freeMemoryInFullyCompactedRegions=%zu)\n",
+			(freeMemoryInCollectibleRegions + freeMemoryInNonCollectibleRegions + freeRegionMemory),
+			freeMemoryInCollectibleRegions,
+			freeMemoryInNonCollectibleRegions,
+			freeRegionMemory,
+			freeMemoryInFullyCompactedRegions);
+
+	j9tty_printf(PORTLIB, "totalRegions=%zu(collectibleRegions=%zu, nonCollectibleRegions=%zu, fullyCompactedRegions=%zu, freeRegions=%zu)\n",
+			(collectibleRegions + nonCollectibleRegions + fullyCompactedRegions + freeRegions),
+			collectibleRegions,
+			nonCollectibleRegions,
+			fullyCompactedRegions,
+			freeRegions);
+
+	j9tty_printf(PORTLIB, "edenSizeInBytes=%zu, surivivorSize=%zu, reservedFreeMemory=%zu, defragmentEmptinessThreshold=%lf, defragmentedMemory=%zu, estimatedFreeMemory=%zu, _bytesCompactedToFreeBytesRatio=%lf\n",
+			edenSizeInBytes,
+			surivivorSize,
+			reservedFreeMemory,
+			defragmentEmptinessThreshold,
+			defragmentedMemory,
+			estimatedFreeMemory,
+			_bytesCompactedToFreeBytesRatio);
+
+	Trc_MM_SchedulingDelegate_calculatePGCCompactionRate_liveToFreeRatio(env->getLanguageVMThread(), _bytesCompactedToFreeBytesRatio, (totalLiveDataInCollectableRegions + totalLiveDataInNonCollectibleRegions + fullyCompactedData), totalLiveDataInCollectableRegions, totalLiveDataInNonCollectibleRegions, fullyCompactedData, (freeMemoryInCollectibleRegions + freeMemoryInNonCollectibleRegions + freeRegionMemory), freeMemoryInCollectibleRegions, freeMemoryInNonCollectibleRegions, freeRegionMemory, freeMemoryInFullyCompactedRegions, (collectibleRegions + nonCollectibleRegions + fullyCompactedRegions + freeRegions), collectibleRegions, nonCollectibleRegions, fullyCompactedRegions, freeRegions, edenSizeInBytes, surivivorSize, reservedFreeMemory, defragmentEmptinessThreshold, defragmentedMemory, estimatedFreeMemory);
+}
+
+void
+MM_SchedulingDelegate::calculatePGCCompactionRate_Debug(MM_EnvironmentVLHGC *env, UDATA edenSizeInBytes)
+{
+	/* Ideally, copy-forwarded regions should be 100% full (i.e. 0% empty), but there are inefficiencies due to parallelism and compact groups.
+	 * We measure this so that we can detect regions which are unlikely to become less empty if we copy-and-forward them.
+	 */
+	const double defragmentEmptinessThreshold = getDefragmentEmptinessThreshold(env);
+	Assert_MM_true( (defragmentEmptinessThreshold >= 0.0) && (defragmentEmptinessThreshold <= 1.0) );
+	const UDATA regionSize = _regionManager->getRegionSize();
+
+	UDATA totalLiveDataInCollectableRegions = 0;
+	UDATA totalLiveDataInNonCollectibleRegions = 0;
+	UDATA fullyCompactedData = 0;
+
+	UDATA freeMemoryInCollectibleRegions = 0;
+	UDATA freeMemoryInNonCollectibleRegions = 0;
+	UDATA freeMemoryInFullyCompactedRegions = 0;
+	UDATA freeRegionMemory = 0;
+
+	UDATA collectibleRegions = 0;
+	UDATA nonCollectibleRegions = 0;
+	UDATA freeRegions = 0;
+	UDATA fullyCompactedRegions = 0;
+
+	UDATA estimatedFreeMemory = 0;
+	UDATA defragmentedMemory = 0;
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "calculatePGCCompactionRate_Debug start\n");
+	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	UDATA regionIndex = 0;
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		regionIndex++;
+//		region->_defragmentationTarget = false;
+		MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+		j9tty_printf(PORTLIB, "region(%zu-%p, age=%zu, type=%zu) - ", regionIndex, region, region->getLogicalAge(), region->getRegionType());
+		if (region->containsObjects()) {
+			Assert_MM_true(region->_sweepData._alreadySwept);
+			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+			if (!region->getRememberedSetCardList()->isAccurate()) {
+				/* Overflowed regions or those that RSCL is being rebuilt will not be be compacted */
+				nonCollectibleRegions += 1;
+				freeMemoryInNonCollectibleRegions += freeMemory;
+				totalLiveDataInNonCollectibleRegions += (regionSize - freeMemory);
+				j9tty_printf(PORTLIB, "nonCollectableRegion freeMemory=%zu, totalLiveDataInNonCollectibleRegions(+)=%zu\n", freeMemory, totalLiveDataInNonCollectibleRegions);
+			} else {
+				double emptiness = (double)freeMemory / (double)regionSize;
+				Assert_MM_true( (emptiness >= 0.0) && (emptiness <= 1.0) );
+
+				j9tty_printf(PORTLIB, "freeMemory=%zu(ActualFreeMemorySize=%zu, DarkMatterBytes=%zu, AllocatableBytes=%zu), emptiness=%lf", freeMemory, memoryPool->getActualFreeMemorySize(), memoryPool->getDarkMatterBytes(), memoryPool->getAllocatableBytes(), emptiness);
+				/* Only consider regions which are likely to become more dense if we copy-and-forward them */
+				if (emptiness > defragmentEmptinessThreshold) {
+					collectibleRegions += 1;
+					freeMemoryInCollectibleRegions += freeMemory;
+					/* see ReclaimDelegate::deriveCompactScore() for an explanation of potentialWastedWork */
+					UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+					double weightedSurvivalRate = MM_GCExtensions::getExtensions(env)->compactGroupPersistentStats[compactGroup]._weightedSurvivalRate;
+					double potentialWastedWork = (1.0 - weightedSurvivalRate) * (1.0 - emptiness);
+
+					/* the probability that we'll recover the free memory is determined by the potential gainful work, so use that determine how much memory we're likely to actually compact */
+					defragmentedMemory += (UDATA)((double)freeMemory * (1.0 - potentialWastedWork));
+					totalLiveDataInCollectableRegions += (UDATA)((double)(regionSize - freeMemory) * (1.0 - potentialWastedWork));
+//					region->_defragmentationTarget = true;
+
+					j9tty_printf(PORTLIB, ", weightedSurvivalRate=%lf, potentialWastedWork=%lf, defragmentedMemory(+)=%zu, totalLiveDataInCollectableRegions(+)=%zu\n", weightedSurvivalRate, potentialWastedWork, defragmentedMemory, totalLiveDataInCollectableRegions);
+				} else {
+					/* if method calculatePGCCompactionRate() is called right after the sweep before PGC(the first PGC after GMP), half of Eden regions were allocated after the final GMP, those Eden regions didn't have been marked, they would be showed as fullyCompacted regions */
+					fullyCompactedRegions += 1;
+					freeMemoryInFullyCompactedRegions += freeMemory;
+					fullyCompactedData += (regionSize - freeMemory);
+					j9tty_printf(PORTLIB, ", fullyCompactedData(+)=%zu\n", fullyCompactedData);
+				}
+			}
+		} else if (region->isFreeOrIdle()) {
+			freeRegions += 1;
+			freeRegionMemory += regionSize;
+			j9tty_printf(PORTLIB, "FreeOrIdle region freeRegionMemory(+)=%zu\n", freeRegionMemory);
+		}
+	}
+
+	/* Adjust estimatedFreeMemory - we are only interested in area that shortfall can be fed from.
+	 * Thus exclude Eden and Survivor size. Survivor space needs to accommodate for Nursery set, Dynamic collection set and Compaction set
+	 */
+	UDATA surivivorSize = (UDATA)(regionSize * (_averageSurvivorSetRegionCount + _extensions->tarokKickoffHeadroomRegionCount));
+	UDATA reservedFreeMemory = edenSizeInBytes + surivivorSize;
+	estimatedFreeMemory = MM_Math::saturatingSubtract(defragmentedMemory + freeRegionMemory, reservedFreeMemory);
+	j9tty_printf(PORTLIB, "surivivorSize=%zu, reservedFreeMemory=%zu, estimatedFreeMemory=%zu\n", surivivorSize, reservedFreeMemory, estimatedFreeMemory);
+	double bytesDiscardedPerByteCopied = (_averageCopyForwardBytesCopied > 0.0) ? (_averageCopyForwardBytesDiscarded / _averageCopyForwardBytesCopied) : 0.0;
+	double estimatedFreeMemoryDiscarded = (double)totalLiveDataInCollectableRegions * bytesDiscardedPerByteCopied;
+	double recoverableFreeMemory = (double)estimatedFreeMemory - estimatedFreeMemoryDiscarded;
+
+	double bytesCompactedToFreeBytesRatio = 0.0;
+	if (0.0 < recoverableFreeMemory) {
+		bytesCompactedToFreeBytesRatio = ((double)totalLiveDataInCollectableRegions)/recoverableFreeMemory;
+	} else {
+		bytesCompactedToFreeBytesRatio = (double)(_regionManager->getTableRegionCount() + 1);
+	}
+	j9tty_printf(PORTLIB, "totalLiveData=%zu(totalLiveDataInCollectableRegions=%zu, totalLiveDataInNonCollectibleRegions=%zu, fullyCompactedData=%zu)\n",
+			(totalLiveDataInCollectableRegions + totalLiveDataInNonCollectibleRegions + fullyCompactedData),
+			totalLiveDataInCollectableRegions,
+			totalLiveDataInNonCollectibleRegions,
+			fullyCompactedData);
+	j9tty_printf(PORTLIB, "totalFreeMemory=%zu(freeMemoryInCollectibleRegions=%zu, freeMemoryInNonCollectibleRegions=%zu, freeRegionMemory=%zu, freeMemoryInFullyCompactedRegions=%zu)\n",
+			(freeMemoryInCollectibleRegions + freeMemoryInNonCollectibleRegions + freeRegionMemory),
+			freeMemoryInCollectibleRegions,
+			freeMemoryInNonCollectibleRegions,
+			freeRegionMemory,
+			freeMemoryInFullyCompactedRegions);
+	j9tty_printf(PORTLIB, "totalRegions=%zu(collectibleRegions=%zu, nonCollectibleRegions=%zu, fullyCompactedRegions=%zu, freeRegions=%zu)\n",
+			(collectibleRegions + nonCollectibleRegions + fullyCompactedRegions + freeRegions),
+			collectibleRegions,
+			nonCollectibleRegions,
+			fullyCompactedRegions,
+			freeRegions);
+
+	j9tty_printf(PORTLIB, "edenSizeInBytes=%zu, surivivorSize=%zu, reservedFreeMemory=%zu, defragmentEmptinessThreshold=%lf, defragmentedMemory=%zu, estimatedFreeMemory=%zu, bytesCompactedToFreeBytesRatio=%lf\n",
+			edenSizeInBytes,
+			surivivorSize,
+			reservedFreeMemory,
+			defragmentEmptinessThreshold,
+			defragmentedMemory,
+			estimatedFreeMemory,
+			bytesCompactedToFreeBytesRatio);
 }
 
 UDATA

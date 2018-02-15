@@ -1216,6 +1216,24 @@ MM_IncrementalGenerationalGC::partialGarbageCollect(MM_EnvironmentVLHGC *env, MM
 	MM_CompactGroupPersistentStats::updateStatsBeforeCollect(env, persistentStats);
 	if (_schedulingDelegate.isGlobalSweepRequired()) {
 		Assert_MM_true(NULL == env->_cycleState->_externalCycleState);
+
+//		{
+//			PORT_ACCESS_FROM_ENVIRONMENT(env);
+//			UDATA regionIndex = 0;
+//			j9tty_printf(PORTLIB, "before SweepBeforePGC\n");
+//			GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
+//			MM_HeapRegionDescriptorVLHGC *region = NULL;
+//			while (NULL != (region = regionIterator.nextRegion())) {
+//				regionIndex++;
+//				if (region->containsObjects()) {
+//					MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+//					j9tty_printf(PORTLIB, "region(%zu-%p, age=%zu, type=%zu) - freeMemory=%zu(ActualFreeMemorySize=%zu, DarkMatterBytes=%zu, AllocatableBytes=%zu)\n",  regionIndex, region, region->getLogicalAge(), region->getRegionType(), memoryPool->getFreeMemoryAndDarkMatterBytes(), memoryPool->getActualFreeMemorySize(), memoryPool->getDarkMatterBytes(), memoryPool->getAllocatableBytes());
+//				} else if (region->isFreeOrIdle()) {
+//					j9tty_printf(PORTLIB, "region(%zu-%p) - idle\n", regionIndex, region);
+//				}
+//			}
+//		}
+
 		_reclaimDelegate.runGlobalSweepBeforePGC(env, allocDescription, env->_cycleState->_activeSubSpace, env->_cycleState->_gcCode);
 
 		/* TODO: lpnguyen make another statisticsDelegate or something that both schedulingDelegate and reclaimDelegate can see
@@ -1228,6 +1246,15 @@ MM_IncrementalGenerationalGC::partialGarbageCollect(MM_EnvironmentVLHGC *env, MM
 
 		double optimalEmptinessRegionThreshold = _reclaimDelegate.calculateOptimalEmptinessRegionThreshold(env, regionConsumptionRate, avgSurvivorRegions, avgCopyForwardRate, scanTimeCostPerGMP);
 		_schedulingDelegate.setAutomaticDefragmentEmptinessThreshold(optimalEmptinessRegionThreshold);
+
+//		if (_extensions->recalculateRatesAfterSweep) {
+//			/* recalculate ratios due to sweep */
+//			_schedulingDelegate.calculatePGCCompactionRate(env, _schedulingDelegate.getCurrentEdenSizeInRegions(env) * _regionManager->getRegionSize());
+//			_schedulingDelegate.calculateHeapOccupancyTrend(env);
+//			_schedulingDelegate.calculateScannableBytesRatio(env);
+//		} else {
+		_schedulingDelegate.calculatePGCCompactionRate_Debug(env, _schedulingDelegate.getCurrentEdenSizeInRegions(env) * _regionManager->getRegionSize());
+//		}
 	}
 
 	if (env->_cycleState->_shouldRunCopyForward) {
@@ -1368,7 +1395,27 @@ MM_IncrementalGenerationalGC::partialGarbageCollectUsingCopyForward(MM_Environme
 		_reclaimDelegate.performAtomicSweep(env, allocDescription, env->_cycleState->_activeSubSpace, env->_cycleState->_gcCode);
 	}
 
+//	if (!_extensions->recalculateRatesAfterSweep) {
 	_schedulingDelegate.recalculateRatesOnFirstPGCAfterGMP(env);
+//	} else {
+//		if (_schedulingDelegate.isFirstPGCAfterGMP()) {
+//			PORT_ACCESS_FROM_ENVIRONMENT(env);
+//			UDATA regionIndex = 0;
+//			j9tty_printf(PORTLIB, "after FirstPGC(CopyForward)AfterGMP\n");
+//			GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
+//			MM_HeapRegionDescriptorVLHGC *region = NULL;
+//			while (NULL != (region = regionIterator.nextRegion())) {
+//				regionIndex++;
+//				if (region->containsObjects()) {
+//					MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+//					j9tty_printf(PORTLIB, "region(%zu-%p, age=%zu, type=%zu) - freeMemory=%zu(ActualFreeMemorySize=%zu, DarkMatterBytes=%zu, AllocatableBytes=%zu)\n",  regionIndex, region, region->getLogicalAge(), region->getRegionType(), memoryPool->getFreeMemoryAndDarkMatterBytes(), memoryPool->getActualFreeMemorySize(), memoryPool->getDarkMatterBytes(), memoryPool->getAllocatableBytes());
+//				} else if (region->isFreeOrIdle()) {
+//					j9tty_printf(PORTLIB, "region(%zu-%p) - idle\n", regionIndex, region);
+//				}
+//			}
+//			_schedulingDelegate.firstPGCAfterGMPCompleted();
+//		}
+//	}
 
 	/* Need to understand how to do the estimates here found within the following two calls */
 	UDATA defragmentReclaimableRegions = 0;
@@ -1442,7 +1489,27 @@ MM_IncrementalGenerationalGC::partialGarbageCollectUsingMarkCompact(MM_Environme
 		Trc_MM_ReclaimDelegate_runReclaimComplete_Exit(env->getLanguageVMThread(), 0);
 	}
 
+//	if (!_extensions->recalculateRatesAfterSweep) {
 	_schedulingDelegate.recalculateRatesOnFirstPGCAfterGMP(env);
+//	} else {
+//		if (_schedulingDelegate.isFirstPGCAfterGMP()) {
+//			PORT_ACCESS_FROM_ENVIRONMENT(env);
+//			UDATA regionIndex = 0;
+//			j9tty_printf(PORTLIB, "after FirstPGC(MarkCompact)AfterGMP\n");
+//			GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
+//			MM_HeapRegionDescriptorVLHGC *region = NULL;
+//			while (NULL != (region = regionIterator.nextRegion())) {
+//				regionIndex++;
+//				if (region->containsObjects()) {
+//					MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+//					j9tty_printf(PORTLIB, "region(%zu-%p, age=%zu, type=%zu) - freeMemory=%zu(ActualFreeMemorySize=%zu, DarkMatterBytes=%zu, AllocatableBytes=%zu)\n",  regionIndex, region, region->getLogicalAge(), region->getRegionType(), memoryPool->getFreeMemoryAndDarkMatterBytes(), memoryPool->getActualFreeMemorySize(), memoryPool->getDarkMatterBytes(), memoryPool->getAllocatableBytes());
+//				} else if (region->isFreeOrIdle()) {
+//					j9tty_printf(PORTLIB, "region(%zu-%p) - idle\n", regionIndex, region);
+//				}
+//			}
+//			_schedulingDelegate.firstPGCAfterGMPCompleted();
+//		}
+//	}
 
 	UDATA defragmentReclaimableRegions = 0;
 	UDATA reclaimableRegions = 0;

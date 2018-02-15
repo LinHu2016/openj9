@@ -318,6 +318,11 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			continue;
 		}
 
+//		if (try_scan(&scan_start, "recalculateRatesAfterSweep")) {
+//			extensions->recalculateRatesAfterSweep = true;
+//			continue;
+//		}
+
 		/* see if we are being asked to enable our debugging capabilities (free region poisoning, etc)  */
 		if (try_scan(&scan_start, "tarokDebugEnabled")) {
 			extensions->tarokDebugEnabled = true;

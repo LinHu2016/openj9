@@ -182,6 +182,7 @@ public:
 #if defined(J9VM_GC_IDLE_HEAP_MANAGER)
 	MM_IdleGCManager* idleGCManager; /**< Manager which registers for VM Runtime State notification & manages free heap on notification */
 #endif
+	bool recalculateRatesAfterSweep;
 protected:
 private:
 protected:
@@ -297,6 +298,7 @@ public:
 #if defined(J9VM_GC_IDLE_HEAP_MANAGER)
 		, idleGCManager(NULL)
 #endif
+		, recalculateRatesAfterSweep(false)
 	{
 		_typeId = __FUNCTION__;
 	}

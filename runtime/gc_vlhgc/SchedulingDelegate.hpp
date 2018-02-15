@@ -318,6 +318,7 @@ public:
 	 * @param edenSizeInBytes[in] The size of the Eden space which preceded this PGC, in bytes
 	 */
 	void calculatePGCCompactionRate(MM_EnvironmentVLHGC *env, UDATA edenSizeInBytes);
+	void calculatePGCCompactionRate_Debug(MM_EnvironmentVLHGC *env, UDATA edenSizeInBytes);
 
 	/**
 	 * Calculate ratio of scannable bytes vs total live set (scannable + non-scannable)
