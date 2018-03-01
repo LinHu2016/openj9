@@ -1236,6 +1236,10 @@ MM_IncrementalGenerationalGC::partialGarbageCollect(MM_EnvironmentVLHGC *env, MM
 		GC_HeapRegionIteratorVLHGC iterator(_regionManager);
 		while (env->_cycleState->_shouldRunCopyForward && (NULL != (region = iterator.nextRegion()))) {
 			if ((region->_criticalRegionsInUse > 0) && region->isEden()) {
+
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "partialGarbageCollect  _criticalRegionsInUse region=%p(age=%zu, type=%zu)\n", region, region->getLogicalAge(), region->getRegionType());
+
 				/* if we find any Eden regions which have critical regions in use, we need to switch to Mark-Compact since we have to collect Eden but can't move objects in this region */
 				env->_cycleState->_shouldRunCopyForward = false;
 				/* record this observation in the cycle state so that verbose can see it and produce an appropriate message */

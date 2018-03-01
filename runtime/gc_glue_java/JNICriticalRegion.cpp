@@ -101,11 +101,14 @@ MM_JNICriticalRegion::releaseAccess(J9VMThread* vmThread, UDATA* accessMask)
 		}
 		if(0 != (currentAccess & J9_PUBLIC_FLAGS_JNI_CRITICAL_ACCESS)) {
 			--vm->jniCriticalResponseCount;
+			j9tty_printf(PORTLIB, "releaseAccess jniCriticalResponseCount=%zu vmThread=%p\n", vm->jniCriticalResponseCount, vmThread);
 			if(0 == vm->jniCriticalResponseCount) {
 				shouldRespond = TRUE;
 			}
 		}
 		if(shouldRespond) {
+			j9tty_printf(PORTLIB, "releaseAccess respondToExclusiveRequest vmThread=%p\n", vmThread);
+
 			VM_VMAccess::respondToExclusiveRequest(vmThread, vm, PORTLIB, timeNow);
 		}
 		omrthread_monitor_exit(vm->exclusiveAccessMutex);

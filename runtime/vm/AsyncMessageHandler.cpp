@@ -76,6 +76,11 @@ javaCheckAsyncMessages(J9VMThread *currentThread, UDATA throwExceptions)
 		if (J9_ARE_ANY_BITS_SET(publicFlags, J9_PUBLIC_FLAGS_RELEASE_ACCESS_REQUIRED_MASK)) {
 			Assert_VM_false(J9_ARE_ANY_BITS_SET(publicFlags, J9_PUBLIC_FLAGS_NOT_AT_SAFE_POINT));
 			internalReleaseVMAccessNoMutex(currentThread);
+
+//			J9JavaVM* vm = currentThread->javaVM;
+//			PORT_ACCESS_FROM_JAVAVM(vm);
+//			j9tty_printf(PORTLIB, "javaCheckAsyncMessages internalAcquireVMAccessNoMutex currentThread=%p\n", currentThread);
+
 			internalAcquireVMAccessNoMutex(currentThread);
 			continue;
 		}

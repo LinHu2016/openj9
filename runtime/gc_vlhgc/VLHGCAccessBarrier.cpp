@@ -287,6 +287,11 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 			}
 		}
 		vmThread->jniCriticalCopyCount += 1;
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		MM_HeapRegionDescriptorVLHGC* region = (MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject);
+		j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical shouldCopy jniCriticalCopyCount=%zu, arrayObject=%p, region=%p(age=%zu, type=%zu), sizeInBytes=%zu\n", vmThread->jniCriticalCopyCount, arrayObject, region,  region->getLogicalAge(), region->getRegionType(), sizeInBytes);
+
 	} else {
 		// acquire access and return a direct pointer
 #if defined(J9VM_INTERP_ATOMIC_FREE_JNI)
@@ -304,9 +309,19 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		/* we need to increment this region's critical count so that we know not to compact it */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
 		MM_AtomicOperations::add(criticalCount, 1);
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		MM_HeapRegionDescriptorVLHGC* region = (MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject);
+		UDATA sizeInBytes = ((GC_ArrayObjectModel*)&_extensions->indexableObjectModel)->getDataSizeInBytes(arrayObject);
+#if defined(J9VM_INTERP_ATOMIC_FREE_JNI)
+		j9tty_printf(PORTLIB, "ATOMIC_FREE_JNI ");
+#endif /* J9VM_INTERP_ATOMIC_FREE_JNI */
+		j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical jniCriticalDirectCount=%zu, arrayObject=%p, region=%p(age=%zu, type=%zu), sizeInBytes=%zu, vmThread=%p\n", vmThread->jniCriticalDirectCount, arrayObject, region,  region->getLogicalAge(), region->getRegionType(), sizeInBytes, vmThread);
+
 #endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
+
 	return data;
 }
 
@@ -348,6 +363,10 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 		} else {
 			Assert_MM_invalidJNICall();
 		}
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical shouldCopy jniCriticalCopyCount=%zu, arrayObject=%p, mode=%zu\n", vmThread->jniCriticalCopyCount, arrayObject, mode);
+
 	} else {
 		/*
 		 * Objects can not be moved if critical section is active
@@ -368,6 +387,9 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 #else /* J9VM_INTERP_ATOMIC_FREE_JNI */
 		MM_JNICriticalRegion::exitCriticalRegion(vmThread);
 #endif /* J9VM_INTERP_ATOMIC_FREE_JNI */
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical jniCriticalDirectCount=%zu, arrayObject=%p, vmThread=%p\n", vmThread->jniCriticalDirectCount, arrayObject, vmThread);
+
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
 }
@@ -449,6 +471,11 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, j
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(valueObject))->_criticalRegionsInUse);
 		MM_AtomicOperations::add(criticalCount, 1);
 #endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		MM_HeapRegionDescriptorVLHGC* region = (MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(valueObject);
+		j9tty_printf(PORTLIB, "jniGetStringCritical jniCriticalDirectCount=%zu, stringObject=%p, valueObject=%p, region=%p\n", vmThread->jniCriticalDirectCount, stringObject, valueObject, region,  region->getLogicalAge(), region->getRegionType());
+
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
 	return data;
@@ -502,6 +529,12 @@ MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread* vmThread, jstring st
 #else /* J9VM_INTERP_ATOMIC_FREE_JNI */
 		MM_JNICriticalRegion::exitCriticalRegion(vmThread);
 #endif /* J9VM_INTERP_ATOMIC_FREE_JNI */
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "jniReleaseStringCritical jniCriticalDirectCount=%zu, stringObject=%p\n", vmThread->jniCriticalDirectCount, stringObject);
+
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
+
+
 }

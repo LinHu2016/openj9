@@ -76,6 +76,7 @@ public:
 			omrthread_t const osThread = vmThread->osThread;
 			omrthread_monitor_t const publicFlagsMutex = vmThread->publicFlagsMutex;
 			omrthread_monitor_enter_using_threadId(publicFlagsMutex, osThread);
+
 			if (J9_ARE_ANY_BITS_SET(vmThread->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS)) {
 				/* Entering a critical region with VM access; set the JNI_CRITICAL_REGION flag */
 				VM_VMAccess::setPublicFlags(vmThread, J9_PUBLIC_FLAGS_JNI_CRITICAL_REGION | J9_PUBLIC_FLAGS_JNI_CRITICAL_ACCESS);
@@ -90,6 +91,10 @@ public:
 					omrthread_monitor_t const exclusiveAccessMutex = vm->exclusiveAccessMutex;
 					omrthread_monitor_enter_using_threadId(exclusiveAccessMutex, osThread);
 					vm->jniCriticalResponseCount += 1;
+
+					PORT_ACCESS_FROM_JAVAVM(vm);
+					j9tty_printf(PORTLIB, "enterCriticalRegion J9_PUBLIC_FLAGS_HALT_THREAD_EXCLUSIVE jniCriticalResponseCount=%zu, vmThread=%p\n", vm->jniCriticalResponseCount, vmThread);
+
 					omrthread_monitor_exit_using_threadId(exclusiveAccessMutex, osThread);
 				}
 			} else {
@@ -143,7 +148,12 @@ public:
 					omrthread_monitor_enter_using_threadId(exclusiveAccessMutex, osThread);
 					PORT_ACCESS_FROM_JAVAVM(vm);
 					U_64 const timeNow = VM_VMAccess::updateExclusiveVMAccessStats(vmThread, vm, PORTLIB);
-					if (--vm->jniCriticalResponseCount == 0) {
+					--vm->jniCriticalResponseCount;
+					j9tty_printf(PORTLIB, "exitCriticalRegion jniCriticalResponseCount=%zu, vmThread=%p\n", vm->jniCriticalResponseCount, vmThread);
+					if (vm->jniCriticalResponseCount == 0) {
+
+						j9tty_printf(PORTLIB, "exitCriticalRegion respondToExclusiveRequest vmThread=%p\n", vmThread);
+
 						VM_VMAccess::respondToExclusiveRequest(vmThread, vm, PORTLIB, timeNow);
 					}
 					omrthread_monitor_exit_using_threadId(exclusiveAccessMutex, osThread);

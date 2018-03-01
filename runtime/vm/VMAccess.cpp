@@ -150,6 +150,8 @@ acquireExclusiveVMAccess(J9VMThread * vmThread)
 	PORT_ACCESS_FROM_JAVAVM(vm);
 	J9VMThread * currentThread;
 
+	j9tty_printf(PORTLIB, "acquireExclusiveVMAccess start vmThread=%p, vm->exclusiveAccessState=%zu\n", vmThread, vm->exclusiveAccessState);
+	U_64 timeTaken = 0;
 	Trc_VM_acquireExclusiveVMAccess_Entry(vmThread);
 	if (vm->extendedRuntimeFlags & J9_EXTENDED_RUNTIME_DEBUG_VM_ACCESS) {
 		Assert_VM_true(currentVMThread(vm) == vmThread);
@@ -210,6 +212,7 @@ acquireExclusiveVMAccess(J9VMThread * vmThread)
 			 */
 			Trc_VM_acquireExclusiveVMAccess_WaitingOnMutex(vmThread);
 			internalAcquireVMAccessNoMutexWithMask(vmThread,J9_PUBLIC_FLAGS_HALT_THREAD_EXCLUSIVE);
+			j9tty_printf(PORTLIB, "acquireExclusiveVMAccess internalAcquireVMAccessNoMutexWithMask vmThread=%p, J9_PUBLIC_FLAGS_HALT_THREAD_EXCLUSIVE\n", vmThread);
 			VM_VMAccess::clearPublicFlags(vmThread, J9_PUBLIC_FLAGS_QUEUED_FOR_EXCLUSIVE);
 			if(reacquireJNICriticalAccess) {
 				/* Restore the manually cleared JNI critical access flag. */
@@ -231,6 +234,7 @@ acquireExclusiveVMAccess(J9VMThread * vmThread)
 				 */
 				responsesExpected = 1;
 				jniCriticalResponsesExpected = 1;
+				j9tty_printf(PORTLIB, "acquireExclusiveVMAccess exclusiveAccessState=%zu, jniCriticalResponsesExpected=%zu\n", vm->exclusiveAccessState, jniCriticalResponsesExpected);
 			}
 			vm->exclusiveAccessState = J9_XACCESS_HANDED_OFF;
 			omrthread_monitor_exit(vm->exclusiveAccessMutex);
@@ -244,6 +248,7 @@ acquireExclusiveVMAccess(J9VMThread * vmThread)
 			vm->exclusiveAccessState = J9_XACCESS_PENDING;
 			vm->exclusiveAccessResponseCount = 0;
 			vm->jniCriticalResponseCount = 0;
+			j9tty_printf(PORTLIB, "acquireExclusiveVMAccess first thread going for exclusive access vmThread=%p\n", vmThread);
 			initializeExclusiveVMAccessStats(vm, vmThread);
 			omrthread_monitor_exit(vm->exclusiveAccessMutex);
 			omrthread_monitor_exit(vmThread->publicFlagsMutex);
@@ -336,6 +341,7 @@ acquireExclusiveVMAccess(J9VMThread * vmThread)
 			 * This wait could be given a timeout to allow long (or blocked)
 			 * critical regions to be interrupted by exclusive requests.
 			 */
+			j9tty_printf(PORTLIB, "acquireExclusiveVMAccess jniCriticalResponseCount=%zu, jniCriticalResponsesExpected=%zu, exclusiveAccessState=%zu\n", vm->jniCriticalResponseCount, jniCriticalResponsesExpected, vm->exclusiveAccessState);
 			omrthread_monitor_wait(vm->exclusiveAccessMutex);
 		}
 
@@ -349,6 +355,9 @@ acquireExclusiveVMAccess(J9VMThread * vmThread)
 	}
 	Assert_VM_true(J9_XACCESS_EXCLUSIVE == vm->exclusiveAccessState);
 	Trc_VM_acquireExclusiveVMAccess_Exit(vmThread);
+
+	timeTaken = j9time_hires_delta(vm->omrVM->exclusiveVMAccessStats.startTime, vm->omrVM->exclusiveVMAccessStats.endTime, J9PORT_TIME_DELTA_IN_MILLISECONDS);
+	j9tty_printf(PORTLIB, "acquireExclusiveVMAccess end vmThread=%p time=%zu ms\n", vmThread, timeTaken);
 }
 
 
@@ -379,8 +388,8 @@ void   internalAcquireVMAccessNoMutexWithMask(J9VMThread * vmThread, UDATA haltM
 			omrthread_monitor_enter(vm->exclusiveAccessMutex);
 
 			U_64 timeNow = updateExclusiveVMAccessStats(vmThread);
-
 			--vm->jniCriticalResponseCount;
+			j9tty_printf(PORTLIB, "internalAcquireVMAccessNoMutexWithMask jniCriticalResponseCount=%zu, vmThread=%p\n", vm->jniCriticalResponseCount, vmThread);
 			if(vm->jniCriticalResponseCount == 0) {
 				U_64 timeTaken = j9time_hires_delta(vm->omrVM->exclusiveVMAccessStats.startTime, timeNow, J9PORT_TIME_DELTA_IN_MILLISECONDS);
 
@@ -391,6 +400,7 @@ void   internalAcquireVMAccessNoMutexWithMask(J9VMThread * vmThread, UDATA haltM
 				if (timeTaken > slowTolerance) {
 					TRIGGER_J9HOOK_VM_SLOW_EXCLUSIVE(vm->hookInterface, vmThread, (UDATA) timeTaken);
 				}
+				j9tty_printf(PORTLIB, "internalAcquireVMAccessNoMutexWithMask slowTolerance=%zu, timeTaken=%zu ms\n", slowTolerance, timeTaken);
 				omrthread_monitor_notify_all(vm->exclusiveAccessMutex);
 			}
 			omrthread_monitor_exit(vm->exclusiveAccessMutex);
@@ -455,7 +465,9 @@ void  internalReleaseVMAccessNoMutex(J9VMThread * vmThread)
 			U_64 timeNow = updateExclusiveVMAccessStats(vmThread);
 
 			--vm->exclusiveAccessResponseCount;
+//			j9tty_printf(PORTLIB, "internalReleaseVMAccessNoMutex exclusiveAccessResponseCount=%zu, vmThread=%p\n", vm->exclusiveAccessResponseCount, vmThread);
 			if (vm->exclusiveAccessResponseCount == 0) {
+//				j9tty_printf(PORTLIB, "internalReleaseVMAccessNoMutex respondToExclusiveRequest vmThread=%p\n", vmThread);
 				VM_VMAccess::respondToExclusiveRequest(vmThread, vm, PORTLIB, timeNow);
 			}
 		}
@@ -489,6 +501,7 @@ void  internalReleaseVMAccessSetStatus(J9VMThread * vmThread, UDATA flags)
 void releaseExclusiveVMAccess(J9VMThread * vmThread)
 {
 	J9JavaVM* vm = vmThread->javaVM;
+	PORT_ACCESS_FROM_JAVAVM(vm);
 
 	Trc_VM_releaseExclusiveVMAccess_Entry(vmThread);
 	if (vm->extendedRuntimeFlags & J9_EXTENDED_RUNTIME_DEBUG_VM_ACCESS) {
@@ -522,12 +535,14 @@ void releaseExclusiveVMAccess(J9VMThread * vmThread)
 				 * until it gives it up before the hand off can complete.
 				 */
 				vm->jniCriticalResponseCount = 0;
+				j9tty_printf(PORTLIB, "releaseExclusiveVMAccess jniCriticalResponseCount=0, vmThread=%p\n", vmThread);
 			} else {
 				/* This thread does not hold critical access. Preemptively
 				 * decrement the response count so the accepting thread
 				 * will not wait.
 				 */
 				vm->jniCriticalResponseCount = -1;
+				j9tty_printf(PORTLIB, "releaseExclusiveVMAccess jniCriticalResponseCount=-1, vmThread=%p\n", vmThread);
 			}
 			omrthread_monitor_exit(vmThread->publicFlagsMutex);
 
@@ -671,6 +686,8 @@ IDATA   internalTryAcquireVMAccessNoMutex(J9VMThread * vmThread)
 static BOOLEAN
 synchronizeRequestsFromExternalThread(J9JavaVM * vm, BOOLEAN block)
 {
+	PORT_ACCESS_FROM_JAVAVM(vm);
+
 	omrthread_monitor_enter(vm->exclusiveAccessMutex);
 	while (J9_XACCESS_NONE != vm->exclusiveAccessState) {
 		if (block) {
@@ -683,6 +700,7 @@ synchronizeRequestsFromExternalThread(J9JavaVM * vm, BOOLEAN block)
 	vm->exclusiveAccessState = J9_XACCESS_EXCLUSIVE;
 	vm->exclusiveAccessResponseCount = 0;
 	vm->jniCriticalResponseCount = 0;
+	j9tty_printf(PORTLIB, "synchronizeRequestsFromExternalThread block=%zu\n", block);
 	initializeExclusiveVMAccessStats(vm, NULL);
 	omrthread_monitor_exit(vm->exclusiveAccessMutex);
 
@@ -703,10 +721,12 @@ waitForResponseFromExternalThread(J9JavaVM * vm, UDATA vmResponsesExpected, UDAT
 #if !defined(J9VM_INTERP_ATOMIC_FREE_JNI)
 	if(jniResponsesExpected > 0) {
 		vm->jniCriticalResponseCount += jniResponsesExpected;
+		j9tty_printf(PORTLIB, "waitForResponseFromExternalThread jniCriticalResponseCount=%zu, jniResponsesExpected=%zu\n", vm->jniCriticalResponseCount, jniResponsesExpected);
 		while(vm->jniCriticalResponseCount != 0) {
 			/* This wait could be given a timeout to allow long (or blocked)
 			 * critical regions to be interrupted by exclusive requests.
 			 */
+			j9tty_printf(PORTLIB, "waitForResponseFromExternalThread jniCriticalResponseCount=%zu\n", vm->jniCriticalResponseCount);
 			omrthread_monitor_wait(vm->exclusiveAccessMutex);
 		}
 	}
@@ -1020,10 +1040,16 @@ internalEnterVMFromJNI(J9VMThread *currentThread)
 		omrthread_monitor_enter_using_threadId(publicFlagsMutex, osThread);
 		if (J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_RELEASE_ACCESS_REQUIRED_MASK)) {
 			if (J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS)) {
+//				J9JavaVM* vm = currentThread->javaVM;
+//				PORT_ACCESS_FROM_JAVAVM(vm);
+//				j9tty_printf(PORTLIB, "internalEnterVMFromJNI internalReleaseVMAccessNoMutex currentThread=%p\n", currentThread);
 				internalReleaseVMAccessNoMutex(currentThread);
 			}
 		}
 		if (!J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS)) {
+			J9JavaVM* vm = currentThread->javaVM;
+			PORT_ACCESS_FROM_JAVAVM(vm);
+			j9tty_printf(PORTLIB, "internalEnterVMFromJNI internalAcquireVMAccessNoMutex currentThread=%p\n", currentThread);
 			internalAcquireVMAccessNoMutex(currentThread);
 		}
 		omrthread_monitor_exit_using_threadId(publicFlagsMutex, osThread);
@@ -1040,6 +1066,9 @@ internalExitVMToJNI(J9VMThread *currentThread)
 		omrthread_monitor_t const publicFlagsMutex = currentThread->publicFlagsMutex;
 		omrthread_t const osThread = currentThread->osThread;
 		omrthread_monitor_enter_using_threadId(publicFlagsMutex, osThread);
+//		J9JavaVM* vm = currentThread->javaVM;
+//		PORT_ACCESS_FROM_JAVAVM(vm);
+//		j9tty_printf(PORTLIB, "internalExitVMToJNI internalReleaseVMAccessNoMutex currentThread=%p\n", currentThread);
 		internalReleaseVMAccessNoMutex(currentThread);
 		internalAcquireVMAccessNoMutex(currentThread);
 		omrthread_monitor_exit_using_threadId(publicFlagsMutex, osThread);
@@ -1062,6 +1091,9 @@ internalReleaseVMAccessInJNI(J9VMThread *currentThread)
 		omrthread_t const osThread = currentThread->osThread;
 		omrthread_monitor_enter_using_threadId(publicFlagsMutex, osThread);
 		if (J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS)) {
+//			J9JavaVM* vm = currentThread->javaVM;
+//			PORT_ACCESS_FROM_JAVAVM(vm);
+//			j9tty_printf(PORTLIB, "internalReleaseVMAccessInJNI internalReleaseVMAccessNoMutex currentThread=%p\n", currentThread);
 			internalReleaseVMAccessNoMutex(currentThread);
 		}
 		omrthread_monitor_exit_using_threadId(publicFlagsMutex, osThread);
@@ -1167,6 +1199,10 @@ retry:
 		}
 		omrthread_monitor_exit(vm->exclusiveAccessMutex);
 		internalAcquireVMAccessWithMask(vmThread, J9_PUBLIC_FLAGS_HALT_THREAD_EXCLUSIVE);
+
+		PORT_ACCESS_FROM_JAVAVM(vm);
+		j9tty_printf(PORTLIB, "acquireSafePointVMAccess internalAcquireVMAccessWithMask\n");
+
 		omrthread_monitor_enter(vm->exclusiveAccessMutex);
 		if (0 != vm->safePointResponseCount) {
 			omrthread_monitor_exit(vm->exclusiveAccessMutex);

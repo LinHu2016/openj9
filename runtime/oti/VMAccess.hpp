@@ -323,6 +323,7 @@ public:
 			slowTolerance = J9_EXCLUSIVE_SLOW_TOLERANCE_REALTIME;
 		}
 		if (timeTaken > slowTolerance) {
+			j9tty_printf(PORTLIB, "respondToExclusiveRequesttimeTaken timeTaken=%zu ms, currentThread=%p\n", timeTaken, currentThread);
 			TRIGGER_J9HOOK_VM_SLOW_EXCLUSIVE(vm->hookInterface, currentThread, (UDATA) timeTaken);
 		}
 		omrthread_monitor_notify_all(vm->exclusiveAccessMutex);

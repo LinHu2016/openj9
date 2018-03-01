@@ -277,6 +277,12 @@ MM_StandardAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jar
 			}
 		}
 		vmThread->jniCriticalCopyCount += 1;
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		UDATA header = *((UDATA *)arrayObject);
+		UDATA size = sizeInBytes;
+		j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical shouldCopy jniCriticalCopyCount=%zu, arrayObject=%p, header_flag=%x, size=%zu\n", vmThread->jniCriticalCopyCount, arrayObject, header&0xff, size);
+
 		VM_VMAccess::inlineExitVMToJNI(vmThread);
 	} else {
 		// acquire access and return a direct pointer
@@ -291,10 +297,20 @@ MM_StandardAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jar
 		if(NULL != isCopy) {
 			*isCopy = JNI_FALSE;
 		}
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		UDATA header = *((UDATA *)arrayObject);
+		UDATA size = ((GC_ArrayObjectModel*)&_extensions->indexableObjectModel)->getDataSizeInBytes(arrayObject);
+#if defined(J9VM_INTERP_ATOMIC_FREE_JNI)
+		j9tty_printf(PORTLIB, "ATOMIC_FREE_JNI ");
+#endif /* J9VM_INTERP_ATOMIC_FREE_JNI */
+		j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical jniCriticalDirectCount=%zu, arrayObject=%p, header_flag=%x, size=%zu, vmThread=%p\n", vmThread->jniCriticalDirectCount, arrayObject, header&0xff, size, vmThread);
+
 #if defined(J9VM_INTERP_ATOMIC_FREE_JNI)
 		VM_VMAccess::inlineExitVMToJNI(vmThread);
 #endif /* J9VM_INTERP_ATOMIC_FREE_JNI */
 	}
+
 	return data;
 }
 
@@ -331,6 +347,9 @@ MM_StandardAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread,
 			Assert_MM_invalidJNICall();
 		}
 
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical shouldCopy jniCriticalCopyCount=%zu, arrayObject=%p, mode=%zu\n", vmThread->jniCriticalCopyCount, (J9IndexableObject*)J9_JNI_UNWRAP_REFERENCE(array), mode);
+
 		VM_VMAccess::inlineExitVMToJNI(vmThread);
 	} else {
 #if defined(J9VM_INTERP_ATOMIC_FREE_JNI)
@@ -353,6 +372,10 @@ MM_StandardAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread,
 #else /* J9VM_INTERP_ATOMIC_FREE_JNI */
 		MM_JNICriticalRegion::exitCriticalRegion(vmThread);
 #endif /* J9VM_INTERP_ATOMIC_FREE_JNI */
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical jniCriticalDirectCount=%zu, arrayObject=%p, vmThread=%p\n", vmThread->jniCriticalDirectCount, arrayObject, vmThread);
+
 	}
 }
 
@@ -432,10 +455,16 @@ MM_StandardAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str
 		if (NULL != isCopy) {
 			*isCopy = JNI_FALSE;
 		}
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		UDATA header = *((UDATA *)valueObject);
+		j9tty_printf(PORTLIB, "jniGetStringCritical jniCriticalDirectCount=%zu, stringObject=%p, valueObject=%p, header_flag=%x, size=%zu\n", vmThread->jniCriticalDirectCount, stringObject, valueObject, header&0xff, J9VMJAVALANGSTRING_LENGTH(vmThread, stringObject), vmThread);
+
 	}
 	if (hasVMAccess) {
 		VM_VMAccess::inlineExitVMToJNI(vmThread);
 	}
+
 	return data;
 }
 
@@ -480,6 +509,8 @@ MM_StandardAccessBarrier::jniReleaseStringCritical(J9VMThread* vmThread, jstring
 #else /* J9VM_INTERP_ATOMIC_FREE_JNI */
 		MM_JNICriticalRegion::exitCriticalRegion(vmThread);
 #endif /* J9VM_INTERP_ATOMIC_FREE_JNI */
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "jniReleaseStringCritical jniCriticalDirectCount=%zu, stringObject=%p\n", vmThread->jniCriticalDirectCount, J9_JNI_UNWRAP_REFERENCE(str));
 	}
 
 	if (hasVMAccess) {

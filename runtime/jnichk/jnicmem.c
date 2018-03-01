@@ -80,6 +80,7 @@ jniRecordMemoryAcquire(JNIEnv* env, const char* functionName, jobject object, co
 		Trc_JNI_MemoryAcquire(env, functionName, memory);
 		j9tty_printf(PORTLIB, "<JNI %s: buffer=0x%p>\n", functionName, memory);
 	}
+	j9tty_printf(PORTLIB, "<JNI %s: buffer=0x%p>\n", functionName, memory);
 
 	if (recordCRC) {
 		U_32 length;
@@ -178,6 +179,7 @@ jniRecordMemoryRelease(JNIEnv* env, const char* acquireFunction, const char* rel
 		Trc_JNI_MemoryRelease(env, releaseFunction, memory);
 		j9tty_printf(PORTLIB, "<JNI %s: buffer=%p>\n", releaseFunction, memory);
 	}
+	j9tty_printf(PORTLIB, "<JNI %s: buffer=%p>\n", releaseFunction, memory);
 
 	omrthread_monitor_enter(MemMonitor);
 

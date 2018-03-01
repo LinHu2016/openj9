@@ -99,12 +99,18 @@ MM_CopyForwardDelegate::postCopyForwardCleanup(MM_EnvironmentVLHGC *env)
 UDATA
 MM_CopyForwardDelegate::estimateRequiredSurvivorBytes(MM_EnvironmentVLHGC *env)
 {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	UDATA regionIndex = 0;
+	j9tty_printf(PORTLIB, "estimateRequiredSurvivorBytes start\n");
+
 	UDATA estimatedSurvivorRequired = 0;
 	MM_HeapRegionManager *const regionManager = _extensions->heapRegionManager;
 	MM_CompactGroupPersistentStats *const persistentStats = _extensions->compactGroupPersistentStats;
 	GC_HeapRegionIteratorVLHGC regionIterator(regionManager, MM_HeapRegionDescriptor::MANAGED);
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	while (NULL != (region = regionIterator.nextRegion())) {
+		regionIndex += 1;
+		j9tty_printf(PORTLIB, "region(%zu-%p, age=%zu, type=%zu) - ", regionIndex, region, region->getLogicalAge(), region->getRegionType());
 		if (region->_markData._shouldMark) {
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 			double survivalRate = persistentStats[compactGroup]._historicalSurvivalRate;
@@ -118,8 +124,10 @@ MM_CopyForwardDelegate::estimateRequiredSurvivorBytes(MM_EnvironmentVLHGC *env)
 				Assert_MM_true(MM_HeapRegionDescriptor::BUMP_ALLOCATED_MARKED == region->getRegionType());
 				freeMemory = pool->getFreeMemoryAndDarkMatterBytes();
 			}
+			j9tty_printf(PORTLIB, "shouldMark compactGroup=%zu, survivalRate=%lf, freeMemory=%zu\n", compactGroup, survivalRate, freeMemory);
 			estimatedSurvivorRequired += (UDATA)((double)(region->getSize() - freeMemory) * survivalRate);
 		}
 	}
+	j9tty_printf(PORTLIB, "estimateRequiredSurvivorBytes end estimatedSurvivorRequired=%zu\n", estimatedSurvivorRequired);
 	return estimatedSurvivorRequired;
 }
