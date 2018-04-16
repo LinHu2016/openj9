@@ -1237,18 +1237,22 @@ MM_IncrementalGenerationalGC::partialGarbageCollect(MM_EnvironmentVLHGC *env, MM
 		double optimalEmptinessRegionThreshold = _reclaimDelegate.calculateOptimalEmptinessRegionThreshold(env, regionConsumptionRate, avgSurvivorRegions, avgCopyForwardRate, scanTimeCostPerGMP);
 		_schedulingDelegate.setAutomaticDefragmentEmptinessThreshold(optimalEmptinessRegionThreshold);
 	}
-
+// mark jni critical regions and copyforward the rest region
 	if (env->_cycleState->_shouldRunCopyForward) {
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
 		GC_HeapRegionIteratorVLHGC iterator(_regionManager);
+		UDATA noEvacuationRegionCount = 0;
 		while (env->_cycleState->_shouldRunCopyForward && (NULL != (region = iterator.nextRegion()))) {
 			if ((region->_criticalRegionsInUse > 0) && region->isEden()) {
-				/* if we find any Eden regions which have critical regions in use, we need to switch to Mark-Compact since we have to collect Eden but can't move objects in this region */
-				env->_cycleState->_shouldRunCopyForward = false;
-				/* record this observation in the cycle state so that verbose can see it and produce an appropriate message */
-				env->_cycleState->_reasonForMarkCompactPGC = MM_CycleState::reason_JNI_critical_in_Eden;
+//				/* if we find any Eden regions which have critical regions in use, we need to switch to Mark-Compact since we have to collect Eden but can't move objects in this region */
+//				env->_cycleState->_shouldRunCopyForward = false;
+//				/* record this observation in the cycle state so that verbose can see it and produce an appropriate message */
+//				env->_cycleState->_reasonForMarkCompactPGC = MM_CycleState::reason_JNI_critical_in_Eden;
+				noEvacuationRegionCount++;
 			}
 		}
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "noEvacuationRegionCount=%zu\n", noEvacuationRegionCount);
 	}
 	
 	/* Determine if there are enough regions available to attempt a copy-forward collection.
@@ -1366,7 +1370,7 @@ MM_IncrementalGenerationalGC::partialGarbageCollectUsingCopyForward(MM_Environme
 		_reclaimDelegate.runCompact(env, allocDescription, env->_cycleState->_activeSubSpace, desiredCompactWork, env->_cycleState->_gcCode, _markMapManager->getGlobalMarkPhaseMap(), &regionsSkippedByCompactorRequiringSweep);
 		/* we can't tell exactly how many bytes were added to meet the compact goal, so we'll assume it was an exact match. The precise amount could be lower or higher */ 
 		static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._externalCompactBytes = desiredCompactWork;
-	} else if(!successful) {
+	} else if(!successful || _copyForwardDelegate.isHybrid(env)) {
 		/* compact any unsuccessfully evacuated regions */
 		_reclaimDelegate.runReclaimForAbortedCopyForward(env, allocDescription, env->_cycleState->_activeSubSpace, env->_cycleState->_gcCode, _markMapManager->getGlobalMarkPhaseMap(), &regionsSkippedByCompactorRequiringSweep);
 	}

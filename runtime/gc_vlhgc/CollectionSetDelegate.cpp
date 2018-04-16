@@ -165,7 +165,8 @@ MM_CollectionSetDelegate::createNurseryCollectionSet(MM_EnvironmentVLHGC *env)
 			bool regionHasCriticalRegions = (0 != region->_criticalRegionsInUse);
 			bool isSelectionForCopyForward = env->_cycleState->_shouldRunCopyForward;
 
-			if (region->getRememberedSetCardList()->isAccurate() && (!isSelectionForCopyForward || !regionHasCriticalRegions)) {
+			/* allow jniCritical regions are part of nursery collectionSet for copyforward */
+			if (region->getRememberedSetCardList()->isAccurate() && (!isSelectionForCopyForward || !regionHasCriticalRegions || (regionHasCriticalRegions && region->isEden()))) {
 				if(MM_CompactGroupManager::isRegionInNursery(env, region)) {
 					UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 					/* on collection phase, mark all non-overflowed regions and those that RSCL is not being rebuilt */
@@ -460,6 +461,7 @@ MM_CollectionSetDelegate::deleteRegionCollectionSetForPartialGC(MM_EnvironmentVL
 
 		region->_markData._shouldMark = false;
 		region->_reclaimData._shouldReclaim = false;
+		region->_markData._noEvacuation = false;
 	}
 }
 

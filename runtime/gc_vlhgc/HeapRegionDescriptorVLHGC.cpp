@@ -70,6 +70,7 @@ MM_HeapRegionDescriptorVLHGC::initialize(MM_EnvironmentBase *env, MM_HeapRegionM
 	}
 
 	_markData._shouldMark = false;
+	_markData._noEvacuation = false;
 	_markData._dynamicMarkCost = 0;
 	_markData._overflowFlags = 0x0;
 	_reclaimData._shouldReclaim = false;

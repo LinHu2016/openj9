@@ -104,6 +104,18 @@ public:
 	 * @return the estimated number of bytes which will survive 
 	 */
 	UDATA estimateRequiredSurvivorBytes(MM_EnvironmentVLHGC *env);
+
+	/**
+	 *
+	 */
+	bool isHybrid(MM_EnvironmentVLHGC *env)
+	{
+		bool ret = false;
+		if (NULL != _breadthFirstCopyForwardScheme) {
+			ret = _breadthFirstCopyForwardScheme->isHybrid(env);
+		}
+		return ret;
+	}
 };
 
 

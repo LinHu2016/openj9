@@ -130,6 +130,8 @@ private:
 	volatile bool _abortFlag;  /**< Flag indicating whether the current copy forward cycle should be aborted due to insufficient heap to complete */
 	bool _abortInProgress;  /**< Flag indicating that the copy forward mechanism is now operating in abort mode, which is attempting to secure integrity of the heap to continue execution */
 
+	UDATA _regionCountCannotBeEvacuated; /**<The number of eden regions, which can not be copyforward */
+
 	UDATA _cacheLineAlignment; /**< The number of bytes per cache line which is used to determine which boundaries in memory represent the beginning of a cache line */
 
 	bool _clearableProcessingStarted;  /**< Flag indicating that clearable processing had been started during this cycle (used for abort purposes) */
@@ -931,6 +933,8 @@ private:
 	 */
 	void setAllocationAgeForMergedRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region);
 
+	bool isObjectInNoEvacuationRegions(MM_EnvironmentVLHGC *env, J9Object *objectPtr);
+
 protected:
 
 	MM_CopyForwardScheme(MM_EnvironmentVLHGC *env, MM_HeapRegionManager *manager);
@@ -1031,6 +1035,15 @@ public:
 	 * @return Flag indicating if the copy forward collection was succesful or not.
 	 */
 	bool copyForwardCollectionSet(MM_EnvironmentVLHGC *env);
+
+	/**
+	 *
+	 */
+	bool isHybrid(MM_EnvironmentVLHGC *env)
+	{
+		return (0 != _regionCountCannotBeEvacuated);
+	}
+
 
 	friend class MM_CopyForwardGMPCardCleaner;
 	friend class MM_CopyForwardNoGMPCardCleaner;
