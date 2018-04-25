@@ -2587,6 +2587,37 @@ setDefaultConfigOptions(MM_GCExtensions *extensions, bool scavenge, bool concurr
 #endif /* defined(J9VM_GC_LARGE_OBJECT_AREA) */
 }
 
+void
+setConfigOptionsForNoGc(MM_GCExtensions *extensions)
+{
+	/* noScavenger noConcurrentMark noConcurrentSweep, noLOA */
+	extensions->configurationOptions._forceOptionScavenge  = true;
+	extensions->scavengerEnabled = false;
+	extensions->configurationOptions._forceOptionConcurrentMark = true;
+	extensions->concurrentMark = false;
+	extensions->configurationOptions._forceOptionConcurrentSweep = true;
+	extensions->concurrentSweep = false;
+	extensions->configurationOptions._forceOptionLargeObjectArea = true;
+	extensions->largeObjectArea = false;
+	/* 1 gcThread */
+	extensions->gcThreadCountForced = true;
+	extensions->gcThreadCount = 1;
+
+	extensions->packetListSplit = 1;
+	extensions->cacheListSplit = 1;
+	extensions->splitFreeListSplitAmount = 1;
+	extensions->objectListFragmentCount = 1;
+
+	/* disable excessiveGC */
+	extensions->excessiveGCEnabled._wasSpecified = true;
+	extensions->excessiveGCEnabled._valueSpecified = false;
+	/* disable estimate fragmentation */
+	extensions->estimateFragmentation = 0;
+	extensions->processLargeAllocateStats = false;
+	/* disable system gc */
+	extensions->disableExplicitGC = true;
+}
+
 /**
  * Create proper configuration for SE based on options
  * @param env pointer to Environment
@@ -2710,6 +2741,14 @@ configurateGCWithPolicyAndOptions(OMR_VM* omrVM)
 		extensions->gcModeString = "-Xgcpolicy:balanced";
 		omrVM->gcPolicy = J9_GC_POLICY_BALANCED;
 		result = MM_ConfigurationIncrementalGenerational::newInstance(&env);
+		break;
+
+	case gc_policy_nogc:
+		extensions->gcModeString = "-Xgcpolicy:nogc";
+		omrVM->gcPolicy = J9_GC_POLICY_NOGC;
+		/* noScavenge, noConcurrentMark, noConcurrentSweep, noLOA */
+		setConfigOptionsForNoGc(extensions);
+		result = configurateGCWithPolicyAndOptionsStandard(&env);
 		break;
 
 	case gc_policy_undefined:

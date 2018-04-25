@@ -422,6 +422,7 @@ configureDumpAgents(J9JavaVM *vm)
 	IDATA agentNum = 0;
 	IDATA kind = 0;
 	char *optionString = NULL;
+//	BOOLEAN disableGC = (0 != vm->memoryManagerFunctions->j9gc_is_garbagecollection_disabled(vm));
 
 	/* -Xdump:help */
 	if ( FIND_AND_CONSUME_ARG(EXACT_MATCH, VMOPT_XDUMP ":help", NULL) >= 0 )
@@ -458,6 +459,7 @@ configureDumpAgents(J9JavaVM *vm)
 	if ( FIND_AND_CONSUME_ARG(EXACT_MATCH, VMOPT_XDUMP ":what", NULL) >= 0 )
 	{
 		showAgents = 1;
+		dumpGlobal->showAgents = 1;
 	}
 
 	/* -Xdump:noprotect */
@@ -515,11 +517,14 @@ configureDumpAgents(J9JavaVM *vm)
 
 	/* Load up the default agents */
 	for (i = 0; i < numDefaultAgents; i++) {
-		char *typeString = defaultAgents[i].type;
-		agentOpts[agentNum].kind = scanDumpType(&typeString);
-		agentOpts[agentNum].flags = J9RAS_DUMP_OPT_ARGS_STATIC;
-		agentOpts[agentNum].args = defaultAgents[i].args;
-		agentNum++;
+//		/* disable IBM_JAVADUMP_OUTOFMEMORY, IBM_HEAPDUMP_OUTOFMEMORY, IBM_SNAPDUMP_OUTOFMEMORY for gcpolicy:nogc */
+//		if (!disableGC || NULL == strstr(defaultAgents[i].args, "java/lang/OutOfMemoryError")) {
+			char *typeString = defaultAgents[i].type;
+			agentOpts[agentNum].kind = scanDumpType(&typeString);
+			agentOpts[agentNum].flags = J9RAS_DUMP_OPT_ARGS_STATIC;
+			agentOpts[agentNum].args = defaultAgents[i].args;
+			agentNum++;
+//		}
 	}
 	
 	/* Process DISABLE_JAVADUMP IBM_HEAPDUMP IBM_JAVADUMP_OUTOFMEMORY and IBM_HEAPDUMP_OUTOFMEMORY */
@@ -672,6 +677,80 @@ configureDumpAgents(J9JavaVM *vm)
 	return J9VMDLLMAIN_OK;
 }
 
+/**
+ * Update Dump Agents for -Xgcpolicy:nogc
+ * disable all of dump agents for "java/lang/OutOfMemoryError" in nogc case
+ * if the agents do not be explicitly specified via -Xdump
+ */
+static void
+updateDumpAgentsForNoGC(J9JavaVM *vm)
+{
+	J9RASdumpQueue *queue;
+
+	if ( FIND_DUMP_QUEUE(vm, queue) ) {
+		J9RASdumpAgent * current = queue->agents;
+		J9RASdumpAgent *systemOOM = NULL;
+		J9RASdumpAgent *heapOOM = NULL;
+		J9RASdumpAgent *javaOOM = NULL;
+		J9RASdumpAgent *snapOOM = NULL;
+
+		while (current) {
+			J9RASdumpAgent * next = current->nextPtr;
+			if ((NULL != current->detailFilter) && (NULL != strstr(current->detailFilter, "java/lang/OutOfMemoryError"))) {
+				switch (getDumpType(vm, current)) {
+				case RASDUMP_TYPE_SYSTEM :
+					systemOOM = current;
+					break;
+				case RASDUMP_TYPE_HEAP :
+					heapOOM = current;
+					break;
+				case RASDUMP_TYPE_JAVA :
+					javaOOM = current;
+					break;
+				case RASDUMP_TYPE_SNAP :
+					snapOOM = current;
+					break;
+				default :
+					break;
+				}
+			}
+			current = next;
+		}
+		if (NULL != systemOOM) {
+			if (systemOOM->shutdownFn) {
+				systemOOM->shutdownFn(vm, &systemOOM);	/* agent will remove itself */
+			} else {
+				removeDumpAgent(vm, systemOOM);
+			}
+		}
+		if (NULL != heapOOM) {
+			if (heapOOM->shutdownFn) {
+				heapOOM->shutdownFn(vm, &heapOOM);	/* agent will remove itself */
+			} else {
+				removeDumpAgent(vm, heapOOM);
+			}
+		}
+		if (NULL != javaOOM) {
+			if (javaOOM->shutdownFn) {
+				javaOOM->shutdownFn(vm, &javaOOM);	/* agent will remove itself */
+			} else {
+				removeDumpAgent(vm, javaOOM);
+			}
+		}
+		if (NULL != snapOOM) {
+			if (snapOOM->shutdownFn) {
+				snapOOM->shutdownFn(vm, &snapOOM);	/* agent will remove itself */
+			} else {
+				removeDumpAgent(vm, snapOOM);
+			}
+		}
+		if (((RasDumpGlobalStorage *)vm->j9rasdumpGlobalStorage)->showAgents) {
+			PORT_ACCESS_FROM_JAVAVM(vm);
+			j9tty_err_printf(PORTLIB, "\nUpdate dump agents for nogc");
+			showDumpAgents(vm);
+		}
+	}
+}
 
 static omr_error_t
 shutdownDumpAgents(J9JavaVM *vm)
@@ -1385,7 +1464,6 @@ J9VMDllMain(J9JavaVM *vm, IDATA stage, void *reserved)
 			break;
 
 		case ALL_LIBRARIES_LOADED:
-
 			if (vm->j9rasGlobalStorage == NULL) {
 				/* RAS init may happen in either dump or trace */
 				vm->j9rasGlobalStorage = j9mem_allocate_memory(sizeof(RasGlobalStorage), OMRMEM_CATEGORY_VM);
@@ -1396,6 +1474,13 @@ J9VMDllMain(J9JavaVM *vm, IDATA stage, void *reserved)
 			break;
 
 		case TRACE_ENGINE_INITIALIZED:
+			{
+				/* updateDumpAgentsForNoGC(vm); */
+				BOOLEAN disableGC = (0 != vm->memoryManagerFunctions->j9gc_is_garbagecollection_disabled(vm));
+				if (disableGC) {
+					updateDumpAgentsForNoGC(vm);
+				}
+			}
 
 			if (((RasGlobalStorage *)vm->j9rasGlobalStorage)->jvmriInterface == NULL) {
 				/* JVMRI init may happen in either dump or trace */

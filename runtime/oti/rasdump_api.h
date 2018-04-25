@@ -49,6 +49,24 @@ struct J9RASdumpEventData;
 struct J9VMThread;
 
 /* ---------------- dmpagent.c ---------------- */
+#define RASDUMP_TYPE_UNKNOWN		0
+#define RASDUMP_TYPE_SYSTEM 		1
+#define RASDUMP_TYPE_HEAP 		2
+#define RASDUMP_TYPE_JAVA		3
+#define RASDUMP_TYPE_TOOL		4
+#define RASDUMP_TYPE_JIT			5
+#define RASDUMP_TYPE_CONSOLE		6
+#define RASDUMP_TYPE_SILENT		7
+#define RASDUMP_TYPE_CEE			8
+#define RASDUMP_TYPE_SNAP		9
+#define RASDUMP_TYPE_STACK		10
+/**
+ * @param *vm
+ * @param *agent
+ * @return UDATA RASDUMP_TYPE_xxxx
+ */
+UDATA
+getDumpType(struct J9JavaVM *vm, struct J9RASdumpAgent *agent);
 
 /**
 * @brief

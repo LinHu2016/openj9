@@ -2122,6 +2122,39 @@ queryAgent(struct J9JavaVM *vm, struct J9RASdumpAgent *agent, IDATA buffer_size,
 #endif /* J9VM_RAS_DUMP_AGENTS */
 
 #if (defined(J9VM_RAS_DUMP_AGENTS)) 
+
+UDATA
+getDumpType(struct J9JavaVM *vm, struct J9RASdumpAgent *agent)
+{
+	UDATA type = RASDUMP_TYPE_UNKNOWN;
+	if (agent->dumpFn == doSystemDump) {
+		type = RASDUMP_TYPE_SYSTEM;
+	} else if (agent->dumpFn == doHeapDump) {
+		type = RASDUMP_TYPE_HEAP;
+	} else if (agent->dumpFn == doJavaDump) {
+		type = RASDUMP_TYPE_JAVA;
+	} else if (agent->dumpFn == doToolDump) {
+		type = RASDUMP_TYPE_TOOL;
+	} else if (agent->dumpFn == doJitDump) {
+		type = RASDUMP_TYPE_JIT;
+	} else if (agent->dumpFn == doConsoleDump) {
+		type = RASDUMP_TYPE_CONSOLE;
+	} else if (agent->dumpFn == doSilentDump) {
+		type = RASDUMP_TYPE_SILENT;
+#if defined(J9ZOS390)
+	} else if (agent->dumpFn == doCEEDump) {
+		type = RASDUMP_TYPE_CEE;
+#endif
+	} else if(agent->dumpFn == doSnapDump) {
+		type = RASDUMP_TYPE_SNAP;
+	} else if (agent->dumpFn == doStackDump) {
+		type = RASDUMP_TYPE_STACK;
+	} else {
+		type = RASDUMP_TYPE_UNKNOWN;
+	}
+	return type;
+}
+
 omr_error_t
 printDumpAgent(struct J9JavaVM *vm, struct J9RASdumpAgent *agent)
 {

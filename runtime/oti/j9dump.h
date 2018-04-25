@@ -36,6 +36,7 @@ typedef struct RasDumpGlobalStorage {
 	
 	UDATA noProtect; /* If set, do not take dumps under their own signal handler */
 	UDATA noFailover; /* If set, do not failover to /tmp etc if unable to write dump */
+	UDATA showAgents;
 } RasDumpGlobalStorage;
 
 struct J9RASdumpAgent; /* Forward struct declaration */
