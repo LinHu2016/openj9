@@ -2788,6 +2788,11 @@ gcInitializeDefaults(J9JavaVM* vm)
 	MM_GCExtensions *extensions;
 	MM_EnvironmentBase env(vm->omrVM);
 	PORT_ACCESS_FROM_JAVAVM(vm);
+	U_64 startTime = j9time_hires_clock();
+	U_64 endTime;
+
+	j9tty_printf(PORTLIB, "gcInitializeDefaults() startTime=%zu\n", startTime);
+//	U_64 time = j9time_hires_delta(startTime, endTime, J9PORT_TIME_DELTA_IN_MICROSECONDS);
 
 	minimumVMSize = MINIMUM_VM_SIZE;
 
@@ -2823,11 +2828,16 @@ gcInitializeDefaults(J9JavaVM* vm)
 	}
 
 	initializeVerboseFunctionTableWithDummies(&extensions->verboseFunctionTable);
+	endTime = j9time_hires_clock();
+	j9tty_printf(PORTLIB, "initializeVerboseFunctionTableWithDummies() endTime=%zu (%zu)\n", endTime, endTime-startTime);
 
 	if (JNI_OK != gcParseCommandLineAndInitializeWithValues(vm, memoryParameterTable)) {
 		loadInfo->fatalErrorStr = (char *)j9nls_lookup_message(J9NLS_DO_NOT_PRINT_MESSAGE_TAG | J9NLS_DO_NOT_APPEND_NEWLINE, J9NLS_GC_FAILED_TO_INITIALIZE_PARSING_COMMAND_LINE, "Failed to initialize, parsing command line.");
 		goto error;
 	}
+
+	endTime = j9time_hires_clock();
+	j9tty_printf(PORTLIB, "gcParseCommandLineAndInitializeWithValues() endTime=%zu\n", endTime);
 
 	if ((-1 == memoryParameterTable[opt_Xms]) && (-1 != memoryParameterTable[opt_initialRAMPercent])) {
 		extensions->initialMemorySize = (uintptr_t)(((double)extensions->usablePhysicalMemory / 100.0) * extensions->initialRAMPercent);
@@ -2874,6 +2884,9 @@ gcInitializeDefaults(J9JavaVM* vm)
 #endif /* OMR_GC_CONCURRENT_SCAVENGER */
 
 	extensions->configuration = configurateGCWithPolicyAndOptions(vm->omrVM);
+
+	endTime = j9time_hires_clock();
+	j9tty_printf(PORTLIB, "configurateGCWithPolicyAndOptions() endTime=%zu\n", endTime);
 	
 	/* omrVM->gcPolicy is set by configurateGCWithPolicyAndOptions */
 	((J9JavaVM*)env.getLanguageVM())->gcPolicy = vm->omrVM->gcPolicy;
@@ -2890,6 +2903,9 @@ gcInitializeDefaults(J9JavaVM* vm)
 		loadInfo->fatalErrorStr = (char *)j9nls_lookup_message(J9NLS_DO_NOT_PRINT_MESSAGE_TAG | J9NLS_DO_NOT_APPEND_NEWLINE, J9NLS_GC_FAILED_TO_INITIALIZE_PARSING_COMMAND_LINE, "Failed to initialize, parsing command line.");
 		goto error;
 	}
+
+	endTime = j9time_hires_clock();
+	j9tty_printf(PORTLIB, "gcParseTGCCommandLine() endTime=%zu\n", endTime);
 
 #if defined(J9VM_GC_MODRON_SCAVENGER)
 	if (extensions->scavengerEnabled) {
@@ -2918,6 +2934,8 @@ gcInitializeDefaults(J9JavaVM* vm)
 
 		/* Try to initialize basic heap structures with the memory parameters we currently have */
 		if (JNI_OK == j9gc_initialize_heap(vm, memoryParameterTable, extensions->memoryMax)) {
+			endTime = j9time_hires_clock();
+			j9tty_printf(PORTLIB, "j9gc_initialize_heap() endTime=%zu, extensions->memoryMax=%zu\n", endTime, extensions->memoryMax);
 			break;
 		}
 
@@ -2934,6 +2952,10 @@ gcInitializeDefaults(J9JavaVM* vm)
 
 		/* We are going to try again -- free any buffer we already have from j9gc_initialize_heap */
 		if  ((loadInfo->loadFlags & FREE_ERROR_STRING) && (NULL != loadInfo->fatalErrorStr)) {
+
+			endTime = j9time_hires_clock();
+			j9tty_printf(PORTLIB, "fatalErrorStr=%s endTime=%zu\n", loadInfo->fatalErrorStr, endTime);
+
 			j9mem_free_memory(loadInfo->fatalErrorStr);
 			loadInfo->loadFlags &= ~FREE_ERROR_STRING;
 		}
@@ -2942,6 +2964,10 @@ gcInitializeDefaults(J9JavaVM* vm)
 
 	warnIfPageSizeNotSatisfied(vm,extensions);
 	j9mem_free_memory(memoryParameterTable);
+
+	endTime = j9time_hires_clock();
+	j9tty_printf(PORTLIB, "gcInitializeDefaults() endTime=%zu (%zu)\n", endTime, endTime-startTime);
+
 	return J9VMDLLMAIN_OK;
 
 error:
