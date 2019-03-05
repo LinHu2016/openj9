@@ -343,6 +343,15 @@ Currently only available on linux_x86 and win_x96 32 bit builds.</description>
 			<require flag="gc_realtime"/>
 		</requires>
 	</flag>
+	<flag id="gc_enableDoubleMap">
+                <description>Set on double map. Reduces footprint when arrays are stored via arraylets.</description>
+                <ifRemoved></ifRemoved>
+                <requires>
+                        <require flag="gc_arraylets"/>
+			<require flag="gc_hybridArraylets"/>
+			<require flag="gc_vlhgc"/>
+                </requires>
+        </flag>
 	<flag id="gc_compressedPointerBarrier">
 		<description>VM performs runtime checks for missed access barriers in a compressed pointer sense</description>
 		<ifRemoved>VM does not check for missed access barriers in a compressed pointer sense</ifRemoved>
