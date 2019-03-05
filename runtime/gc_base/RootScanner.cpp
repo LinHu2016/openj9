@@ -218,6 +218,19 @@ MM_RootScanner::doStringTableSlot(J9Object **slotPtr, GC_StringTableIterator *st
 	doSlot(slotPtr);
 }
 
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+/**
+ * @todo Provide function documentation
+ */
+void 
+MM_RootScanner::doDoubleMappedObjectSlot(ArrayletTableEntry *slotPtr, GC_HashTableIterator *hashTableIterator)
+{
+	doSlot((J9Object **)slotPtr);
+}
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
+
 /**
  * @Perform operation on the given string cache table slot.
  * @String table cache contains cached entries of string table, it's
@@ -851,6 +864,27 @@ MM_RootScanner::scanJVMTIObjectTagTables(MM_EnvironmentBase *env)
 }
 #endif /* J9VM_OPT_JVMTI */
 
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+void 
+MM_RootScanner::scanDoubleMappedObjects(MM_EnvironmentBase *env)
+{
+	if(_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+		J9HashTable* arrayletHashTable = _extensions->getArrayletHashTable();
+		reportScanningStarted(RootScannerEntity_DoubleMappedObjects);
+		if(arrayletHashTable != NULL) {
+			GC_HashTableIterator hashTableIterator(arrayletHashTable);
+			ArrayletTableEntry *slot = NULL;
+			while(NULL != (slot = (ArrayletTableEntry *)hashTableIterator.nextSlot())) {
+				doDoubleMappedObjectSlot(slot, &hashTableIterator);
+			}
+		}
+		reportScanningEnded(RootScannerEntity_DoubleMappedObjects);
+	}
+}
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
+
 /**
  * Scan all root set references from the VM into the heap.
  * For all slots that are hard root references into the heap, the appropriate slot handler will be called.
@@ -975,6 +1009,14 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 		scanJVMTIObjectTagTables(env);
 	}
 #endif /* J9VM_OPT_JVMTI */
+
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+	if (_includeDoubleMap) {
+		scanDoubleMappedObjects(env);
+	}
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
 }
 
 /**
@@ -1023,6 +1065,14 @@ MM_RootScanner::scanAllSlots(MM_EnvironmentBase *env)
 		scanJVMTIObjectTagTables(env);
 	}
 #endif /* J9VM_OPT_JVMTI */
+
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+        if (_includeDoubleMap) {
+                scanDoubleMappedObjects(env);
+        }
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
 
 	scanOwnableSynchronizerObjects(env);
 }
