@@ -30,6 +30,12 @@
 #include "j9nongenerated.h"
 #include "j9port.h"
 #include "util_api.h"
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+#include "ArrayletLeafIterator.hpp"
+#include "Heap.hpp"
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
 
 #include "EnvironmentBase.hpp"
 #include "Forge.hpp"
@@ -83,10 +89,38 @@ bool
 MM_GCExtensions::initialize(MM_EnvironmentBase *env)
 {
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+	OMRPORT_ACCESS_FROM_J9PORT(privatePortLibrary);
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
 
 	if (!MM_GCExtensionsBase::initialize(env)) {
 		goto failed;
 	}
+
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+	/* Initialize arraylet hash table */
+	/* Create hash table. Maps arraylet heap addresses to contiguous arraylet leaf addresses */
+	arrayletHashTable = hashTableNew(
+                                   privateOmrPortLibrary,
+                                   J9_GET_CALLSITE(),
+                                   2677,
+                                   sizeof(ArrayletTableEntry),
+                                   sizeof(UDATA),
+                                   J9HASH_TABLE_ALLOW_SIZE_OPTIMIZATION,
+                                   OMRMEM_CATEGORY_MM,
+                                   ArrayletTableEntry::hash,
+                                   ArrayletTableEntry::equal,
+                                   NULL,
+                                   getJavaVM());
+
+	if(!_arrayletLock.initialize(env, &lnrlOptions, "MM_GCExtensions:ArrayletTableEntry:lock")) {
+		goto failed;
+	}
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
 
 #if defined(J9VM_GC_REALTIME)
 #if defined(J9VM_GC_HYBRID_ARRAYLETS)
@@ -272,3 +306,81 @@ MM_GCExtensions::computeDefaultMaxHeap(MM_EnvironmentBase *env)
 
 	memoryMax = MM_Math::roundToFloor(heapAlignment, memoryMax);
 }
+
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+void* 
+MM_GCExtensions::doubleMapArraylets(MM_EnvironmentBase* env, J9Object *objectPtr) 
+{
+	J9JavaVM *javaVM = getJavaVM();
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	OMRPORT_ACCESS_FROM_J9PORT(privatePortLibrary);
+
+	GC_ArrayletLeafIterator arrayletLeafIterator(javaVM, (J9IndexableObject*)objectPtr);
+	UDATA arrayletLeafCount = arrayletLeafIterator.getNumLeafs();
+	MM_Heap *heap = getHeap();
+	void* result = NULL;
+	void* arrayletLeaveAddrs[arrayletLeafCount];
+	UDATA elementsSize = indexableObjectModel.getDataSizeInBytes((J9IndexableObject*)objectPtr);
+
+	GC_SlotObject *slotObject = NULL;
+	int count = 0;
+
+	while (NULL != (slotObject = arrayletLeafIterator.nextLeafPointer())) {
+		void *currentLeaf = slotObject->readReferenceFromSlot();
+		arrayletLeaveAddrs[count] = currentLeaf;
+		count++;
+	}
+
+	ArrayletTableEntry addrEntry;
+	UDATA arrayletLeafSize = javaVM->arrayletLeafSize;
+	UDATA pageSize = j9mmap_get_region_granularity(NULL); /* get pagesize  or j9vmem_supported_page_sizes()[0]? */
+	OMRMemCategory *category = omrmem_get_category(OMRMEM_CATEGORY_PORT_LIBRARY);
+
+	// Get heap and from there call an OMR API that will doble map everything
+	result = heap->doubleMapArraylet(env, arrayletLeaveAddrs, count, arrayletLeafSize, elementsSize, 
+				&addrEntry.identifier,
+				pageSize,
+				category);
+
+	if(result == NULL) { /* Double map failed */
+		return NULL;
+	}
+
+	addrEntry.heapAddr = (void*)objectPtr;
+	addrEntry.contiguousAddr = result;
+	addrEntry.dataSize = addrEntry.identifier.size; /* When arraylet storage is updated this should be larger than actualSize */
+	addrEntry.actualSize = elementsSize;
+
+	void *findObject = NULL;
+	findObject = hashTableFind(arrayletHashTable, &addrEntry);
+
+	if(findObject == NULL) {
+		_arrayletLock.acquire();
+		ArrayletTableEntry *entry = (ArrayletTableEntry *)hashTableAdd(arrayletHashTable, &addrEntry);
+		_arrayletLock.release();
+
+		if(entry == NULL) {
+	        	result = NULL;
+        	}
+	} else {
+		result = NULL;
+	}
+
+	return result;
+}
+
+bool 
+MM_GCExtensions::freeDoubleMap(MM_EnvironmentBase* env, void* contiguousAddr, UDATA dataSize, struct J9PortVmemIdentifier *identifier) 
+{
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	void *contiguousMem = contiguousAddr;
+
+	int result = -1;
+
+	result = j9vmem_free_memory(contiguousMem, dataSize, identifier);
+
+	return result != -1;
+}
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
