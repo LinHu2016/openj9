@@ -309,7 +309,7 @@ public:
 		, _includeJVMTIObjectTagTables(true)
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-		, _includeDoubleMap(_extensions->indexableObjectModel.isDoubleMappingEnabled() ? true : false)
+		, _includeDoubleMap(_extensions->indexableObjectModel.isDoubleMappingEnabled())
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #endif /* LINUX */
 		, _trackVisibleStackFrameDepth(false)

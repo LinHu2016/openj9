@@ -124,10 +124,10 @@ public:
 	}
 
 	MMINLINE bool
-        isDoubleMappingEnabled()
-        {
-                return _enableDoubleMapping;
-        }
+	isDoubleMappingEnabled()
+	{
+		return _enableDoubleMapping;
+	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #endif /* LINUX */
 
@@ -226,7 +226,7 @@ public:
 
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-			if(_enableDoubleMapping && numberOfArraylets > 1 && unadjustedDataSizeInBytes % leafSize == 0) {
+			if ((_enableDoubleMapping && numberOfArraylets > 1) && (unadjustedDataSizeInBytes % leafSize == 0)) {
 				numberOfArraylets -= 1;
 			}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */

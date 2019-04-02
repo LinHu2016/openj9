@@ -81,14 +81,14 @@ class MM_IdleGCManager;
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 struct ArrayletTableEntry {
-        void *heapAddr; /* Arraylet address in the heap */
-        void *contiguousAddr; /* Arraylet address in contiguous region of memory */
+	void *heapAddr; /* Arraylet address in the heap */
+	void *contiguousAddr; /* Arraylet address in contiguous region of memory */
 	UDATA dataSize; /* Number of regions arraylet leaves occupy times region size */
 	UDATA actualSize; /* Actual arraylet size in bytes */
 	J9PortVmemIdentifier identifier;
 
-        static UDATA hash(void *key, void *userData) { return (UDATA)((ArrayletTableEntry*)key)->contiguousAddr; }
-        static UDATA equal(void *leftKey, void *rightKey, void *userData) { return ((ArrayletTableEntry*)leftKey)->contiguousAddr == ((ArrayletTableEntry*)rightKey)->contiguousAddr; }
+	static UDATA hash(void *key, void *userData) { return (UDATA)((ArrayletTableEntry*)key)->contiguousAddr; }
+	static UDATA equal(void *leftKey, void *rightKey, void *userData) { return ((ArrayletTableEntry*)leftKey)->contiguousAddr == ((ArrayletTableEntry*)rightKey)->contiguousAddr; }
 };
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #endif /* LINUX */
