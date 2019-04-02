@@ -106,7 +106,7 @@ MM_GCExtensions::initialize(MM_EnvironmentBase *env)
 	arrayletHashTable = hashTableNew(
                                    privateOmrPortLibrary,
                                    J9_GET_CALLSITE(),
-                                   2677,
+                                   401, /* Avoids collisions and table growth given average number of objects kept alive is 250 */
                                    sizeof(ArrayletTableEntry),
                                    sizeof(UDATA),
                                    J9HASH_TABLE_ALLOW_SIZE_OPTIMIZATION,
@@ -314,7 +314,7 @@ MM_GCExtensions::doubleMapArraylets(MM_EnvironmentBase* env, J9Object *objectPtr
 {
 	J9JavaVM *javaVM = getJavaVM();
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
-	OMRPORT_ACCESS_FROM_J9PORT(privatePortLibrary);
+	// OMRPORT_ACCESS_FROM_J9PORT(privatePortLibrary);
 
 	GC_ArrayletLeafIterator arrayletLeafIterator(javaVM, (J9IndexableObject*)objectPtr);
 	UDATA arrayletLeafCount = arrayletLeafIterator.getNumLeafs();
@@ -335,13 +335,11 @@ MM_GCExtensions::doubleMapArraylets(MM_EnvironmentBase* env, J9Object *objectPtr
 	ArrayletTableEntry addrEntry;
 	UDATA arrayletLeafSize = javaVM->arrayletLeafSize;
 	UDATA pageSize = j9mmap_get_region_granularity(NULL); /* get pagesize  or j9vmem_supported_page_sizes()[0]? */
-	OMRMemCategory *category = omrmem_get_category(OMRMEM_CATEGORY_PORT_LIBRARY);
 
 	// Get heap and from there call an OMR API that will doble map everything
 	result = heap->doubleMapArraylet(env, arrayletLeaveAddrs, count, arrayletLeafSize, elementsSize, 
 				&addrEntry.identifier,
-				pageSize,
-				category);
+				pageSize);
 
 	if (result == NULL) { /* Double map failed */
 		return NULL;
