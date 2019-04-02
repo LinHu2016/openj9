@@ -287,6 +287,13 @@ MM_IndexableObjectAllocationModel::layoutDiscontiguousArraylet(MM_EnvironmentBas
 
 		/* Unreachable if double map is enabled */
 		case GC_ArrayletObjectModel::Hybrid:
+#if defined(LINUX)
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+			if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
+				Assert_MM_double_map_unreachable();
+			}
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* LINUX */
 			/* last arrayoid points to end of arrayoid array in spine header (object-aligned if
 			 * required). (data size % leaf size) bytes of data are stored here (may be empty).
 			 */
