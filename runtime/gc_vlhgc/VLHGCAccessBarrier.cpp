@@ -275,12 +275,11 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	bool successDoubleMap = false;
-        if(shouldCopy && _extensions->indexableObjectModel.isDoubleMappingEnabled()) {
-	
+	if (shouldCopy && _extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 		GC_HashTableIterator hashTableIterator(_extensions->getArrayletHashTable());
-                ArrayletTableEntry *slot = NULL;
-                bool found = false;
-                while(NULL != (slot = (ArrayletTableEntry *)hashTableIterator.nextSlot())) {
+		ArrayletTableEntry *slot = NULL;
+		bool found = false;
+		while (NULL != (slot = (ArrayletTableEntry *)hashTableIterator.nextSlot())) {
 			if(slot->heapAddr == (void *)arrayObject) {
 				found = true;
 				data = slot->contiguousAddr;
@@ -288,15 +287,15 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 			}
 		}
 
-		if(data == NULL || !found) {
+		if (data == NULL || !found) {
 			successDoubleMap = false;
 		} else {
 			successDoubleMap = true;
 		}
 
 		_successDoubleMap = successDoubleMap;
-        }
-	if(!successDoubleMap) 
+	}
+	if (!successDoubleMap) 
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #endif /* LINUX */
 	{
@@ -305,11 +304,11 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 			I_32 sizeInElements = (I_32)indexableObjectModel->getSizeInElements(arrayObject);
 			UDATA sizeInBytes = indexableObjectModel->getDataSizeInBytes(arrayObject);
 			data = functions->jniArrayAllocateMemoryFromThread(vmThread, sizeInBytes);
-			if(NULL == data) {
+			if (NULL == data) {
 				functions->setNativeOutOfMemoryError(vmThread, 0, 0);	// better error message here?
 			} else {
 				indexableObjectModel->memcpyFromArray(data, arrayObject, 0, sizeInElements);
-				if(NULL != isCopy) {
+				if (NULL != isCopy) {
 					*isCopy = JNI_TRUE;
 				}
 			}
@@ -320,7 +319,7 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 			Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
 			arrayObject = (J9IndexableObject*)J9_JNI_UNWRAP_REFERENCE(array);
 			data = (void *)_extensions->indexableObjectModel.getDataPointerForContiguous(arrayObject);
-			if(NULL != isCopy) {
+			if (NULL != isCopy) {
 				*isCopy = JNI_FALSE;
 			}
 #if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)
@@ -356,12 +355,12 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 	}
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-	if(!_successDoubleMap) 
+	if (!_successDoubleMap) 
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #endif /* LINUX */
 	{
-		if(shouldCopy) {
-			if(JNI_ABORT != mode) {
+		if (shouldCopy) {
+			if (JNI_ABORT != mode) {
 				GC_ArrayObjectModel* indexableObjectModel = &_extensions->indexableObjectModel;
 				I_32 sizeInElements = (I_32)indexableObjectModel->getSizeInElements(arrayObject);
 				_extensions->indexableObjectModel.memcpyToArray(arrayObject, 0, sizeInElements, elems);
@@ -369,11 +368,11 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 	
 			// Commit means copy the data but do not free the buffer.
 			// All other modes free the buffer.
-			if(JNI_COMMIT != mode) {
+			if (JNI_COMMIT != mode) {
 				functions->jniArrayFreeMemoryFromThread(vmThread, elems);
 			}	
 
-			if(vmThread->jniCriticalCopyCount > 0) {
+			if (vmThread->jniCriticalCopyCount > 0) {
 				vmThread->jniCriticalCopyCount -= 1;
 			} else {
 				Assert_MM_invalidJNICall();
@@ -384,7 +383,7 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 			 * This trace point will be generated if object has been moved or passed value of elems is corrupted
 			 */
 			void *data = (void *)_extensions->indexableObjectModel.getDataPointerForContiguous(arrayObject);
-			if(elems != data) {
+			if (elems != data) {
 				Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
 			}
 #if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)

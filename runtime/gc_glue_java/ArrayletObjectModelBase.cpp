@@ -100,7 +100,7 @@ GC_ArrayletObjectModelBase::getSpineSizeWithoutHeader(ArrayLayout layout, UDATA 
 	} else if (Hybrid == layout) {
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-		if(extensions->indexableObjectModel.isDoubleMappingEnabled()) {
+		if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 			spineDataSize = 0;
 		} else
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */

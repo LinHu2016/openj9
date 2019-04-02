@@ -116,7 +116,7 @@ MM_GCExtensions::initialize(MM_EnvironmentBase *env)
                                    NULL,
                                    getJavaVM());
 
-	if(!_arrayletLock.initialize(env, &lnrlOptions, "MM_GCExtensions:ArrayletTableEntry:lock")) {
+	if (!_arrayletLock.initialize(env, &lnrlOptions, "MM_GCExtensions:ArrayletTableEntry:lock") || (arrayletHashTable == NULL)) {
 		goto failed;
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
@@ -343,7 +343,7 @@ MM_GCExtensions::doubleMapArraylets(MM_EnvironmentBase* env, J9Object *objectPtr
 				pageSize,
 				category);
 
-	if(result == NULL) { /* Double map failed */
+	if (result == NULL) { /* Double map failed */
 		return NULL;
 	}
 
@@ -352,15 +352,14 @@ MM_GCExtensions::doubleMapArraylets(MM_EnvironmentBase* env, J9Object *objectPtr
 	addrEntry.dataSize = addrEntry.identifier.size; /* When arraylet storage is updated this should be larger than actualSize */
 	addrEntry.actualSize = elementsSize;
 
-	void *findObject = NULL;
-	findObject = hashTableFind(arrayletHashTable, &addrEntry);
+	void *findObject = hashTableFind(arrayletHashTable, &addrEntry);
 
-	if(findObject == NULL) {
+	if (findObject == NULL) {
 		_arrayletLock.acquire();
 		ArrayletTableEntry *entry = (ArrayletTableEntry *)hashTableAdd(arrayletHashTable, &addrEntry);
 		_arrayletLock.release();
 
-		if(entry == NULL) {
+		if (entry == NULL) {
 	        	result = NULL;
         	}
 	} else {
@@ -376,9 +375,7 @@ MM_GCExtensions::freeDoubleMap(MM_EnvironmentBase* env, void* contiguousAddr, UD
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
 	void *contiguousMem = contiguousAddr;
 
-	int result = -1;
-
-	result = j9vmem_free_memory(contiguousMem, dataSize, identifier);
+	int result = j9vmem_free_memory(contiguousMem, dataSize, identifier);
 
 	return result != -1;
 }

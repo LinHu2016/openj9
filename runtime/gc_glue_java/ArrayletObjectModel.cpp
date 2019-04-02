@@ -93,7 +93,7 @@ GC_ArrayletObjectModel::getArrayletLayout(J9Class* clazz, UDATA dataSizeInBytes,
 			}
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-			if(extensions->indexableObjectModel.isDoubleMappingEnabled()) {
+			if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 				layout = Discontiguous;
 			} else
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */

@@ -267,7 +267,7 @@ MM_IndexableObjectAllocationModel::layoutDiscontiguousArraylet(MM_EnvironmentBas
 #if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 			/* All data from array are stored in the leaves */
-			if(extensions->indexableObjectModel.isDoubleMappingEnabled()) {
+			if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 				Assert_MM_true(arrayoidIndex == _numberOfArraylets);
 			} else
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
