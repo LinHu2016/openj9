@@ -869,13 +869,13 @@ MM_RootScanner::scanJVMTIObjectTagTables(MM_EnvironmentBase *env)
 void 
 MM_RootScanner::scanDoubleMappedObjects(MM_EnvironmentBase *env)
 {
-	if(_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+	if (_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 		J9HashTable* arrayletHashTable = _extensions->getArrayletHashTable();
 		reportScanningStarted(RootScannerEntity_DoubleMappedObjects);
-		if(arrayletHashTable != NULL) {
+		if (arrayletHashTable != NULL) {
 			GC_HashTableIterator hashTableIterator(arrayletHashTable);
 			ArrayletTableEntry *slot = NULL;
-			while(NULL != (slot = (ArrayletTableEntry *)hashTableIterator.nextSlot())) {
+			while (NULL != (slot = (ArrayletTableEntry *)hashTableIterator.nextSlot())) {
 				doDoubleMappedObjectSlot(slot, &hashTableIterator);
 			}
 		}
