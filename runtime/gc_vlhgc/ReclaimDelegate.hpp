@@ -323,7 +323,6 @@ private:
 	 * @param env[in] The current thread
 	 */
 	void calculateOptimalEmptinessRegionThreshold(MM_EnvironmentVLHGC *env);
-
 };
 
 #endif /* RECLAIMDELEGATE_HPP_ */

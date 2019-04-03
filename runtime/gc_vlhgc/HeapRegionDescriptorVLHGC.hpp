@@ -84,7 +84,7 @@ public:
 	IDATA _projectedLiveBytesDeviation;	/**< difference between actual live bytes and projected live bytes. Note: not always update to date and can be negative. */
 	MM_HeapRegionDescriptorVLHGC *_compactDestinationQueueNext; /**< pointer to next compact destination region in the queue */
 	bool _defragmentationTarget;		/**< indicates whether this region should be considered for defragmentation, currently this means the region has been GMPed but not collected yet */
-
+	bool _recoveryFreeTailAfterSweep;
 protected:
 	MM_GCExtensions * _extensions;
 

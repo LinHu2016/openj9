@@ -70,6 +70,10 @@ MM_ReferenceObjectList::addAll(MM_EnvironmentBase* env, UDATA referenceObjectTyp
 		previousHead = *list;
 	}
 
+	if ((head == previousHead) || (tail == previousHead)) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB,"previousHead=%p, head=%p, tail=%p, referenceObjectType=%zu\n", previousHead, head, tail, referenceObjectType);
+	}
 	/* detect trivial cases which can inject cycles into the linked list */
 	Assert_MM_true( (head != previousHead) && (tail != previousHead) );
 	

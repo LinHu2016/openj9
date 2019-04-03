@@ -116,10 +116,10 @@ private:
 
 	J9Pool *_poolSweepPoolState;				/**< Memory pools for SweepPoolState*/ 
 	omrthread_monitor_t _mutexSweepPoolState;	/**< Monitor to protect memory pool operations for sweepPoolState*/
-	
+	bool _noCompactionAfterSweep;	/**< if true, no compaction would be expected after current sweep */
+
 protected:
 public:
-	
 /*
  * Function members
  */
@@ -186,6 +186,13 @@ protected:
 	virtual void setupForSweep(MM_EnvironmentVLHGC *env);
 
 	void recycleFreeRegions(MM_EnvironmentVLHGC *env);
+	void recoverRegionAllocationPointers(MM_EnvironmentVLHGC *env);
+	bool verifyRegionAllocationPointer(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region);
+//	UDATA getRegionFreeBytesFromTail(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region);
+	void printRegion(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region);
+
+
+//	void verifyCardTable(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region);
 
 	static void hookMemoryPoolNew(J9HookInterface** hook, UDATA eventNum, void* eventData, void* userData);
 	static void hookMemoryPoolKill(J9HookInterface** hook, UDATA eventNum, void* eventData, void* userData);
@@ -244,6 +251,9 @@ public:
 #if defined(J9VM_GC_CONCURRENT_SWEEP)
 	virtual bool replenishPoolForAllocate(MM_EnvironmentBase *env, MM_MemoryPool *memoryPool, UDATA size);
 #endif /* J9VM_GC_CONCURRENT_SWEEP */
+
+	bool isNoCompactionAfterSweep() { return _noCompactionAfterSweep; }
+	void setNoCompactionAfterSweep(bool opt) { _noCompactionAfterSweep = opt; }
 
 	/**
 	 * Create a ParallelSweepSchemeVLHGC object.

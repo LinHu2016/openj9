@@ -32,9 +32,14 @@
 #include "EnvironmentVLHGC.hpp"
 #include "GCExtensions.hpp"
 
+//#include "CardTable.hpp"
+//#include "HeapRegionManager.hpp"
+//#include "HeapRegionDescriptorVLHGC.hpp"
+
 void
 MM_GlobalMarkNoScanCardCleaner::clean(MM_EnvironmentBase *envModron, void *lowAddress, void *highAddress, Card *cardToClean)
 {
+//	PORT_ACCESS_FROM_ENVIRONMENT(envModron);
 	MM_EnvironmentVLHGC* env = MM_EnvironmentVLHGC::getEnvironment(envModron);
 	Assert_MM_false(MM_CycleState::CT_PARTIAL_GARBAGE_COLLECTION == env->_cycleState->_collectionType);
 	
@@ -45,6 +50,13 @@ MM_GlobalMarkNoScanCardCleaner::clean(MM_EnvironmentBase *envModron, void *lowAd
 		toState = CARD_PGC_MUST_SCAN;
 		break;
 	case CARD_GMP_MUST_SCAN:
+//		{
+//			MM_CardTable *cardTable = MM_GCExtensions::getExtensions(env)->cardTable;
+//			uintptr_t *address = (uintptr_t *)cardTable->cardAddrToHeapAddr(env,cardToClean);
+//			MM_HeapRegionManager *regionManager = MM_GCExtensions::getExtensions(env)->getHeap()->getHeapRegionManager();
+//			MM_HeapRegionDescriptorVLHGC *region = (MM_HeapRegionDescriptorVLHGC *)regionManager->tableDescriptorForAddress(address);
+//			j9tty_printf(PORTLIB,"MM_GlobalMarkNoScanCardCleaner::clean CARD_GMP_MUST_SCAN address=%p, region=%zu\n", address, regionManager->mapDescriptorToRegionTableIndex(region));
+//		}
 		Assert_MM_unreachable();
 		break;
 	case CARD_CLEAN:

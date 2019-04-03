@@ -176,6 +176,7 @@ private:
 	void verifyClassLoaderObjectSlots(MM_EnvironmentVLHGC *env, J9Object *classLoaderObject);
 	void verifyExternalState(MM_EnvironmentVLHGC *env);
 	friend class MM_CopyForwardVerifyScanner;
+	void printRegions(MM_EnvironmentVLHGC *env);
 
 	/**
 	 * Called to retire a copy cache once a thread no longer wants to use it as a copy destination.
@@ -513,6 +514,16 @@ private:
 	 * @param tailRegion[in] The region to add
 	 */
 	void insertTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *tailRegion);
+	/**
+	 * Insert the specified tail candidate into the tail candidate list and sort the list by tail size ascending order.
+	 * The implementation assumes that the calling thread can modify
+	 * regionList without locking it so the callsite either needs to have locked the list or be single-threaded.
+	 * @param env[in] The GC thread
+	 * @param regionList[in] The region list to which tailRegion should be added as a a tail candidate
+	 * @param tailRegion[in] The region to add
+	 * @param isAscending
+	 */
+	void insertAndSortTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC* tailRegion, bool isAscending);
 
 	/**
 	 * Remove the specified tail candidate from the tail candidate list.  The implementation assumes that the calling thread can modify 
@@ -939,6 +950,8 @@ private:
 	 * @param survivorBase the lowest address in the region where survivor objects can be found
 	 */
 	void convertTailCandidateToSurvivorRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase);
+//	void verifyCardTable(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region);
+	bool isCardCleanForTail(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region);
 
 	/**
 	 * Scan the root set, copying-and-forwarding any objects found.

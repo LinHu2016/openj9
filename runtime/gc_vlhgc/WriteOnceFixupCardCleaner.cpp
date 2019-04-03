@@ -36,6 +36,8 @@
 #include "HeapRegionDescriptorVLHGC.hpp"
 #include "WriteOnceCompactor.hpp"
 
+//#include "CardTable.hpp"
+//#include "HeapRegionManager.hpp"
 
 MM_WriteOnceFixupCardCleaner::MM_WriteOnceFixupCardCleaner(MM_WriteOnceCompactor *compactScheme, MM_CycleState *cycleState, MM_HeapRegionManager* regionManager)
 	: MM_CardCleaner()
@@ -52,6 +54,7 @@ MM_WriteOnceFixupCardCleaner::MM_WriteOnceFixupCardCleaner(MM_WriteOnceCompactor
 void
 MM_WriteOnceFixupCardCleaner::clean(MM_EnvironmentBase *envModron, void *lowAddress, void *highAddress, Card *cardToClean)
 {
+//	PORT_ACCESS_FROM_ENVIRONMENT(envModron);
 	MM_EnvironmentVLHGC* env = MM_EnvironmentVLHGC::getEnvironment(envModron);
 	Card fromState = *cardToClean;
 	Card toState = CARD_INVALID;
@@ -95,6 +98,13 @@ MM_WriteOnceFixupCardCleaner::clean(MM_EnvironmentBase *envModron, void *lowAddr
 		toState = CARD_CLEAN;
 		break;		
 	case CARD_GMP_MUST_SCAN:
+//		if (!_isGlobalMarkPhaseRunning) {
+//			MM_CardTable *cardTable = MM_GCExtensions::getExtensions(env)->cardTable;
+//			uintptr_t *address = (uintptr_t *)cardTable->cardAddrToHeapAddr(env,cardToClean);
+//			MM_HeapRegionManager *regionManager = MM_GCExtensions::getExtensions(env)->getHeap()->getHeapRegionManager();
+//			MM_HeapRegionDescriptorVLHGC *region = (MM_HeapRegionDescriptorVLHGC *)regionManager->tableDescriptorForAddress(address);
+//			j9tty_printf(PORTLIB,"MM_WriteOnceFixupCardCleaner::clean CARD_GMP_MUST_SCAN address=%p, region=%zu\n", address, regionManager->mapDescriptorToRegionTableIndex(region));
+//		}
 		Assert_MM_true(_isGlobalMarkPhaseRunning);
 		break;
 	default:

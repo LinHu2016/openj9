@@ -358,6 +358,14 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			extensions->tarokEnableExpensiveAssertions = false;
 			continue;
 		}
+		if (try_scan(&scan_start, "tarokEnableAllocationPointerAssertion")) {
+			extensions->tarokEnableAllocationPointerAssertion = true;
+			continue;
+		}
+		if (try_scan(&scan_start, "tarokDisableAllocationPointerAssertion")) {
+			extensions->tarokEnableAllocationPointerAssertion = false;
+			continue;
+		}
 		if (try_scan(&scan_start, "tarokTgcEnableRememberedSetDuplicateDetection")) {
 			extensions->tarokTgcEnableRememberedSetDuplicateDetection = true;
 			continue;
@@ -639,6 +647,33 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			continue;
 		}
 
+		if (try_scan(&scan_start, "tarokReserveRegionsFromCollectionSet=mostAllocatable")) {
+			extensions->tarokReserveRegionsFromCollectionSet = MM_GCExtensionsBase::PRESERVE_REGIONS_MOST_ALLOCATABLE;
+			continue;
+		}
+
+		if (try_scan(&scan_start, "tarokReserveRegionsFromCollectionSet=mostFree")) {
+			extensions->tarokReserveRegionsFromCollectionSet = MM_GCExtensionsBase::PRESERVE_REGIONS_MOST_FREE;
+			continue;
+		}
+		if (try_scan(&scan_start, "tarokEnableFindTailsAfterSweep")) {
+			extensions->tarokEnableFindTailsAfterSweep = true;
+			continue;
+		}
+		if (try_scan(&scan_start, "tarokPrintRegions")) {
+			extensions->tarokPrintRegions = true;
+			continue;
+		}
+		if (try_scan(&scan_start, "tarokSortTailCandidateAscending")) {
+//			extensions->tarokSortTailCandidateAscending = true;
+			extensions->tarokTailCandidateListSortOrder = MM_GCExtensionsBase::SORT_ORDER_ASCENDING;
+			continue;
+		}
+		if (try_scan(&scan_start, "tarokSortTailCandidateDescending")) {
+//			extensions->tarokSortTailCandidateAscending = true;
+			extensions->tarokTailCandidateListSortOrder = MM_GCExtensionsBase::SORT_ORDER_DESCENDING;
+			continue;
+		}
 #endif /* defined (J9VM_GC_VLHGC) */
 
 		if(try_scan(&scan_start, "packetListLockSplit=")) {

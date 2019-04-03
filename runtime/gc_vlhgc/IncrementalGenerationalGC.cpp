@@ -1351,6 +1351,17 @@ MM_IncrementalGenerationalGC::partialGarbageCollectUsingCopyForward(MM_Environme
 	/* flush the RSList and RSM from our currently selected regions into the card table since we will rebuild them as we process the table */
 	flushRememberedSetIntoCardTable(env);
 	_interRegionRememberedSet->flushBuffersForDecommitedRegions(env);
+	if (_schedulingDelegate.isGlobalSweepRequired()) {
+		/* clear cards for region free tails, global sweep before PGC recovery free tails for the regions, flush RS might dirty the free tails. */
+		GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
+		MM_HeapRegionDescriptorVLHGC *region = NULL;
+		while(NULL != (region = regionIterator.nextRegion())) {
+			if (region->_recoveryFreeTailAfterSweep) {
+				MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+				_extensions->cardTable->clearCardsInRange(env, regionPool->getAllocationPointer(), region->getHighAddress());
+			}
+		}
+	}
 
 	Assert_MM_true(env->_cycleState->_markMap == _markMapManager->getPartialGCMap());
 	Assert_MM_true(env->_cycleState->_workPackets == _workPacketsForPartialGC);

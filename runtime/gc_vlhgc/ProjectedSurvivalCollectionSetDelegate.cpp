@@ -56,6 +56,9 @@ MM_ProjectedSurvivalCollectionSetDelegate::MM_ProjectedSurvivalCollectionSetDele
 	, _setSelectionDataTable(NULL)
 	, _dynamicSelectionList(NULL)
 	, _dynamicSelectionRegionList(NULL)
+	, _reservedFromCollectionSet(NULL)
+	, _reservedFromCollectionSetMostFree(NULL)
+	, _projectedLiveBytes(NULL)
 {
 	_typeId = __FUNCTION__;
 }
@@ -88,6 +91,19 @@ MM_ProjectedSurvivalCollectionSetDelegate::initialize(MM_EnvironmentVLHGC *env)
 		if(NULL == _dynamicSelectionRegionList) {
 			goto error_no_memory;
 		}
+
+		_reservedFromCollectionSet = (MM_HeapRegionDescriptorVLHGC **)env->getForge()->allocate(sizeof(MM_HeapRegionDescriptorVLHGC *) * setSelectionEntryCount, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+		if(NULL == _reservedFromCollectionSet) {
+			goto error_no_memory;
+		}
+		_reservedFromCollectionSetMostFree = (MM_HeapRegionDescriptorVLHGC **)env->getForge()->allocate(sizeof(MM_HeapRegionDescriptorVLHGC *) * setSelectionEntryCount, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+		if(NULL == _reservedFromCollectionSetMostFree) {
+			goto error_no_memory;
+		}
+		_projectedLiveBytes = (UDATA*) env->getForge()->allocate(sizeof(UDATA) * setSelectionEntryCount, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+		if(NULL == _projectedLiveBytes) {
+			goto error_no_memory;
+		}
 	}
 
 	return true;
@@ -112,6 +128,20 @@ MM_ProjectedSurvivalCollectionSetDelegate::tearDown(MM_EnvironmentVLHGC *env)
 	if(NULL != _dynamicSelectionRegionList) {
 		env->getForge()->free(_dynamicSelectionRegionList);
 		_dynamicSelectionRegionList = NULL;
+	}
+
+	if(NULL != _reservedFromCollectionSet) {
+		env->getForge()->free(_reservedFromCollectionSet);
+		_reservedFromCollectionSet = NULL;
+	}
+
+	if(NULL != _reservedFromCollectionSetMostFree) {
+		env->getForge()->free(_reservedFromCollectionSetMostFree);
+		_reservedFromCollectionSetMostFree = NULL;
+	}
+	if(NULL != _projectedLiveBytes) {
+		env->getForge()->free(_projectedLiveBytes);
+		_projectedLiveBytes = NULL;
 	}
 }
 
@@ -180,8 +210,10 @@ MM_ProjectedSurvivalCollectionSetDelegate::createNurseryCollectionSet(MM_Environ
 				if(MM_CompactGroupManager::isRegionInNursery(env, region)) {
 					/* on collection phase, mark all non-overflowed regions and those that RSCL is not being rebuilt */
 					/* sweep/compact flags are set in ReclaimDelegate */
-					selectRegion(env, region);
-					nurseryRegionCount += 1;
+					if (!isInPreserveList(env, region)) {
+						selectRegion(env, region);
+						nurseryRegionCount += 1;
+					}
 				} else {
 					Assert_MM_true(!region->isEden());
 				}
@@ -237,9 +269,10 @@ MM_ProjectedSurvivalCollectionSetDelegate::selectRegionsForBudget(MM_Environment
 		regionSelectionIndex += regionSelectionIncrement;
 		if(regionSelectionIndex >= regionSelectionThreshold) {
 			/* The region is to be selected as part of the dynamic set */
-			selectRegion(env, regionSelectionPtr);
-			ageGroupBudgetRemaining -= 1;
-
+			if (!isInPreserveList(env, regionSelectionPtr)) {
+				selectRegion(env, regionSelectionPtr);
+				ageGroupBudgetRemaining -= 1;
+			}
 		}
 		regionSelectionIndex %= regionSelectionThreshold;
 
@@ -300,9 +333,11 @@ MM_ProjectedSurvivalCollectionSetDelegate::createRateOfReturnCollectionSet(MM_En
 		double projectedReclaimableBytesFraction = (double)projectedReclaimableBytes / (double)regionSize;
 
 		if (projectedReclaimableBytesFraction > _extensions->tarokCopyForwardFragmentationTarget) {
-			selectRegion(env, region);
-			_setSelectionDataTable[compactGroup]._dynamicSelectionThisCycle = true;
-			regionBudget -= 1;
+			if (!isInPreserveList(env, region)) {
+				selectRegion(env, region);
+				_setSelectionDataTable[compactGroup]._dynamicSelectionThisCycle = true;
+				regionBudget -= 1;
+			}
 		} else {
 			/* Since _dynamicSelectionRegionList is sorted by projectedReclaimableBytes, they'll be no more regions to select so break */
 			break;
@@ -398,12 +433,161 @@ MM_ProjectedSurvivalCollectionSetDelegate::createCoreSamplingCollectionSet(MM_En
 	);
 }
 
+bool
+MM_ProjectedSurvivalCollectionSetDelegate::isInPreserveList(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region)
+{
+	bool ret = false;
+	UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+	switch (_extensions->tarokReserveRegionsFromCollectionSet)
+	{
+	case MM_GCExtensionsBase::PRESERVE_REGIONS_MOST_ALLOCATABLE :
+		ret = (region == _reservedFromCollectionSet[compactGroup]);
+		break;
+	case MM_GCExtensionsBase::PRESERVE_REGIONS_MOST_FREE :
+		ret = (region == _reservedFromCollectionSetMostFree[compactGroup]);
+		break;
+	case MM_GCExtensionsBase::PRESERVE_REGIONS_NO :
+		ret = false;
+		break;
+	default :
+		Assert_MM_unreachable();
+		break;
+	}
+	return ret;
+}
+
+/**
+ * Prepare the preserve region list, which contains the non-eden most free region per compact group, try to exclude those regions from copyforward collection set,
+ * they are good candidate for survivor region rather than collection set to avoid abort cases.
+ */
+void
+MM_ProjectedSurvivalCollectionSetDelegate::preparePreserveList(MM_EnvironmentVLHGC *env)
+{
+	MM_HeapRegionManager *regionManager = _extensions->heapRegionManager;
+	UDATA regionSize = _regionManager->getRegionSize();
+
+	GC_HeapRegionIteratorVLHGC regionIterator(regionManager);
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		if (region->containsObjects() && region->getRememberedSetCardList()->isAccurate()) {
+			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+			_projectedLiveBytes[compactGroup] += region->_projectedLiveBytes;
+			if (!region->isEden()) {
+				UDATA freeMemory = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocatableBytes();
+				if ((10 < (100 * freeMemory)/regionSize) && ((NULL == _reservedFromCollectionSet[compactGroup]) ||
+					(freeMemory > ((MM_MemoryPoolBumpPointer *)_reservedFromCollectionSet[compactGroup]->getMemoryPool())->getAllocatableBytes()))) {
+					_reservedFromCollectionSet[compactGroup] = region;
+				}
+				UDATA mostFreeMemory = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getFreeMemoryAndDarkMatterBytes();
+				if ((10 < (100 * mostFreeMemory)/regionSize) && ((NULL == _reservedFromCollectionSetMostFree[compactGroup]) ||
+					(mostFreeMemory > ((MM_MemoryPoolBumpPointer *)_reservedFromCollectionSetMostFree[compactGroup]->getMemoryPool())->getFreeMemoryAndDarkMatterBytes()))) {
+					_reservedFromCollectionSetMostFree[compactGroup] = region;
+				}
+			}
+		}
+	}
+
+	UDATA compactGroupMaxCount = MM_CompactGroupManager::getCompactGroupMaxCount(env);
+	UDATA reservedSize = 0;
+	/* check if we would like reserved a survivor region for the age group to reduce to use the free region for copyforward */
+	for (UDATA idx =0; idx<compactGroupMaxCount; idx++) {
+		region = _reservedFromCollectionSet[idx];
+		if (NULL != region) {
+			reservedSize = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocatableBytes() + region->_projectedLiveBytes;
+			if ( (reservedSize < _projectedLiveBytes[idx]) && (MM_Math::roundToCeiling(regionSize, _projectedLiveBytes[idx]) <= MM_Math::roundToCeiling(regionSize, _projectedLiveBytes[idx] - reservedSize))) {
+				/* if reserved "the most allocatable region" would not save any free region for copyforward, cancel the reservation */
+				_reservedFromCollectionSet[idx] = NULL;
+			}
+		}
+
+		region = _reservedFromCollectionSetMostFree[idx];
+		if (NULL != region) {
+			reservedSize = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getFreeMemoryAndDarkMatterBytes() + region->_projectedLiveBytes;
+			if ( (reservedSize < _projectedLiveBytes[idx]) && (MM_Math::roundToCeiling(regionSize, _projectedLiveBytes[idx]) <= MM_Math::roundToCeiling(regionSize, _projectedLiveBytes[idx] - reservedSize))) {
+				/* if reserved "the most free region" would not save any free region for copyforward, cancel the reservation */
+				_reservedFromCollectionSetMostFree[idx] = NULL;
+			}
+		}
+	}
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_ProjectedSurvivalCollectionSetDelegate::preparePreserveList\n");
+
+	MM_MemoryPoolBumpPointer * memoryPool = NULL;
+	j9tty_printf(PORTLIB, "the most Allocatable list: ");
+	for (UDATA idx =0; idx<compactGroupMaxCount; idx++) {
+		region = _reservedFromCollectionSet[idx];
+
+		if (NULL != region) {
+			memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			j9tty_printf(PORTLIB, " compactGroup=%zu, id=%zu, allocable=%zu, ", idx, _regionManager->mapDescriptorToRegionTableIndex(region), memoryPool->getAllocatableBytes());
+		}
+	}
+	j9tty_printf(PORTLIB, "\nthe most Free list: ");
+	for (UDATA idx =0; idx<compactGroupMaxCount; idx++) {
+		region = _reservedFromCollectionSetMostFree[idx];
+		if (NULL != region) {
+			memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			j9tty_printf(PORTLIB, " compactGroup=%zu, id=%zu, free=%zu, ", idx, _regionManager->mapDescriptorToRegionTableIndex(region), memoryPool->getFreeMemoryAndDarkMatterBytes());
+		}
+	}
+	j9tty_printf(PORTLIB, "\n projectedLiveBytes :");
+	for (UDATA idx =0; idx<compactGroupMaxCount; idx++) {
+		j9tty_printf(PORTLIB, " compactGroup=%zu, bytes=%zu, ", idx, _projectedLiveBytes[idx]);
+	}
+
+	j9tty_printf(PORTLIB, "\n");
+}
+
+void
+MM_ProjectedSurvivalCollectionSetDelegate::printRegions(MM_EnvironmentVLHGC *env)
+{
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	UDATA regionSize = _regionManager->getRegionSize();
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		UDATA tableIndex = _regionManager->mapDescriptorToRegionTableIndex(region);
+		j9tty_printf(PORTLIB, "id=%zu", tableIndex);
+		if (region->isFreeOrIdle()) {
+			j9tty_printf(PORTLIB, " FreeOrIdle\n");
+		} else if (region->containsObjects()) {
+			bool regionHasCriticalRegions = (0 != region->_criticalRegionsInUse);
+			bool accurateRememberedSet = region->getRememberedSetCardList()->isAccurate();
+			bool inNursery = MM_CompactGroupManager::isRegionInNursery(env, region);
+			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+			UDATA allocatable = memoryPool->getAllocatableBytes();
+			UDATA projectedFreeMemoryAfterGC = regionSize - region->_projectedLiveBytes;
+			UDATA projectedReclaimableBytes = region->getProjectedReclaimableBytes();
+			j9tty_printf(PORTLIB, " compactGroup=%zu, regionHasCriticalRegions=%zu, accurateRememberedSet=%zu, inNursery=%zu, free=%zu%%, =%zu, allocatable=%zu%%, =%zu, projected free after GC=%zu%%, projected reclaimed=%zu%%\n",
+					compactGroup, regionHasCriticalRegions, accurateRememberedSet, inNursery, (100 * freeMemory)/regionSize, freeMemory, (100 * allocatable)/regionSize, allocatable, (100 * projectedFreeMemoryAfterGC)/regionSize, (100 * projectedReclaimableBytes)/regionSize);
+		} else {
+			Assert_MM_true(region->isArrayletLeaf());
+			j9tty_printf(PORTLIB, " ArrayletLeaf\n");
+		}
+	}
+}
+
 void
 MM_ProjectedSurvivalCollectionSetDelegate::createRegionCollectionSetForPartialGC(MM_EnvironmentVLHGC *env)
 {
 	Assert_MM_true(MM_CycleState::CT_PARTIAL_GARBAGE_COLLECTION == env->_cycleState->_collectionType);
 
 	bool dynamicCollectionSet = _extensions->tarokEnableDynamicCollectionSetSelection;
+
+	memset((void *)_reservedFromCollectionSet, 0, sizeof(MM_HeapRegionDescriptorVLHGC *) * MM_CompactGroupManager::getCompactGroupMaxCount(env));
+	memset((void *)_reservedFromCollectionSetMostFree, 0, sizeof(MM_HeapRegionDescriptorVLHGC *) * MM_CompactGroupManager::getCompactGroupMaxCount(env));
+	memset((void *) _projectedLiveBytes, 0, sizeof(UDATA) * MM_CompactGroupManager::getCompactGroupMaxCount(env));
+	if (env->_cycleState->_shouldRunCopyForward) {
+		if (_extensions->tarokPrintRegions) {
+			printRegions(env);
+		}
+		preparePreserveList(env);
+	}
 
 	/* If dynamic collection sets are enabled, reset all related data structures that are used for selection */
 	if(dynamicCollectionSet) {

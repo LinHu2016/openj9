@@ -132,6 +132,7 @@ MM_ReclaimDelegate::tearDown(MM_EnvironmentVLHGC *env)
 		j9mem_free_memory(_regionsSortedByEmptinessArray);
 		_regionsSortedByEmptinessArray = NULL;
 	}
+
 }
 
 void 
@@ -474,6 +475,10 @@ done:
 void
 MM_ReclaimDelegate::runGlobalSweepBeforePGC(MM_EnvironmentVLHGC *env, MM_AllocateDescription *allocDescription, MM_MemorySubSpace *activeSubSpace, MM_GCCode gcCode)
 {
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+	if (extensions->tarokEnableFindTailsAfterSweep) {
+		_sweepScheme->setNoCompactionAfterSweep(true);
+	}
 	performAtomicSweep(env, allocDescription, activeSubSpace, gcCode);
 	
 	/* Now that dark matter and free bytes data have been updated in all memoryPools, we want to rebuild the _regionsSortedByEmptinessArray table */
@@ -605,7 +610,7 @@ MM_ReclaimDelegate::deriveCompactScore(MM_EnvironmentVLHGC *env)
 					
 					if (env->_cycleState->_shouldRunCopyForward) {
 						double sparsity = (double)(freeMemory - memoryPool->getAllocatableBytes()) / (double)regionSize;
-						compactScore = 50.0 * (sparsity + emptiness) * (1.0 - potentialWastedWork);
+						compactScore = 100.0 * (sparsity + potentialWastedWork);
 					} else {
 						compactScore = 100.0 * emptiness * (1.0 - potentialWastedWork);
 					}

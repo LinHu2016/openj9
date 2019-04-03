@@ -492,6 +492,7 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 		MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
 
 		if (region->_copyForwardData._evacuateSet) {
+			region->_recoveryFreeTailAfterSweep = false;
 			if (region->isEden()) {
 				static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._edenEvacuateRegionCount += 1;
 			} else {
@@ -897,6 +898,12 @@ MM_CopyForwardScheme::reserveMemoryForObject(MM_EnvironmentVLHGC *env, UDATA com
 		_reservedRegionList[compactGroup]._tailCandidatesLock.acquire();
 		region = _reservedRegionList[compactGroup]._tailCandidates;
 		MM_HeapRegionDescriptorVLHGC *resultRegion = NULL;
+		while (NULL != region && !isCardCleanForTail(env, region)) {
+			removeTailCandidate(env, &_reservedRegionList[compactGroup], region);
+			MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			regionPool->setAllocationPointer(env, region->getHighAddress());
+			region = _reservedRegionList[compactGroup]._tailCandidates;
+		}
 		while ((NULL == result) && (NULL != region)) {
 			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
@@ -996,6 +1003,12 @@ MM_CopyForwardScheme::reserveMemoryForCache(MM_EnvironmentVLHGC *env, UDATA comp
 	if ((!result) && (NULL != _reservedRegionList[compactGroup]._tailCandidates)) {
 		_reservedRegionList[compactGroup]._tailCandidatesLock.acquire();
 		region = _reservedRegionList[compactGroup]._tailCandidates;
+		while (NULL != region && !isCardCleanForTail(env, region)) {
+			removeTailCandidate(env, &_reservedRegionList[compactGroup], region);
+			MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			regionPool->setAllocationPointer(env, region->getHighAddress());
+			region = _reservedRegionList[compactGroup]._tailCandidates;
+		}
 		if (NULL != region) {
 			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
@@ -1637,9 +1650,46 @@ MM_CopyForwardScheme::copyForwardCollectionSet(MM_EnvironmentVLHGC *env)
 
 	/* Do any final work to regions in order to release them back to the master collector implementation */
 	postProcessRegions(env);
+	if (_extensions->tarokPrintRegions) {
+		printRegions(env);
+	}
 
 	return copyForwardCompletedSuccessfully(env);
 }
+
+void
+MM_CopyForwardScheme::printRegions(MM_EnvironmentVLHGC *env)
+{
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	UDATA regionSize = _regionManager->getRegionSize();
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		UDATA tableIndex = _regionManager->mapDescriptorToRegionTableIndex(region);
+		j9tty_printf(PORTLIB, "id=%zu", tableIndex);
+		if (region->isFreeOrIdle()) {
+			j9tty_printf(PORTLIB, " FreeOrIdle\n");
+//			verifyCardTable(env, region);
+		} else if (region->containsObjects()) {
+			bool regionHasCriticalRegions = (0 != region->_criticalRegionsInUse);
+			bool accurateRememberedSet = region->getRememberedSetCardList()->isAccurate();
+			bool inNursery = MM_CompactGroupManager::isRegionInNursery(env, region);
+			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+			UDATA allocatable = memoryPool->getAllocatableBytes();
+			UDATA projectedFreeMemoryAfterGC = regionSize - region->_projectedLiveBytes;
+			UDATA projectedReclaimableBytes = region->getProjectedReclaimableBytes();
+			j9tty_printf(PORTLIB, " compactGroup=%zu, regionHasCriticalRegions=%zu, accurateRememberedSet=%zu, inNursery=%zu, free=%zu%%, =%zu, allocatable=%zu%%, =%zu, projected free after GC=%zu%%, projected reclaimed=%zu%%\n",
+					compactGroup, regionHasCriticalRegions, accurateRememberedSet, inNursery, (100 * freeMemory)/regionSize, freeMemory, (100 * allocatable)/regionSize, allocatable, (100 * projectedFreeMemoryAfterGC)/regionSize, (100 * projectedReclaimableBytes)/regionSize);
+		} else {
+			Assert_MM_true(region->isArrayletLeaf());
+			j9tty_printf(PORTLIB, " ArrayletLeaf\n");
+		}
+	}
+}
+
 
 /**
  * Determine whether a copy forward that has been started did complete successfully.
@@ -2355,6 +2405,14 @@ MM_CopyForwardScheme::scanReferenceObjectSlots(MM_EnvironmentVLHGC *env, MM_Allo
 		} else if (isReferenceInCollectionSet) {
 			if (!isReferenceCleared) {
 				if (success) {
+//					UDATA referenceObjectType = J9CLASS_FLAGS(J9GC_J9OBJECT_CLAZZ(objectPtr)) & J9AccClassReferenceMask;
+//					if (referenceObjectType == J9AccClassReferenceWeak || referenceObjectType == J9AccClassReferenceSoft) {
+//						MM_HeapRegionDescriptorVLHGC * region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(objectPtr);
+//						if (region->isTailFilledSurvivorRegion() && region->_recoveryFreeTailAfterSweep) {
+//							PORT_ACCESS_FROM_ENVIRONMENT(env);
+//							j9tty_printf(PORTLIB, "scanReferenceObjectSlots add objectPtr=%p, ScanReason=%zu, env=%p\n", objectPtr, reason, env);
+//						}
+//					}
 					env->getGCEnvironment()->_referenceObjectBuffer->add(env, objectPtr);
 				}
 			}
@@ -3425,6 +3483,7 @@ MM_CopyForwardScheme::cleanCardTableForPartialCollect(MM_EnvironmentVLHGC *env, 
 			if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 				if (!region->_markData._shouldMark) {
 					/* this region isn't part of the collection set, so it may have dirty or remembered cards in it. */
+//					j9tty_printf(PORTLIB, "cleanCardTableForPartialCollect cleanCardsInRegion region=%zu, env=%p\n", _regionManager->mapDescriptorToRegionTableIndex(region), env);
 					cardTable->cleanCardsInRegion(env, cardCleaner, region);
 				} else {
 					/* this region is part of the collection set, so just change its dirty cards to clean (or GMP_MUST_SCAN) */
@@ -3441,6 +3500,11 @@ MM_CopyForwardScheme::cleanCardTableForPartialCollect(MM_EnvironmentVLHGC *env, 
 							break;
 						case CARD_GMP_MUST_SCAN:
 							/* This can only occur if a GMP is currently active, no transition is required */
+//							if (!gmpIsRunning)	{
+//								uintptr_t *address = (uintptr_t *)cardTable->cardAddrToHeapAddr(env,card);
+//								MM_HeapRegionDescriptorVLHGC *region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(address);
+//								j9tty_printf(PORTLIB, "cleanCardTableForPartialCollect CARD_GMP_MUST_SCAN address=%p, region=%zu\n", address, _regionManager->mapDescriptorToRegionTableIndex(region));
+//							}
 							Assert_MM_true(gmpIsRunning);
 							break;
 						case CARD_DIRTY:
@@ -3964,8 +4028,9 @@ MM_CopyForwardScheme::clearCardTableForPartialCollect(MM_EnvironmentVLHGC *env)
 			if (region->_copyForwardData._evacuateSet && !region->_markData._noEvacuation) {
 				if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 					void *low = region->getLowAddress();
-					void *bumpPointer = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocationPointer();
-					void *high = (void *)MM_Math::roundToCeiling(CARD_SIZE, (UDATA)bumpPointer);
+//					void *bumpPointer = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocationPointer();
+//					void *high = (void *)MM_Math::roundToCeiling(CARD_SIZE, (UDATA)bumpPointer);
+					void *high = region->getHighAddress();
 					Card *lowCard = cardTable->heapAddrToCardAddr(env, low);
 					Card *highCard = cardTable->heapAddrToCardAddr(env, high);
 					UDATA cardRangeSize = (UDATA)highCard - (UDATA)lowCard;
@@ -4022,7 +4087,13 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 						Assert_MM_true(pool->getActualFreeMemorySize() < region->getSize());
 						Assert_MM_false(region->isSurvivorRegion());
 						Assert_MM_true(NULL == region->_copyForwardData._survivorBase);
-						insertTailCandidate(env, &_reservedRegionList[compactGroup], region);
+//						if (!_extensions->tarokSortTailCandidateAscending) {
+						if (MM_GCExtensionsBase::SORT_ORDER_NOORDER == _extensions->tarokTailCandidateListSortOrder) {
+							insertTailCandidate(env, &_reservedRegionList[compactGroup], region);
+						} else {
+							/* insert and sort tail candidate list ascendingly */
+							insertAndSortTailCandidate(env, &_reservedRegionList[compactGroup], region, (MM_GCExtensionsBase::SORT_ORDER_ASCENDING == _extensions->tarokTailCandidateListSortOrder));
+						}
 					}
 				}
 			}
@@ -4139,7 +4210,7 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 
 	env->_copyForwardCompactGroups = NULL;
 
-	return ;
+	return;
 }
 
 void
@@ -4821,6 +4892,8 @@ MM_CopyForwardScheme::verifyIsPointerInEvacute(MM_EnvironmentVLHGC *env, J9Objec
 void
 MM_CopyForwardScheme::scanWeakReferenceObjects(MM_EnvironmentVLHGC *env)
 {
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB,"scanWeakReferenceObjects start, env=%p\n", env);
 	Assert_MM_true(env->getGCEnvironment()->_referenceObjectBuffer->isEmpty());
 	
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
@@ -4835,11 +4908,14 @@ MM_CopyForwardScheme::scanWeakReferenceObjects(MM_EnvironmentVLHGC *env)
 	
 	/* processReferenceList() may have pushed remembered references back onto the buffer if a GMP is active */
 	env->getGCEnvironment()->_referenceObjectBuffer->flush(env);
+//	j9tty_printf(PORTLIB,"scanWeakReferenceObjects end, env=%p\n", env);
 }
 
 void
 MM_CopyForwardScheme::scanSoftReferenceObjects(MM_EnvironmentVLHGC *env)
 {
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB,"scanSoftReferenceObjects start, env=%p\n", env);
 	Assert_MM_true(env->getGCEnvironment()->_referenceObjectBuffer->isEmpty());
 
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
@@ -4854,11 +4930,14 @@ MM_CopyForwardScheme::scanSoftReferenceObjects(MM_EnvironmentVLHGC *env)
 
 	/* processReferenceList() may have pushed remembered references back onto the buffer if a GMP is active */
 	env->getGCEnvironment()->_referenceObjectBuffer->flush(env);
+//	j9tty_printf(PORTLIB,"scanSoftReferenceObjects end, env=%p\n", env);
 }
 
 void
 MM_CopyForwardScheme::scanPhantomReferenceObjects(MM_EnvironmentVLHGC *env)
 {
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB,"scanPhantomReferenceObjects start, env=%p\n", env);
 	/* unfinalized processing may discover more phantom reference objects */
 	env->getGCEnvironment()->_referenceObjectBuffer->flush(env);
 
@@ -4899,11 +4978,14 @@ MM_CopyForwardScheme::scanPhantomReferenceObjects(MM_EnvironmentVLHGC *env)
 
 	/* processReferenceList() may have pushed remembered references back onto the buffer if a GMP is active */
 	env->getGCEnvironment()->_referenceObjectBuffer->flush(env);
+//	j9tty_printf(PORTLIB,"scanPhantomReferenceObjects end, env=%p\n", env);
 }
 
 void
 MM_CopyForwardScheme::processReferenceList(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC* region, J9Object* headOfList, MM_ReferenceStats *referenceStats)
 {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB,"processReferenceList headOfList=%p, env=%p, region=%zu\n", headOfList, env, _regionManager->mapDescriptorToRegionTableIndex(region));
 	/* no list can possibly contain more reference objects than there are bytes in a region. */
 	const UDATA maxObjects = _regionManager->getRegionSize();
 	UDATA objectsVisited = 0;
@@ -4917,6 +4999,9 @@ MM_CopyForwardScheme::processReferenceList(MM_EnvironmentVLHGC *env, MM_HeapRegi
 		referenceStats->_candidates += 1;
 
 		Assert_MM_true(region->isAddressInRegion(referenceObj));
+		if(objectsVisited >= maxObjects) {
+			j9tty_printf(PORTLIB,"processReferenceList headOfList=%p, region=%zu, env=%p\n", headOfList, _regionManager->mapDescriptorToRegionTableIndex(region), env);
+		}
 		Assert_MM_true(objectsVisited < maxObjects);
 
 		J9Object* nextReferenceObj = _extensions->accessBarrier->getReferenceLink(referenceObj);
@@ -4983,6 +5068,7 @@ MM_CopyForwardScheme::processReferenceList(MM_EnvironmentVLHGC *env, MM_HeapRegi
 			Assert_MM_true(NULL != env->_cycleState->_externalCycleState);
 			/* This reference object was on a list of GMP reference objects at the start of the cycle. Restore it to its original condition. */
 			J9GC_J9VMJAVALANGREFERENCE_STATE(env, referenceObj) = GC_ObjectModel::REF_STATE_INITIAL;
+//			j9tty_printf(PORTLIB, "processReferenceList add referenceObj=%p\n", referenceObj);
 			env->getGCEnvironment()->_referenceObjectBuffer->add(env, referenceObj);
 			break;
 		case GC_ObjectModel::REF_STATE_CLEARED:
@@ -5008,6 +5094,8 @@ MM_CopyForwardScheme::processReferenceList(MM_EnvironmentVLHGC *env, MM_HeapRegi
 void
 MM_CopyForwardScheme::rememberReferenceList(MM_EnvironmentVLHGC *env, J9Object* headOfList)
 {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB,"rememberReferenceList headOfList=%p, env=%p\n", headOfList, env);
 	Assert_MM_true((NULL == headOfList) || (NULL != env->_cycleState->_externalCycleState));
 	/* If phantom reference processing has already started this list will never be processed */
 	Assert_MM_true(0 == _phantomReferenceRegionsToProcess);
@@ -5023,6 +5111,7 @@ MM_CopyForwardScheme::rememberReferenceList(MM_EnvironmentVLHGC *env, J9Object* 
 			if (!isObjectInEvacuateMemory(referenceObj)) {
 				Assert_MM_true(_markMap->isBitSet(referenceObj));
 				Assert_MM_true(!isObjectInNurseryMemory(referenceObj));
+//				j9tty_printf(PORTLIB,"rememberReferenceList add referenceObj=%p\n", referenceObj);
 				env->getGCEnvironment()->_referenceObjectBuffer->add(env, referenceObj);
 			}
 			break;
@@ -5241,6 +5330,91 @@ MM_CopyForwardScheme::insertTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedR
 }
 
 void
+MM_CopyForwardScheme::insertAndSortTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC* tailRegion, bool isAscending)
+{
+	/* Sort regionList by AllocatableByte low to high */
+	if (NULL == regionList->_tailCandidates) {
+		regionList->_tailCandidates = tailRegion;
+		tailRegion->_copyForwardData._nextRegion = NULL;
+		tailRegion->_copyForwardData._previousRegion = NULL;
+	} else {
+		MM_HeapRegionDescriptorVLHGC* current = regionList->_tailCandidates;
+		UDATA insertAllocatableBytes = ((MM_MemoryPoolBumpPointer *)tailRegion->getMemoryPool())->getAllocatableBytes();
+		UDATA currentAllocatableBytes = 0;
+		while (NULL != current) {
+			currentAllocatableBytes = ((MM_MemoryPoolBumpPointer *)current->getMemoryPool())->getAllocatableBytes();
+			if ((isAscending && (insertAllocatableBytes <= currentAllocatableBytes)) ||
+				(!isAscending && (insertAllocatableBytes >= currentAllocatableBytes))) {
+				MM_HeapRegionDescriptorVLHGC* previous = current->_copyForwardData._previousRegion;
+				if (NULL == previous) {
+					regionList->_tailCandidates = tailRegion;
+				} else {
+					previous->_copyForwardData._nextRegion = tailRegion;
+				}
+				tailRegion->_copyForwardData._previousRegion = previous;
+				tailRegion->_copyForwardData._nextRegion = current;
+				current->_copyForwardData._previousRegion = tailRegion;
+				break;
+			}
+			if (NULL != current->_copyForwardData._nextRegion) {
+				current = current->_copyForwardData._nextRegion;
+			} else {
+				current->_copyForwardData._nextRegion = tailRegion;
+				tailRegion->_copyForwardData._previousRegion = current;
+				tailRegion->_copyForwardData._nextRegion = NULL;
+				break;
+			}
+		}
+	}
+	regionList->_tailCandidateCount += 1;
+}
+
+/*
+void
+MM_CopyForwardScheme::verifyCardTable(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region)
+{
+	MM_CardTable *cardTable = _extensions->cardTable;
+	MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	Card *lowCard = cardTable->heapAddrToCardAddr(env, region->getLowAddress());
+	Card *highCard = cardTable->heapAddrToCardAddr(env, regionPool->getAllocationPointer());
+	for (Card *thisCard = lowCard; thisCard < highCard; thisCard++) {
+		if (CARD_CLEAN != *thisCard) {
+			j9tty_printf(PORTLIB, "    verifyCardTable=Not Clean between low and allocatable, region=%zu, env=%p\n", _regionManager->mapDescriptorToRegionTableIndex(region), env);
+			break;
+		}
+	}
+	lowCard = cardTable->heapAddrToCardAddr(env, regionPool->getAllocationPointer());
+	highCard = cardTable->heapAddrToCardAddr(env, region->getHighAddress());
+	for (Card *thisCard = lowCard; thisCard < highCard; thisCard++) {
+		if (CARD_CLEAN != *thisCard) {
+			j9tty_printf(PORTLIB, "    verifyCardTable=Not Clean between allocatable to high, region=%zu, env=%p\n", _regionManager->mapDescriptorToRegionTableIndex(region), env);
+			break;
+		}
+	}
+}
+*/
+
+bool
+MM_CopyForwardScheme::isCardCleanForTail(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region)
+{
+	bool ret = true;
+	MM_CardTable *cardTable = _extensions->cardTable;
+	MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	Card *lowCard = cardTable->heapAddrToCardAddr(env, regionPool->getAllocationPointer());
+	Card *highCard = cardTable->heapAddrToCardAddr(env, region->getHighAddress());
+	for (Card *thisCard = lowCard; thisCard < highCard; thisCard++) {
+		if (CARD_CLEAN != *thisCard) {
+			j9tty_printf(PORTLIB, "    IsCardCleanForTail? no, region=%zu, env=%p\n", _regionManager->mapDescriptorToRegionTableIndex(region), env);
+			ret = false;
+			break;
+		}
+	}
+	return ret;
+}
+
+void
 MM_CopyForwardScheme::convertTailCandidateToSurvivorRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase)
 {
 	Trc_MM_CopyForwardScheme_convertTailCandidateToSurvivorRegion_Entry(env->getLanguageVMThread(), region, survivorBase);
@@ -5250,6 +5424,12 @@ MM_CopyForwardScheme::convertTailCandidateToSurvivorRegion(MM_EnvironmentVLHGC* 
 	Assert_MM_true(region->isAddressInRegion(survivorBase));
 
 	setRegionAsSurvivor(env, region, survivorBase);
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "convertTailCandidateToSurvivorRegion region=%zu, age=%zu, restoretail=%zu, survivorBase=%p env=%p\n", _regionManager->mapDescriptorToRegionTableIndex(region), region->getLogicalAge(), region->_recoveryFreeTailAfterSweep, survivorBase, env);
+//	if (region->_recoveryFreeTailAfterSweep) {
+//		verifyCardTable(env, region);
+//	}
 
 	/* TODO: Remembering does not really have to be done under a lock, but dual (prev, current) list implementation indirectly forces us to do it this way. */
 	rememberAndResetReferenceLists(env, region);
@@ -5263,6 +5443,7 @@ MM_CopyForwardScheme::setRegionAsSurvivor(MM_EnvironmentVLHGC* env, MM_HeapRegio
 	MM_MemoryPoolBumpPointer *memoryPool =  (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
 	UDATA freeMemorySize = memoryPool->getActualFreeMemorySize();
 	UDATA usedBytes = region->getSize() - freeMemorySize - memoryPool->getDarkMatterBytes();
+//	UDATA usedBytes = region->getSize() - memoryPool->getAllocatableBytes();
 
 	/* convert allocation age into (usedBytes * age) multiple. it will be converted back to pure age at the end of GC.
 	 * in the mean time as caches are allocated from the region, the age will be merged
@@ -5294,6 +5475,7 @@ MM_CopyForwardScheme::setAllocationAgeForMergedRegion(MM_EnvironmentVLHGC* env, 
 
 	MM_MemoryPoolBumpPointer *memoryPool =  (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
 	UDATA usedBytes = region->getSize() - memoryPool->getActualFreeMemorySize() - memoryPool->getDarkMatterBytes();
+//	UDATA usedBytes = region->getSize() - memoryPool->getAllocatableBytes();
 
 	Assert_MM_true(0 != usedBytes);
 

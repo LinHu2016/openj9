@@ -146,6 +146,12 @@ MM_SweepPoolManagerVLHGC::connectChunk(MM_EnvironmentBase *env, MM_ParallelSweep
 			if(memoryPool->canMemoryBeConnectedToPool(env, previousConnectChunk->trailingFreeCandidate, jointFreeSize)) {
 
 				/* Free list candidate has been found - attach it to the free list */
+
+				memoryPool->connectOuterMemoryToPool(env,
+						previousFreeEntry,
+						previousFreeEntrySize,
+						previousConnectChunk->trailingFreeCandidate);
+
 				previousFreeEntry = (MM_HeapLinkedFreeHeader *)previousConnectChunk->trailingFreeCandidate;
 				previousFreeEntrySize = jointFreeSize;
 			
@@ -161,6 +167,12 @@ MM_SweepPoolManagerVLHGC::connectChunk(MM_EnvironmentBase *env, MM_ParallelSweep
 			leadingFreeEntry = NULL;
 		} else {
 			if(memoryPool->canMemoryBeConnectedToPool(env, previousConnectChunk->trailingFreeCandidate, previousConnectChunk->trailingFreeCandidateSize)) {
+
+				memoryPool->connectOuterMemoryToPool(env,
+						previousFreeEntry,
+						previousFreeEntrySize,
+						previousConnectChunk->trailingFreeCandidate);
+
 				previousFreeEntry = (MM_HeapLinkedFreeHeader *)previousConnectChunk->trailingFreeCandidate;
 				previousFreeEntrySize = previousConnectChunk->trailingFreeCandidateSize;
 			
@@ -190,8 +202,12 @@ MM_SweepPoolManagerVLHGC::connectChunk(MM_EnvironmentBase *env, MM_ParallelSweep
 		if(NULL != leadingFreeEntry) { 
 			if(memoryPool->canMemoryBeConnectedToPool(env, leadingFreeEntry, leadingFreeEntrySize)) {
 				
-				Assert_MM_true(previousFreeEntry < leadingFreeEntry);
 				Assert_MM_true(previousFreeEntry <= leadingFreeEntry);
+
+				memoryPool->connectOuterMemoryToPool(env,
+						previousFreeEntry,
+						previousFreeEntrySize,
+						leadingFreeEntry);
 
 				previousFreeEntry = leadingFreeEntry;
 				previousFreeEntrySize = leadingFreeEntrySize;
@@ -202,7 +218,12 @@ MM_SweepPoolManagerVLHGC::connectChunk(MM_EnvironmentBase *env, MM_ParallelSweep
 					sweepState->_sweepFreeHoles += 1;
 					sweepState->_largestFreeEntry = OMR_MAX(leadingFreeEntrySize, sweepState->_largestFreeEntry);
 				}
-			}	
+			}
+//			else {
+//				memoryPool->abandonMemoryInPool(env,
+//						leadingFreeEntry,
+//						leadingFreeEntrySize);
+//			}
 		}	
 	}
 
@@ -212,7 +233,12 @@ MM_SweepPoolManagerVLHGC::connectChunk(MM_EnvironmentBase *env, MM_ParallelSweep
 	 */
 	if(chunk->freeListHead) {
 		Assert_MM_true(previousFreeEntry < chunk->freeListHead);
-		
+
+		memoryPool->connectOuterMemoryToPool(env,
+				previousFreeEntry,
+				previousFreeEntrySize,
+				chunk->freeListHead);
+
 		/* If there is a head, there is a tail - update the previous free entry */
 		previousFreeEntry = chunk->freeListTail;
 		previousFreeEntrySize = chunk->freeListTailSize;
@@ -239,14 +265,26 @@ MM_SweepPoolManagerVLHGC::connectChunk(MM_EnvironmentBase *env, MM_ParallelSweep
 }
 
 void
-MM_SweepPoolManagerVLHGC::flushFinalChunk(MM_EnvironmentBase *envModron, MM_MemoryPool *memoryPool)
+MM_SweepPoolManagerVLHGC::flushFinalChunk(MM_EnvironmentBase *envModron, MM_MemoryPool *memoryPoolBase)
 {
-	MM_SweepPoolState *sweepState = getPoolState(memoryPool);
+	MM_SweepPoolState *sweepState = getPoolState(memoryPoolBase);
 
 	/* If the last chunk had trailing free space, try and add it to the free list */
 	if((sweepState->_connectPreviousChunk != NULL) && (sweepState->_connectPreviousChunk->trailingFreeCandidateSize > 0)) {
 		/* Check if the entry is a candidate */
-		if (((MM_MemoryPoolBumpPointer *)memoryPool)->canMemoryBeConnectedToPool(envModron, sweepState->_connectPreviousChunk->trailingFreeCandidate, sweepState->_connectPreviousChunk->trailingFreeCandidateSize)) {
+		MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)memoryPoolBase;
+		if (!memoryPool->canMemoryBeConnectedToPool(envModron, sweepState->_connectPreviousChunk->trailingFreeCandidate, sweepState->_connectPreviousChunk->trailingFreeCandidateSize)) {
+//			/* It is not - abandon it */
+//			memoryPool->abandonMemoryInPool(envModron,
+//					sweepState->_connectPreviousChunk->trailingFreeCandidate,
+//					sweepState->_connectPreviousChunk->trailingFreeCandidateSize);
+		} else {
+			/* It is - fold it into the free list */
+			memoryPool->connectOuterMemoryToPool(envModron,
+					sweepState->_connectPreviousFreeEntry,
+					sweepState->_connectPreviousFreeEntrySize,
+					sweepState->_connectPreviousChunk->trailingFreeCandidate);
+
 			sweepState->_connectPreviousFreeEntry = (MM_HeapLinkedFreeHeader *)sweepState->_connectPreviousChunk->trailingFreeCandidate;
 			sweepState->_connectPreviousFreeEntrySize = sweepState->_connectPreviousChunk->trailingFreeCandidateSize;
 			Assert_MM_true(sweepState->_connectPreviousFreeEntry != sweepState->_connectPreviousChunk->leadingFreeCandidate);
@@ -259,18 +297,27 @@ MM_SweepPoolManagerVLHGC::flushFinalChunk(MM_EnvironmentBase *envModron, MM_Memo
 }
 
 void
-MM_SweepPoolManagerVLHGC::connectFinalChunk(MM_EnvironmentBase *envModron,MM_MemoryPool *memoryPool)
+MM_SweepPoolManagerVLHGC::connectFinalChunk(MM_EnvironmentBase *envModron,MM_MemoryPool *memoryPoolBase)
 {
 	/* Update pool free memory statistics since they are required to identify free regions to recycle */
-	MM_SweepPoolState *sweepState = getPoolState(memoryPool);
+	MM_SweepPoolState *sweepState = getPoolState(memoryPoolBase);
+	MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)memoryPoolBase;
+
+	if(sweepState->_connectPreviousFreeEntry) {
+
+		memoryPool->connectFinalMemoryToPool(envModron,
+				sweepState->_connectPreviousFreeEntry,
+				sweepState->_connectPreviousFreeEntrySize);
+	}
+
 	memoryPool->setFreeMemorySize(sweepState->_sweepFreeBytes);
 	memoryPool->setFreeEntryCount(sweepState->_sweepFreeHoles);
 	memoryPool->setLargestFreeEntry(sweepState->_largestFreeEntry);
-	MM_MemoryPoolBumpPointer *bpPool = (MM_MemoryPoolBumpPointer *)memoryPool;
-	UDATA actualFreeMemory = bpPool->getActualFreeMemorySize();
-	UDATA allocatableBytes = bpPool->getAllocatableBytes();
+
+	UDATA actualFreeMemory = memoryPool->getActualFreeMemorySize();
+	UDATA allocatableBytes = memoryPool->getAllocatableBytes();
 	if (0 == actualFreeMemory) {
-		Assert_MM_true(allocatableBytes < bpPool->getMinimumFreeEntrySize());
+		Assert_MM_true(allocatableBytes < memoryPool->getMinimumFreeEntrySize());
 	} else {
 		Assert_MM_true(allocatableBytes <= actualFreeMemory);
 	}
@@ -314,8 +361,9 @@ MM_SweepPoolManagerVLHGC::addFreeMemory(MM_EnvironmentBase *env, MM_ParallelSwee
 		Assert_MM_true(objectSizeDelta <= freeSizeInBytes);
 		freeSizeInBytes -= objectSizeDelta;
 		address = (UDATA *) (((UDATA)address) + objectSizeDelta);
-
-		if (((MM_MemoryPoolBumpPointer *)sweepChunk->memoryPool)->canMemoryBeConnectedToPool(env, address, freeSizeInBytes)) {
+		MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)sweepChunk->memoryPool;
+		if (memoryPool->connectInnerMemoryToPool(env, address, freeSizeInBytes, sweepChunk->freeListTail)) {
+//		if (((MM_MemoryPoolBumpPointer *)sweepChunk->memoryPool)->canMemoryBeConnectedToPool(env, address, freeSizeInBytes)) {
 			/* If the hole is first in this chunk, make it the header */
 			if(NULL == sweepChunk->freeListTail) {
 				sweepChunk->freeListHead = (MM_HeapLinkedFreeHeader *)address;
