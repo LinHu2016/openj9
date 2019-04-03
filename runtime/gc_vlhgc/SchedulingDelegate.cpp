@@ -961,6 +961,8 @@ MM_SchedulingDelegate::calculateAutomaticGMPIntermission(MM_EnvironmentVLHGC *en
 			UDATA globalMarkIncrementsRequiredWithHeadroom = globalMarkIncrementsRequired + incrementHeadroom;
 			UDATA globalMarkIncrementsRemaining = partialCollectsRemaining * _extensions->tarokPGCtoGMPDenominator / _extensions->tarokPGCtoGMPNumerator;
 			_remainingGMPIntermissionIntervals = MM_Math::saturatingSubtract(globalMarkIncrementsRemaining, globalMarkIncrementsRequiredWithHeadroom);
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "calculateAutomaticGMPIntermission incrementHeadroom=%zu, globalMarkIncrementsRequired=%zu, globalMarkIncrementsRemaining=%zu, _remainingGMPIntermissionIntervals=%zu\n", incrementHeadroom, globalMarkIncrementsRequired, globalMarkIncrementsRemaining, _remainingGMPIntermissionIntervals);
 		}
 	}
 

@@ -5399,14 +5399,39 @@ MM_CopyForwardScheme::removeTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedR
 }
 
 void
-MM_CopyForwardScheme::insertTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *tailRegion)
+MM_CopyForwardScheme::insertTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC* tailRegion)
 {
-	tailRegion->_copyForwardData._nextRegion = regionList->_tailCandidates;
-	tailRegion->_copyForwardData._previousRegion = NULL;
-	if(NULL != regionList->_tailCandidates) {
-		regionList->_tailCandidates->_copyForwardData._previousRegion = tailRegion;
+	/* Sort regionList by AllocatableByte low to high */
+	if (NULL == regionList->_tailCandidates) {
+		regionList->_tailCandidates = tailRegion;
+		tailRegion->_copyForwardData._nextRegion = NULL;
+		tailRegion->_copyForwardData._previousRegion = NULL;
+	} else {
+		MM_HeapRegionDescriptorVLHGC* current = regionList->_tailCandidates;
+		UDATA insertAllocatableBytes = ((MM_MemoryPoolBumpPointer *)tailRegion->getMemoryPool())->getAllocatableBytes();
+		while (NULL != current) {
+			if (insertAllocatableBytes <= ((MM_MemoryPoolBumpPointer *)current->getMemoryPool())->getAllocatableBytes()) {
+				MM_HeapRegionDescriptorVLHGC* previous = current->_copyForwardData._previousRegion;
+				if (NULL == previous) {
+					regionList->_tailCandidates = tailRegion;
+				} else {
+					previous->_copyForwardData._nextRegion = tailRegion;
+				}
+				tailRegion->_copyForwardData._previousRegion = previous;
+				tailRegion->_copyForwardData._nextRegion = current;
+				current->_copyForwardData._previousRegion = tailRegion;
+				break;
+			}
+			if (NULL != current->_copyForwardData._nextRegion) {
+				current = current->_copyForwardData._nextRegion;
+			} else {
+				current->_copyForwardData._nextRegion = tailRegion;
+				tailRegion->_copyForwardData._previousRegion = current;
+				tailRegion->_copyForwardData._nextRegion = NULL;
+				break;
+			}
+		}
 	}
-	regionList->_tailCandidates = tailRegion;
 	regionList->_tailCandidateCount += 1;
 }
 

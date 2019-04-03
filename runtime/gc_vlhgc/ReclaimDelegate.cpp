@@ -70,6 +70,8 @@ MM_ReclaimDelegate::MM_ReclaimDelegate(MM_EnvironmentBase *env, MM_HeapRegionMan
 	, _compactRateOfReturn(1.0)
 	, _compactGroups(NULL)
 	, _compactGroupMaxCount(MM_CompactGroupManager::getCompactGroupMaxCount(MM_EnvironmentVLHGC::getEnvironment(env)))
+//	, _reservedFromCollectionSet(NULL)
+//	, _reservedFromCollectionSetMostFree(NULL)
 {
 	_typeId = __FUNCTION__;
 	memset(_regionSortedByCompactScore, 0x0, sizeof(_regionSortedByCompactScore));
@@ -104,6 +106,14 @@ MM_ReclaimDelegate::initialize(MM_EnvironmentVLHGC *env)
 		goto error_no_memory;
 	}
 
+//	_reservedFromCollectionSet = (MM_HeapRegionDescriptorVLHGC **)j9mem_allocate_memory(sizeof(MM_HeapRegionDescriptorVLHGC *) * MM_CompactGroupManager::getCompactGroupMaxCount(env), OMRMEM_CATEGORY_MM);
+//	if(NULL == _reservedFromCollectionSet) {
+//		goto error_no_memory;
+//	}
+//	_reservedFromCollectionSetMostFree = (MM_HeapRegionDescriptorVLHGC **)j9mem_allocate_memory(sizeof(MM_HeapRegionDescriptorVLHGC *) * MM_CompactGroupManager::getCompactGroupMaxCount(env), OMRMEM_CATEGORY_MM);
+//	if(NULL == _reservedFromCollectionSetMostFree) {
+//		goto error_no_memory;
+//	}
 	return true;
 
 error_no_memory:
@@ -132,7 +142,95 @@ MM_ReclaimDelegate::tearDown(MM_EnvironmentVLHGC *env)
 		j9mem_free_memory(_regionsSortedByEmptinessArray);
 		_regionsSortedByEmptinessArray = NULL;
 	}
+
+//	if(NULL != _reservedFromCollectionSet) {
+//		j9mem_free_memory(_reservedFromCollectionSet);
+//		_reservedFromCollectionSet = NULL;
+//	}
+//	if(NULL != _reservedFromCollectionSetMostFree) {
+//		j9mem_free_memory(_reservedFromCollectionSetMostFree);
+//		_reservedFromCollectionSetMostFree = NULL;
+//	}
 }
+
+//bool
+//MM_ReclaimDelegate::isInReservedList(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region)
+//{
+//	bool ret = false;
+//	UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+//	switch (MM_GCExtensions::getExtensions(env)->tarokReserveRegionsFromCollectionSet)
+//	{
+//	case MM_GCExtensionsBase::RESERVE_REGIONS_MOST_ALLOCATABLE :
+//		ret = (region == _reservedFromCollectionSet[compactGroup]);
+//		break;
+//	case MM_GCExtensionsBase::RESERVE_REGIONS_MOST_FREE :
+//		ret = (region == _reservedFromCollectionSetMostFree[compactGroup]);
+//		break;
+//	case MM_GCExtensionsBase::RESERVE_REGIONS_NO :
+//		ret = false;
+//		break;
+//	default :
+//		Assert_MM_unreachable();
+//		break;
+//	}
+//	return ret;
+//}
+//
+///**
+// * Prepare the reserved region list, which contains the non-eden most "free" region per compact group, try to exclude those regions from copyforward collection set,
+// * they are good candidate for survivor region rather than collection set to avoid abort cases.
+// */
+//void
+//MM_ReclaimDelegate::prepareReservedList(MM_EnvironmentVLHGC *env)
+//{
+//	MM_HeapRegionManager *regionManager = MM_GCExtensions::getExtensions(env)->heapRegionManager;
+//	UDATA regionSize = _regionManager->getRegionSize();
+//
+//	GC_HeapRegionIteratorVLHGC regionIterator(regionManager);
+//	MM_HeapRegionDescriptorVLHGC *region = NULL;
+//
+//	memset((void *)_reservedFromCollectionSet, 0, sizeof(MM_HeapRegionDescriptorVLHGC *) * _compactGroupMaxCount);
+//	memset((void *)_reservedFromCollectionSetMostFree, 0, sizeof(MM_HeapRegionDescriptorVLHGC *) * _compactGroupMaxCount);
+//
+//	while (NULL != (region = regionIterator.nextRegion())) {
+//		if (region->containsObjects() && !MM_CompactGroupManager::isRegionInNursery(env, region) && region->getRememberedSetCardList()->isAccurate() && (0 == region->_criticalRegionsInUse)) {
+//			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+//			UDATA freeMemory = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocatableBytes();
+//			if ( (10 < (100 * freeMemory)/regionSize) && ((NULL == _reservedFromCollectionSet[compactGroup]) ||
+//				(freeMemory > ((MM_MemoryPoolBumpPointer *)_reservedFromCollectionSet[compactGroup]->getMemoryPool())->getAllocatableBytes()))) {
+//				_reservedFromCollectionSet[compactGroup] = region;
+//			}
+//			UDATA mostFreeMemory = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getFreeMemoryAndDarkMatterBytes();
+//			if ( (10 < (100 * mostFreeMemory)/regionSize) && ((NULL == _reservedFromCollectionSetMostFree[compactGroup]) ||
+//				(mostFreeMemory > ((MM_MemoryPoolBumpPointer *)_reservedFromCollectionSetMostFree[compactGroup]->getMemoryPool())->getFreeMemoryAndDarkMatterBytes()))) {
+//				_reservedFromCollectionSetMostFree[compactGroup] = region;
+//			}
+//		}
+//	}
+//
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB, "MM_ReclaimDelegate::prepareReservedList");
+//
+//	MM_MemoryPoolBumpPointer * memoryPool = NULL;
+//	j9tty_printf(PORTLIB, "the most Allocatable list: ");
+//	for (UDATA idx =0; idx<_compactGroupMaxCount; idx++) {
+//		region = _reservedFromCollectionSet[idx];
+//
+//		if (NULL != region) {
+//			memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+//			j9tty_printf(PORTLIB, " compactGroup=%zu, id=%zu, allocable=%zu, ", MM_CompactGroupManager::getCompactGroupNumber(env, region), _regionManager->mapDescriptorToRegionTableIndex(region), memoryPool->getAllocatableBytes());
+//		}
+//	}
+//	j9tty_printf(PORTLIB, "\nthe most Free list: ");
+//	for (UDATA idx =0; idx<_compactGroupMaxCount; idx++) {
+//		region = _reservedFromCollectionSetMostFree[idx];
+//		if (NULL != region) {
+//			memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+//			j9tty_printf(PORTLIB, " compactGroup=%zu, id=%zu, free=%zu, ", MM_CompactGroupManager::getCompactGroupNumber(env, region), _regionManager->mapDescriptorToRegionTableIndex(region), memoryPool->getFreeMemoryAndDarkMatterBytes());
+//		}
+//	}
+//	j9tty_printf(PORTLIB, "\n");
+//}
 
 void 
 MM_ReclaimDelegate::tagRegionsBeforeSweep(MM_EnvironmentVLHGC *env)
@@ -192,6 +290,10 @@ MM_ReclaimDelegate::tagRegionsBeforeCompactWithWorkGoal(MM_EnvironmentVLHGC *env
 	double lowestCompactScore = 100.0;
 	UDATA regionCount = 0;
 
+//	if (isCopyForward) {
+//		prepareReservedList(env);
+//	}
+
 	deriveCompactScore(env);
 	
 	if (!isCopyForward) {
@@ -212,6 +314,9 @@ MM_ReclaimDelegate::tagRegionsBeforeCompactWithWorkGoal(MM_EnvironmentVLHGC *env
 			Assert_MM_true(region->_sweepData._alreadySwept);
 			if (isCopyForward) {
 				Assert_MM_true(!region->_markData._shouldMark);
+//				if (isInReservedList(env, region)) {
+//					continue;
+//				}
 			} else {
 				Assert_MM_true(!region->_compactData._shouldFixup);
 				Assert_MM_true(!region->_compactData._shouldCompact);
@@ -605,7 +710,7 @@ MM_ReclaimDelegate::deriveCompactScore(MM_EnvironmentVLHGC *env)
 					
 					if (env->_cycleState->_shouldRunCopyForward) {
 						double sparsity = (double)(freeMemory - memoryPool->getAllocatableBytes()) / (double)regionSize;
-						compactScore = 50.0 * (sparsity + emptiness) * (1.0 - potentialWastedWork);
+						compactScore = 100.0 * (sparsity + potentialWastedWork);
 					} else {
 						compactScore = 100.0 * emptiness * (1.0 - potentialWastedWork);
 					}

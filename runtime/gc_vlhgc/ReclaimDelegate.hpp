@@ -83,6 +83,9 @@ private:
 	MM_ReclaimDelegate_ScoreBaseCompactTable *_compactGroups;  /**< Score based compaction recovered details per compactGroup */
 	const UDATA _compactGroupMaxCount;	/**< The number of compact groups in _compactGroups - used for walking the _compactGroups table and validating calculated compaction group numbers */
 
+//	MM_HeapRegionDescriptorVLHGC **_reservedFromCollectionSet; /**< Pointer table used for regions could be excluded from collection set per age */
+//	MM_HeapRegionDescriptorVLHGC **_reservedFromCollectionSetMostFree; /**< Pointer table used for regions could be excluded from collection set per age */
+
 	/* Member Functions */
 public:
 	/**
@@ -324,6 +327,8 @@ private:
 	 */
 	void calculateOptimalEmptinessRegionThreshold(MM_EnvironmentVLHGC *env);
 
+	void prepareReservedList(MM_EnvironmentVLHGC *env);
+	bool isInReservedList(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region);
 };
 
 #endif /* RECLAIMDELEGATE_HPP_ */
