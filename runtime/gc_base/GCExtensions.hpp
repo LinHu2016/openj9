@@ -39,11 +39,9 @@
 #include "modronbase.h"
 #include "omr.h"
 #include "omrmodroncore.h"
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #include "hashtable_api.h"
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 #include "EnvironmentBase.hpp"
 #include "GCExtensionsBase.hpp"
@@ -78,7 +76,6 @@ class MM_ReferenceObjectList;
 class MM_IdleGCManager;
 #endif
 
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 struct ArrayletTableEntry {
 	void *heapAddr; /* Arraylet address in the heap */
@@ -91,7 +88,6 @@ struct ArrayletTableEntry {
 	static UDATA equal(void *leftKey, void *rightKey, void *userData) { return ((ArrayletTableEntry*)leftKey)->contiguousAddr == ((ArrayletTableEntry*)rightKey)->contiguousAddr; }
 };
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 /**
  * @todo Provide class documentation
@@ -100,11 +96,9 @@ struct ArrayletTableEntry {
 class MM_GCExtensions : public MM_GCExtensionsBase {
 public:
 	MM_StringTable* stringTable; /**< top level String Table structure (internally organized as a set of hash sub-tables */
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	J9HashTable* arrayletHashTable;
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 	void* gcchkExtensions;
 
@@ -213,11 +207,9 @@ public:
 
 protected:
 private:
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	MM_LightweightNonReentrantLock _arrayletLock; /* Lock to protect hash table access */
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 protected:
 	virtual bool initialize(MM_EnvironmentBase* env);
 	virtual void tearDown(MM_EnvironmentBase* env);
@@ -225,12 +217,10 @@ protected:
 
 public:
 	static MM_GCExtensions* newInstance(MM_EnvironmentBase* env);
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	virtual void* doubleMapArraylets(MM_EnvironmentBase* env, J9Object *objectPtr);
 	virtual bool freeDoubleMap(MM_EnvironmentBase* env, void* contiguousAddr, UDATA dataSize, struct J9PortVmemIdentifier *identifier);
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 	virtual void kill(MM_EnvironmentBase* env);
 
 	MMINLINE J9HookInterface** getHookInterface() { return J9_HOOK_INTERFACE(hookInterface); };
@@ -240,12 +230,10 @@ public:
 	 * @return the string table
 	 */
 	MMINLINE MM_StringTable* getStringTable() { return stringTable; }
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	MMINLINE J9HashTable* getArrayletHashTable() { return arrayletHashTable; }
 	MMINLINE MM_LightweightNonReentrantLock* getArrayletLock() { return &_arrayletLock; }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 	MMINLINE UDATA getDynamicMaxSoftReferenceAge()
 	{
@@ -310,11 +298,9 @@ public:
 	MM_GCExtensions()
 		: MM_GCExtensionsBase()
 		, stringTable(NULL)
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 		, arrayletHashTable(NULL)
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 		, gcchkExtensions(NULL)
 		, tgcExtensions(NULL)
 #if defined(J9VM_GC_FINALIZATION)

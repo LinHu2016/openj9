@@ -30,12 +30,10 @@
 #include "j9nongenerated.h"
 #include "j9port.h"
 #include "util_api.h"
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #include "ArrayletLeafIterator.hpp"
 #include "Heap.hpp"
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 #include "EnvironmentBase.hpp"
 #include "Forge.hpp"
@@ -89,17 +87,14 @@ bool
 MM_GCExtensions::initialize(MM_EnvironmentBase *env)
 {
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	OMRPORT_ACCESS_FROM_J9PORT(privatePortLibrary);
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 	if (!MM_GCExtensionsBase::initialize(env)) {
 		goto failed;
 	}
 
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	/* Initialize arraylet hash table */
 	/* Create hash table. Maps arraylet heap addresses to contiguous arraylet leaf addresses */
@@ -120,7 +115,6 @@ MM_GCExtensions::initialize(MM_EnvironmentBase *env)
 		goto failed;
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 #if defined(J9VM_GC_REALTIME)
 #if defined(J9VM_GC_HYBRID_ARRAYLETS)
@@ -307,8 +301,11 @@ MM_GCExtensions::computeDefaultMaxHeap(MM_EnvironmentBase *env)
 	memoryMax = MM_Math::roundToFloor(heapAlignment, memoryMax);
 }
 
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+#if !defined(LINUX)
+/* Double map is only supported on LINUX for now */
+#error "Platform not supported by Double Map API"
+#endif /* !LINUX */
 void* 
 MM_GCExtensions::doubleMapArraylets(MM_EnvironmentBase* env, J9Object *objectPtr) 
 {
@@ -378,4 +375,3 @@ MM_GCExtensions::freeDoubleMap(MM_EnvironmentBase* env, void* contiguousAddr, UD
 	return result != -1;
 }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
