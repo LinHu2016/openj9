@@ -91,13 +91,11 @@ GC_ArrayletObjectModel::getArrayletLayout(J9Class* clazz, UDATA dataSizeInBytes,
 			if (extensions->isVLHGC()) {
 				adjustedHybridSpineBytesAfterMove += objectAlignmentInBytes;
 			}
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 			if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 				layout = Discontiguous;
 			} else
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 			{
 				/* if remainder data can fit in spine, make it hybrid */
 				if (adjustedHybridSpineBytesAfterMove <= largestDesirableSpine) {

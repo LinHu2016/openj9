@@ -98,13 +98,11 @@ GC_ArrayletObjectModelBase::getSpineSizeWithoutHeader(ArrayLayout layout, UDATA 
 	if (InlineContiguous == layout) {
 		spineDataSize = dataSize; // All data in spine
 	} else if (Hybrid == layout) {
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 		if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 			spineDataSize = 0;
 		} else
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 		{
 			spineDataSize = (dataSize & (_omrVM->_arrayletLeafSize - 1)); // Last arraylet in spine.
 		}

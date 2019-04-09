@@ -44,11 +44,9 @@ class GC_ArrayletObjectModelBase
 * Data members
 */
 private:
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	bool _enableDoubleMapping; /** Allows arraylets to be double mapped */
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 protected:
 	OMR_VM *_omrVM; 	/**< used so that we can pull the arrayletLeafSize and arrayletLeafLogSize for arraylet sizing calculations */
 	void * _arrayletRangeBase; /**< The base heap range of where discontiguous arraylets are allowed. */
@@ -112,7 +110,6 @@ public:
 		((J9IndexableObjectContiguous *)arrayPtr)->size = (U_32)size;
 	}
 
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	/**
 	 * Sets enable double mapping
@@ -130,7 +127,6 @@ public:
 		return _enableDoubleMapping;
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 	/**
 	 * Sets size in elements of a discontiguous indexable object .
@@ -225,13 +221,11 @@ public:
 			 */
 			numberOfArraylets = ((dataSizeInBytes >> leafLogSize) + (((dataSizeInBytes & leafSizeMask) + leafSizeMask) >> leafLogSize));
 
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 			if ((_enableDoubleMapping && numberOfArraylets > 1) && (unadjustedDataSizeInBytes % leafSize == 0)) {
 				numberOfArraylets -= 1;
 			}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 		}
 		return numberOfArraylets;
 	}
