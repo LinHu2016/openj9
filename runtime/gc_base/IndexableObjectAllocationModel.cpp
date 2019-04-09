@@ -264,14 +264,12 @@ MM_IndexableObjectAllocationModel::layoutDiscontiguousArraylet(MM_EnvironmentBas
 	if (NULL != spine) {
 		switch (_layout) {
 		case GC_ArrayletObjectModel::Discontiguous:
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 			/* All data from array are stored in the leaves */
 			if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 				Assert_MM_true(arrayoidIndex == _numberOfArraylets);
 			} else
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 			{
 				 /* if last arraylet leaf is empty (contains 0 bytes) arrayoid pointer is set to NULL */
 				if (arrayoidIndex == (_numberOfArraylets - 1)) { 
@@ -287,13 +285,11 @@ MM_IndexableObjectAllocationModel::layoutDiscontiguousArraylet(MM_EnvironmentBas
 
 		/* Unreachable if double map is enabled */
 		case GC_ArrayletObjectModel::Hybrid:
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 			if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 				Assert_MM_double_map_unreachable();
 			}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 			/* last arrayoid points to end of arrayoid array in spine header (object-aligned if
 			 * required). (data size % leaf size) bytes of data are stored here (may be empty).
 			 */

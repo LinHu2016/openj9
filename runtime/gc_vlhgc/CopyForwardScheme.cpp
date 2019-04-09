@@ -4050,7 +4050,6 @@ private:
 		}
 	}
 
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	virtual void doDoubleMappedObjectSlot(ArrayletTableEntry *slotPtr, GC_HashTableIterator *hashTableIterator) 
 	{
@@ -4071,7 +4070,6 @@ private:
 		}
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 
 	/**
 	 * @Clear the string table cache slot if the object is not marked

@@ -272,7 +272,6 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 #endif
 	}
 
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	bool successDoubleMap = false;
 	if (shouldCopy && _extensions->indexableObjectModel.isDoubleMappingEnabled()) {
@@ -297,7 +296,6 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 	}
 	if (!successDoubleMap) 
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 	{
 		if (shouldCopy) {
 			GC_ArrayObjectModel* indexableObjectModel = &_extensions->indexableObjectModel;
@@ -353,11 +351,9 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 		}
 #endif
 	}
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	if (!_successDoubleMap) 
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 	{
 		if (shouldCopy) {
 			if (JNI_ABORT != mode) {
@@ -395,11 +391,9 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 			MM_JNICriticalRegion::exitCriticalRegion(vmThread, true);
 		}
 	}
-#if defined(LINUX)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	_successDoubleMap = false;
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-#endif /* LINUX */
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
 }
 
