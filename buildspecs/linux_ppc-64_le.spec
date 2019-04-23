@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Copyright (c) 2006, 2018 IBM Corp. and others
+Copyright (c) 2006, 2019 IBM Corp. and others
 
 This program and the accompanying materials are made available under
 the terms of the Eclipse Public License 2.0 which accompanies this
@@ -139,6 +139,7 @@ SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-excepti
 		<flag id="gc_debugAsserts" value="true"/>
 		<flag id="gc_idleHeapManager" value="true"/>
 		<flag id="gc_inlinedAllocFields" value="true"/>
+		<flag id="gc_enableDoubleMap" value="true"/>
 		<flag id="gc_minimumObjectSize" value="true"/>
 		<flag id="gc_subpoolsAlias" value="true"/>
 		<flag id="graph_cmdLineTester" value="true"/>
