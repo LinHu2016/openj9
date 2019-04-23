@@ -392,6 +392,13 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 		}
 	}
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+	else {
+		// Commit means copy the data but do not free the buffer.
+		// All other modes free the buffer.
+		if (JNI_COMMIT != mode) {
+			functions->jniArrayFreeMemoryFromThread(vmThread, elems);
+		}
+	}
 	_successDoubleMap = false;
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	VM_VMAccess::inlineExitVMToJNI(vmThread);

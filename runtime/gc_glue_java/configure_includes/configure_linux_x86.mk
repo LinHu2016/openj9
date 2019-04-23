@@ -26,6 +26,7 @@ CONFIGURE_ARGS += \
 	--enable-debug \
 	--enable-OMR_THR_THREE_TIER_LOCKING \
 	--enable-OMR_THR_YIELD_ALG \
+	--enable-OMR_GC_DOUBLE_MAP_ARRAYLETS \
 	--enable-OMR_THR_SPIN_WAKE_CONTROL
 
 ifeq (linux_x86-64_cmprssptrs, $(SPEC))
@@ -37,7 +38,6 @@ ifeq (linux_x86-64_cmprssptrs, $(SPEC))
 		--enable-OMR_GC_COMPRESSED_POINTERS \
 		--enable-OMR_GC_IDLE_HEAP_MANAGER \
 		--enable-OMR_GC_TLH_PREFETCH_FTA \
-		--enable-OMR_GC_DOUBLE_MAP_ARRAYLETS \
 		--enable-OMR_GC_CONCURRENT_SCAVENGER \
 		--enable-OMR_INTERP_COMPRESSED_OBJECT_HEADER \
 		--enable-OMR_INTERP_SMALL_MONITOR_SLOT \
