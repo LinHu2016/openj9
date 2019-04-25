@@ -32,6 +32,9 @@
 #include "j9protos.h"
 #include "ModronAssertions.h"
 
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+#include "ArrayletLeafIterator.hpp"
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #include "VLHGCAccessBarrier.hpp"
 #include "AtomicOperations.hpp"
 #include "CardTable.hpp"
@@ -274,7 +277,7 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	bool successDoubleMap = false;
-	if (shouldCopy && _extensions->indexableObjectModel.isDoubleMappingEnabled()) {
+	if (shouldCopy && _extensions->indexableObjectModel.isDoubleMappingEnabled() && _extensions->indexableObjectModel.numArraylets(arrayObject) > 1) {
 		GC_HashTableIterator hashTableIterator(_extensions->getArrayletHashTable());
 		ArrayletTableEntry *slot = NULL;
 		bool found = false;
@@ -287,17 +290,23 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		}
 
 		if (data == NULL || !found) {
+			assert(0);
 			successDoubleMap = false;
 		} else {
 			successDoubleMap = true;
 		}
-
-		_successDoubleMap = successDoubleMap;
 	}
 	if (!successDoubleMap) 
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	{
-		if (shouldCopy) {
+		if(shouldCopy && _extensions->indexableObjectModel.numArraylets(arrayObject) == 1 && _extensions->indexableObjectModel.getSizeInElements(arrayObject) > 0) {
+			/* Solo arraylet leaf is contiguous so we can simply return the data associated with it */
+			MM_JNICriticalRegion::enterCriticalRegion(vmThread, true);
+			Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
+			GC_ArrayletLeafIterator arrayletLeafIterator(javaVM, arrayObject);
+			GC_SlotObject *slotObject = arrayletLeafIterator.nextLeafPointer();
+			data = slotObject->readReferenceFromSlot();
+		} else if (shouldCopy) {
 			GC_ArrayObjectModel* indexableObjectModel = &_extensions->indexableObjectModel;
 			I_32 sizeInElements = (I_32)indexableObjectModel->getSizeInElements(arrayObject);
 			UDATA sizeInBytes = indexableObjectModel->getDataSizeInBytes(arrayObject);
@@ -352,10 +361,22 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 #endif
 	}
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-	if (!_successDoubleMap) 
+	if (!shouldCopy || (shouldCopy && _extensions->indexableObjectModel.numArraylets(arrayObject) <= 1))
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	{
-		if (shouldCopy) {
+		if(shouldCopy && _extensions->indexableObjectModel.numArraylets(arrayObject) == 1 && _extensions->indexableObjectModel.getSizeInElements(arrayObject) > 0) {
+			/*
+			 * Objects can not be moved if critical section is active
+			 * This trace point will be generated if object has been moved or passed value of elems is corrupted
+			 */
+			GC_ArrayletLeafIterator arrayletLeafIterator(javaVM, arrayObject);
+			GC_SlotObject *slotObject = arrayletLeafIterator.nextLeafPointer();
+			void *data = slotObject->readReferenceFromSlot();
+			if (elems != data) {
+				Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
+			}
+			MM_JNICriticalRegion::exitCriticalRegion(vmThread, true);
+		} else if (shouldCopy) {
 			if (JNI_ABORT != mode) {
 				GC_ArrayObjectModel* indexableObjectModel = &_extensions->indexableObjectModel;
 				I_32 sizeInElements = (I_32)indexableObjectModel->getSizeInElements(arrayObject);
@@ -391,16 +412,6 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 			MM_JNICriticalRegion::exitCriticalRegion(vmThread, true);
 		}
 	}
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-	else {
-		// Commit means copy the data but do not free the buffer.
-		// All other modes free the buffer.
-		if (JNI_COMMIT != mode) {
-			functions->jniArrayFreeMemoryFromThread(vmThread, elems);
-		}
-	}
-	_successDoubleMap = false;
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
 }
 

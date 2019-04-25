@@ -534,7 +534,7 @@ J9AllocateIndexableObject(J9VMThread *vmThread, J9Class *clazz, uint32_t numberO
 			Assert_MM_true(sizeInElements == 0 || arrayletLeafCount > 0);
 
 			void *contiguousAddr = NULL;
-			if ((arrayletLeafCount > 0) && (sizeInElements > 0)) {
+			if ((arrayletLeafCount > 1) && (sizeInElements > 0)) {
 				contiguousAddr = extensions->doubleMapArraylets(env, objectPtr);
 				if (contiguousAddr == NULL) {
 					objectPtr = NULL;

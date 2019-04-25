@@ -225,7 +225,7 @@ MM_RootScanner::doStringTableSlot(J9Object **slotPtr, GC_StringTableIterator *st
 void 
 MM_RootScanner::doDoubleMappedObjectSlot(ArrayletTableEntry *slotPtr, GC_HashTableIterator *hashTableIterator)
 {
-	doSlot((J9Object **)slotPtr);
+	doSlot((J9Object **)&slotPtr->heapAddr);
 }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 

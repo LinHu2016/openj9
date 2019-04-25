@@ -372,6 +372,8 @@ MM_GCExtensions::freeDoubleMap(MM_EnvironmentBase* env, void* contiguousAddr, UD
 
 	int result = j9vmem_free_memory(contiguousMem, dataSize, identifier);
 
-	return result != -1;
+	assert(result == 0);
+
+	return result == 0;
 }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
