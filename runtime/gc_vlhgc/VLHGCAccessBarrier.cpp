@@ -32,9 +32,7 @@
 #include "j9protos.h"
 #include "ModronAssertions.h"
 
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #include "ArrayletLeafIterator.hpp"
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #include "VLHGCAccessBarrier.hpp"
 #include "AtomicOperations.hpp"
 #include "CardTable.hpp"
