@@ -349,13 +349,13 @@ When enabled, a contiguous block of memory is created for each array which data 
 if the data was stored in a contiguous region of memory. All of the array data will be stored at their own region (not with spine); hence, all arraylets
 become discontiguous whenever this flag is enabled. Since there won’t be any empty arraylet leaves, then arrayoid NULL pointers are no longer required since
 all data is stored in their own region. It additionaly reduces footprint, mainly for JNI primitive array critical.</description>
-                <ifRemoved></ifRemoved>
-                <requires>
-                        <require flag="gc_arraylets"/>
+		<ifRemoved></ifRemoved>
+		<requires>
+			<require flag="gc_arraylets"/>
 			<require flag="gc_hybridArraylets"/>
 			<require flag="gc_vlhgc"/>
-                </requires>
-        </flag>
+		</requires>
+	</flag>
 	<flag id="gc_compressedPointerBarrier">
 		<description>VM performs runtime checks for missed access barriers in a compressed pointer sense</description>
 		<ifRemoved>VM does not check for missed access barriers in a compressed pointer sense</ifRemoved>

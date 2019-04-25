@@ -51,9 +51,6 @@ class MM_ObjectAccessBarrier : public MM_BaseVirtual
 	/* data members */
 private:
 protected:
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-	bool _successDoubleMap;
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	MM_GCExtensions *_extensions; 
 	MM_Heap *_heap;
 #if defined (OMR_GC_COMPRESSED_POINTERS)
@@ -535,9 +532,6 @@ public:
 #endif /* defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING) */
 
 	MM_ObjectAccessBarrier(MM_EnvironmentBase *env) : MM_BaseVirtual()
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-		, _successDoubleMap(false)
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 		, _extensions(NULL) 
 		, _heap(NULL)
 #if defined (OMR_GC_COMPRESSED_POINTERS)
