@@ -595,7 +595,10 @@ MM_ScavengerDelegate::private_addOwnableSynchronizerObjectInList(MM_EnvironmentS
 	if (NULL != link) {
 		/* this method expects the caller (scanObject) never pass the same object twice, which could cause circular loop when walk through the list.
 		 * the assertion partially could detect duplication case */
-		Assert_MM_false(_extensions->scavenger->isObjectInNewSpace(link));
+//		Assert_MM_false(_extensions->scavenger->isObjectInNewSpace(link));
+		Assert_GC_true_with_message2(env, !(_extensions->scavenger->isObjectInNewSpace(link)), "OwnableSynchronizerObject = %p; link = %p\n", object, link);
+
+
 		env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->add(env, object);
 		env->getGCEnvironment()->_scavengerJavaStats._ownableSynchronizerTotalSurvived += 1;
 		if (_extensions->scavenger->isObjectInNewSpace(object)) {

@@ -42,6 +42,7 @@
 #include "GlobalCollector.hpp"
 #include "ObjectAllocationInterface.hpp"
 #include "ObjectModel.hpp"
+#include "ObjectAccessBarrier.hpp"
 #include "OwnableSynchronizerObjectBuffer.hpp"
 #include "MemorySpace.hpp"
 #include "MemorySubSpace.hpp"
@@ -916,6 +917,12 @@ UDATA
 ownableSynchronizerObjectCreated(J9VMThread *vmThread, j9object_t object)
 {
 	Assert_MM_true(NULL != object);
+
+	Assert_MM_mustHaveVMAccess(vmThread);
+	J9JavaVM *vm = vmThread->javaVM;
+	MM_GCExtensions *ext = MM_GCExtensions::getExtensions(vm->omrVM);
+	Assert_MM_true(NULL == ext->accessBarrier->isObjectInOwnableSynchronizerList(object));
+
 	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
 	env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->add(env, object);
 	MM_ObjectAllocationInterface *objectAllocation = env->_objectAllocationInterface;
