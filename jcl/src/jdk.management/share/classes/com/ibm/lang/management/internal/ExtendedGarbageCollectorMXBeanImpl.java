@@ -92,6 +92,10 @@ public final class ExtendedGarbageCollectorMXBeanImpl
 		Map<String,MemoryUsage> usageBeforeGc = new HashMap<>(poolNames.length); 
 		Map<String,MemoryUsage> usageAfterGc = new HashMap<>(poolNames.length);
 		for (int count = 0; count < poolNames.length; ++count) {
+			if ((preUsed[count] > preCommitted[count]) || ( preCommitted[count] > preMax[count]) ||
+				(postUsed[count] > postCommitted[count]) ||	(postCommitted[count] > postMax[count])) {
+				System.out.println("Warning: memoryUsage is inconsistent, memoryPool: " + poolNames[count] + ", preCollectionUsed: " + preUsed[count] + ", preCollectionCommitted: " + preCommitted[count] + ", preCollectionMax: " + preMax[count] + ", postCollectionUsed: " + postUsed[count] + ", postCollectionCommitted: " + postCommitted[count] + ", postCollectionMax: " + postMax[count]);
+			}
 			usageBeforeGc.put(poolNames[count], new MemoryUsage(initialSize[count], preUsed[count],  preCommitted[count],  preMax[count]));
 			usageAfterGc.put(poolNames[count], new MemoryUsage(initialSize[count], postUsed[count], postCommitted[count], postMax[count]));
 		}
