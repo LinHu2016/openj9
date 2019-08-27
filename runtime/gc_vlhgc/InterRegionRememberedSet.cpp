@@ -771,6 +771,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForCompactDirect(MM_Enviro
 
 	UDATA cardsProcessed = 0;
 	UDATA cardsRemoved = 0;
+	env->_irrsStats._compactCardTableTimesus = 0;
 
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
@@ -792,7 +793,9 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForCompactDirect(MM_Enviro
 
 
 				if (0 != toRemoveCount) {
+					U_64 startTime4Compact = j9time_hires_clock();
 					region->getRememberedSetCardList()->compact(env);
+					env->_irrsStats._compactCardTableTimesus +=  j9time_hires_delta(startTime4Compact, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS);
 					UDATA totalCountAfter = region->getRememberedSetCardList()->getSize(env);
 					
 					Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForCompact_cardCounts(env->getLanguageVMThread(),  MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount, _heapRegionManager->mapDescriptorToRegionTableIndex(region), totalCountBefore, toRemoveCount, totalCountAfter);
@@ -812,7 +815,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForCompactDirect(MM_Enviro
 	env->_irrsStats._clearFromRegionReferencesCardsProcessed = cardsProcessed;
 	env->_irrsStats._clearFromRegionReferencesCardsCleared = cardsRemoved;
 
-	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForCompact_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, 0);
+	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForCompact_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, 0, env->_irrsStats._compactCardTableTimesus);
 }
 
 void
@@ -833,6 +836,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForCompactOptimized(MM_Env
 	UDATA cardsProcessed = 0;
 	UDATA cardsRemoved = 0;
 	bool tableIsReady = false;
+	env->_irrsStats._compactCardTableTimesus = 0;
 
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
@@ -869,7 +873,10 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForCompactOptimized(MM_Env
 				}
 
 				if (0 != toRemoveCount) {
+					U_64 startTime4Compact = j9time_hires_clock();
 					region->getRememberedSetCardList()->compact(env);
+					env->_irrsStats._compactCardTableTimesus +=  j9time_hires_delta(startTime4Compact, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS);
+
 					UDATA totalCountAfter = region->getRememberedSetCardList()->getSize(env);
 
 					Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForCompact_cardCounts(env->getLanguageVMThread(),  MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount, _heapRegionManager->mapDescriptorToRegionTableIndex(region), totalCountBefore, toRemoveCount, totalCountAfter);
@@ -890,7 +897,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForCompactOptimized(MM_Env
 	env->_irrsStats._clearFromRegionReferencesCardsProcessed = cardsProcessed;
 	env->_irrsStats._clearFromRegionReferencesCardsCleared = cardsRemoved;
 
-	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForCompact_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, env->_irrsStats._rebuildCompressedCardTableTimesus);
+	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForCompact_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, env->_irrsStats._rebuildCompressedCardTableTimesus, env->_irrsStats._compactCardTableTimesus);
 }
 
 /*
@@ -926,6 +933,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkDirect(MM_Environme
 
 	UDATA cardsProcessed = 0;
 	UDATA cardsRemoved = 0;
+	env->_irrsStats._compactCardTableTimesus = 0;
 
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
@@ -947,7 +955,9 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkDirect(MM_Environme
 				}
 
 				if (0 != toRemoveCount) {
+					U_64 startTime4Compact = j9time_hires_clock();
 					region->getRememberedSetCardList()->compact(env);
+					env->_irrsStats._compactCardTableTimesus +=  j9time_hires_delta(startTime4Compact, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS);
 					UDATA totalCountAfter = region->getRememberedSetCardList()->getSize(env);
 
 					Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_cardCounts(env->getLanguageVMThread(), MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount, _heapRegionManager->mapDescriptorToRegionTableIndex(region), totalCountBefore, toRemoveCount, totalCountAfter);
@@ -967,7 +977,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkDirect(MM_Environme
 	env->_irrsStats._clearFromRegionReferencesCardsProcessed = cardsProcessed;
 	env->_irrsStats._clearFromRegionReferencesCardsCleared = cardsRemoved;
 
-	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, 0);
+	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, 0, env->_irrsStats._compactCardTableTimesus);
 }
 
 void
@@ -993,6 +1003,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkOptimized(MM_Enviro
 	UDATA cardsProcessed = 0;
 	UDATA cardsRemoved = 0;
 	bool tableIsReady = false;
+	env->_irrsStats._compactCardTableTimesus = 0;
 
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
@@ -1007,11 +1018,13 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkOptimized(MM_Enviro
 					if (tableIsReady) {
 						/* Rebuild of Compressed Card Table has been completed - use it */
 						remove = isCompressedCardDirtyForPartialCollect(env, card, compressedCardTable, markMap);
+//						remove = compressedCardTable->isCompressedCardDirtyForPartialCollect(env, convertHeapAddressFromRememberedSetCard(card));
 					} else {
 						if (compressedCardTable->isReady()) {
 							tableIsReady = true;
 							/* Rebuild of Compressed Card Table has been completed - use it for first time */
 							remove = isCompressedCardDirtyForPartialCollect(env, card, compressedCardTable, markMap);
+//							remove = compressedCardTable->isCompressedCardDirtyForPartialCollect(env, convertHeapAddressFromRememberedSetCard(card));
 						} else {
 							/* rebuild is not complete - look at the region PGC selection and card itself directly */
 							MM_HeapRegionDescriptorVLHGC *fromRegion = tableDescriptorForRememberedSetCard(card);
@@ -1030,7 +1043,10 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkOptimized(MM_Enviro
 				}
 
 				if (0 != toRemoveCount) {
+					U_64 startTime4Compact = j9time_hires_clock();
 					region->getRememberedSetCardList()->compact(env);
+					env->_irrsStats._compactCardTableTimesus +=  j9time_hires_delta(startTime4Compact, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS);
+
 					UDATA totalCountAfter = region->getRememberedSetCardList()->getSize(env);
 					
 					Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_cardCounts(env->getLanguageVMThread(), MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount, _heapRegionManager->mapDescriptorToRegionTableIndex(region), totalCountBefore, toRemoveCount, totalCountAfter);
@@ -1051,7 +1067,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkOptimized(MM_Enviro
 	env->_irrsStats._clearFromRegionReferencesCardsProcessed = cardsProcessed;
 	env->_irrsStats._clearFromRegionReferencesCardsCleared = cardsRemoved;
 
-	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, env->_irrsStats._rebuildCompressedCardTableTimesus);
+	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, env->_irrsStats._rebuildCompressedCardTableTimesus, env->_irrsStats._compactCardTableTimesus);
 }
 
 void

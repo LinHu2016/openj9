@@ -38,6 +38,9 @@
 #include "GCExtensions.hpp"
 #include "Heap.hpp"
 #include "HeapRegionDescriptor.hpp"
+//#include "MarkMap.hpp"
+//#include "CycleStateVLHGC.hpp"
+//#include "SchedulingDelegate.hpp"
 
 #define BITS_PER_BYTE	8
 #define COMPRESSED_CARDS_PER_WORD	(sizeof(UDATA) * BITS_PER_BYTE)
@@ -175,6 +178,11 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 	const UDATA endOfWord = ((UDATA)1) << (COMPRESSED_CARDS_PER_WORD - 1);
 	UDATA compressedCardWord = AllCompressedCardsInWordClean;
 
+//	uint64_t *markMapSlots = NULL;
+//	if (static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_schedulingDelegate->isFirstPGCAfterGMP()) {
+//		markMapSlots = (uint64_t*)env->_cycleState->_markMap->getSlotPtrForAddress((omrobjectptr_t) startHeapAddress);
+//	}
+
 	/*
 	 *  To simplify test logic assume here that given addresses are aligned to correspondent compressed card word border
 	 *  So no need to handle side pieces (no split of compressed card table words between regions)
@@ -187,11 +195,14 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 #if (1 == COMPRESSED_CARD_TABLE_DIV)
 
 		Card state = *card++;
+//		if (isDirtyCardForPartialCollect(state) || ((NULL != markMapSlots) && (0 == *markMapSlots))) {
 		if (isDirtyCardForPartialCollect(state)) {
 			/* invert bit */
 			compressedCardWord ^= mask;
 		}
-
+//		if (NULL != markMapSlots) {
+//			markMapSlots++;
+//		}
 #else /* COMPRESSED_CARD_TABLE_DIV == 1 */
 		/*
 		 * This implementation supports case for COMPRESSED_CARD_TABLE_DIV == 1 as well

@@ -70,8 +70,10 @@ public:
 	MM_ConfigurationIncrementalGenerational(MM_EnvironmentBase *env)
 #if defined(J9VM_GC_COMBINATION_SPEC)
 		: MM_Configuration(env, gc_policy_balanced, mm_regionAlignment, calculateDefaultRegionSize(env), 0, gc_modron_wrtbar_cardmark_incremental, gc_modron_allocation_type_tlh)
+//		: MM_Configuration(env, gc_policy_balanced, mm_regionAlignment, calculateDefaultRegionSize(env), UDATA_MAX, gc_modron_wrtbar_cardmark_incremental, gc_modron_allocation_type_tlh)
 #else
 		: MM_Configuration(env, gc_policy_balanced, mm_regionAlignment, calculateDefaultRegionSize(env), 0, gc_modron_wrtbar_cardmark, gc_modron_allocation_type_tlh)
+//		: MM_Configuration(env, gc_policy_balanced, mm_regionAlignment, calculateDefaultRegionSize(env), UDATA_MAX, gc_modron_wrtbar_cardmark, gc_modron_allocation_type_tlh)
 #endif /* J9VM_GC_COMBINATION_SPEC */
 	{
 		_typeId = __FUNCTION__;
