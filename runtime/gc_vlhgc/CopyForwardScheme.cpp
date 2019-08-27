@@ -277,6 +277,12 @@ MM_CopyForwardScheme::initialize(MM_EnvironmentVLHGC *env)
 		if(!_reservedRegionList[index]._tailCandidatesLock.initialize(env, &_extensions->lnrlOptions, "MM_CopyForwardScheme:_reservedRegionList[]._tailCandidatesLock")) {
 			return false;
 		}
+		_reservedRegionList[index]._largestFreeMemoryCandidates = NULL;
+		_reservedRegionList[index]._largestFreeMemoryCandidateCount = 0;
+		if(!_reservedRegionList[index]._largestFreeMemoryCandidatesLock.initialize(env, &_extensions->lnrlOptions, "MM_CopyForwardScheme:_reservedRegionList[]._largestFreeMemoryCandidatesLock")) {
+			return false;
+		}
+
 	}
 
 	/* Set the min/max sizes for copy scan cache allocation when allocating a general purpose area (does not include non-standard sized objects) */
@@ -331,6 +337,7 @@ MM_CopyForwardScheme::tearDown(MM_EnvironmentVLHGC *env)
 				_reservedRegionList[index]._sublists[sublistIndex]._lock.tearDown();
 			}
 			_reservedRegionList[index]._tailCandidatesLock.tearDown();
+			_reservedRegionList[index]._largestFreeMemoryCandidatesLock.tearDown();
 		}
 		env->getForge()->free(_reservedRegionList);
 		_reservedRegionList = NULL;
@@ -439,6 +446,8 @@ MM_CopyForwardScheme::preProcessRegions(MM_EnvironmentVLHGC *env)
 
 	while(NULL != (region = regionIterator.nextRegion())) {
 		region->_copyForwardData._survivorBase = NULL;
+		region->_copyForwardData._survivorLow = NULL;
+		region->_copyForwardData._survivorHigh = NULL;
 
 		if(region->containsObjects()) {
 			region->_copyForwardData._initialLiveSet = true;
@@ -497,7 +506,7 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 			} else {
 				static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._nonEdenEvacuateRegionCount += 1;
 			}
-		} else if (region->isSurvivorRegion() && !region->isTailFilledSurvivorRegion()) {
+		} else if (region->isSurvivorRegion() && !region->isTailFilledSurvivorRegion() && !region->isLargestFreeMemoryFilledSurvivorRegion()) {
 			/* check Eden Survivor Regions */
 			if (0 == region->getLogicalAge()) {
 				static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._edenSurvivorRegionCount += 1;
@@ -513,18 +522,24 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 			Assert_MM_false(region->_markData._shouldMark);
 			Assert_MM_false(region->_reclaimData._shouldReclaim);
 
-			/* we do not count tails, only regions that we acquired as free */
+			/* we do not count tails and free memory in exist regions, only regions that we acquired as free */
 			if (region->getLowAddress() == region->_copyForwardData._survivorBase) {
 				survivorSetRegionCount += 1;
 			}
 			/* store back the remaining memory in the pool as free memory */
 			UDATA remainingBytes = pool->getAllocatableBytes();
-
-			region->_sweepData._alreadySwept = true;
-			pool->setFreeMemorySize(pool->getActualFreeMemorySize() + remainingBytes);
 			UDATA holeCount = (0 == remainingBytes) ? 0 : 1;
+			UDATA largestFreeEntrySize = remainingBytes;
+			if (region->isLargestFreeMemoryFilledSurvivorRegion()) {
+				remainingBytes += pool->getAllocatableBytes4Collector();
+				largestFreeEntrySize = OMR_MAX( largestFreeEntrySize,  pool->getAllocatableBytes4Collector());
+				holeCount += 1;
+			}
+			region->_sweepData._alreadySwept = true;
+			pool->setFreeMemorySize(remainingBytes);
+
 			pool->setFreeEntryCount(holeCount);
-			pool->setLargestFreeEntry(remainingBytes);
+			pool->setLargestFreeEntry(largestFreeEntrySize);
 			Assert_MM_true(pool->getActualFreeMemorySize() >= pool->getAllocatableBytes());
 			Assert_MM_true(pool->getActualFreeMemorySize() <= region->getSize());
 			if (pool->getActualFreeMemorySize() == region->getSize()) {
@@ -543,6 +558,8 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 		region->_copyForwardData._initialLiveSet = false;
 		region->_copyForwardData._requiresPhantomReferenceProcessing = false;
 		region->_copyForwardData._survivorBase = NULL;
+		region->_copyForwardData._survivorLow = NULL;
+		region->_copyForwardData._survivorHigh = NULL;
 
 		if (region->_copyForwardData._evacuateSet) {
 			Assert_MM_true(region->_sweepData._alreadySwept);
@@ -622,7 +639,8 @@ MM_CopyForwardScheme::isObjectInSurvivorMemory(J9Object *objectPtr)
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
 		region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(objectPtr);
 		Assert_MM_true(region->_copyForwardData._initialLiveSet || (!region->_markData._shouldMark && !region->_copyForwardData._initialLiveSet));
-		result = region->isSurvivorRegion() && (objectPtr >= region->_copyForwardData._survivorBase);
+		result = region->isSurvivorRegion() && (((NULL != region->_copyForwardData._survivorBase) && (objectPtr >= region->_copyForwardData._survivorBase)) ||
+												((NULL != region->_copyForwardData._survivorLow) && (region->_copyForwardData._survivorLow <= objectPtr) && (objectPtr<region->_copyForwardData._survivorHigh)));
 	}
 	return result;
 }
@@ -635,7 +653,7 @@ MM_CopyForwardScheme::isObjectInNurseryMemory(J9Object *objectPtr)
 	if(NULL != objectPtr) {
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
 		region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(objectPtr);
-		result = region->_markData._shouldMark || (region->isSurvivorRegion() && (objectPtr >= region->_copyForwardData._survivorBase));
+		result = region->_markData._shouldMark || isObjectInSurvivorMemory(objectPtr);
 	}
 	return result;
 }
@@ -744,10 +762,16 @@ MM_CopyForwardScheme::clearReservedRegionLists(MM_EnvironmentVLHGC *env)
 			Assert_MM_true(NULL != _reservedRegionList[index]._tailCandidates);
 		}
 		
+		if (0 == _reservedRegionList[index]._largestFreeMemoryCandidateCount) {
+			Assert_MM_true(NULL == _reservedRegionList[index]._largestFreeMemoryCandidates);
+		} else {
+			Assert_MM_true(NULL != _reservedRegionList[index]._largestFreeMemoryCandidates);
+		}
+
 		for (UDATA sublistIndex = 0; sublistIndex < _reservedRegionList[index]._sublistCount; sublistIndex++) {
 			MM_ReservedRegionListHeader::Sublist *regionList = &_reservedRegionList[index]._sublists[sublistIndex];
 			MM_HeapRegionDescriptorVLHGC *region = regionList->_head;
-	
+
 			while(NULL != region) {
 				MM_HeapRegionDescriptorVLHGC *next = region->_copyForwardData._nextRegion;
 				releaseRegion(env, regionList, region);
@@ -767,6 +791,8 @@ MM_CopyForwardScheme::clearReservedRegionLists(MM_EnvironmentVLHGC *env)
 		_reservedRegionList[index]._evacuateRegionCount = 0;
 		_reservedRegionList[index]._tailCandidates = NULL;
 		_reservedRegionList[index]._tailCandidateCount = 0;
+		_reservedRegionList[index]._largestFreeMemoryCandidates = NULL;
+		_reservedRegionList[index]._largestFreeMemoryCandidateCount = 0;
 	}
 	
 	Trc_MM_CopyForwardScheme_clearReservedRegionLists_Exit(env->getLanguageVMThread());
@@ -889,9 +915,45 @@ MM_CopyForwardScheme::reserveMemoryForObject(MM_EnvironmentVLHGC *env, UDATA com
 		result = memoryPool->collectorAllocate(env, &allocDescription, false);
 		region = region->_copyForwardData._nextRegion;
 	}
-
 	/* 
-	 * 2. attempt to acquire a region from the tail candidates list 
+	 * 2.1 attempt to acquire a region from the largest freememory candidates list
+	 */
+	if ((NULL == result) && (NULL != _reservedRegionList[compactGroup]._largestFreeMemoryCandidates)) {
+		_reservedRegionList[compactGroup]._largestFreeMemoryCandidatesLock.acquire();
+		region = _reservedRegionList[compactGroup]._largestFreeMemoryCandidates;
+		MM_HeapRegionDescriptorVLHGC *resultRegion = NULL;
+		MM_MemoryPoolBumpPointer *memoryPool = NULL;
+		while ((NULL == result) && (NULL != region)) {
+			memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
+			Assert_MM_true(NULL != memoryPool);
+
+			result = memoryPool->collectorAllocate(env, &allocDescription, false);
+			resultRegion = region;
+			region = region->_copyForwardData._nextRegion;
+		}
+		if (NULL != result) {
+			/* remove this region from the common largest freememory candidates list and add it to our own sublist */
+			Assert_MM_true(NULL != resultRegion);
+			Assert_MM_true(NULL != memoryPool);
+			void *baseAddr =memoryPool->getAllocationPointer();
+			void *lowAddr = memoryPool->getAllocationPointer4Collector();
+			void *highAddr = memoryPool->getAlloctionTop4Collector();
+			if ((UDATA) result > (UDATA) highAddr) {
+				baseAddr = result;
+			} else {
+				lowAddr = result;
+			}
+			if (baseAddr == resultRegion->getHighAddress()) {
+				baseAddr = NULL;
+			}
+			removeCandidate(env, _reservedRegionList[compactGroup]._largestFreeMemoryCandidates, _reservedRegionList[compactGroup]._largestFreeMemoryCandidateCount, resultRegion);
+			insertRegionIntoLockedList(env, regionList, resultRegion);
+			convertCandidateToSurvivorRegion(env, resultRegion, baseAddr, lowAddr, highAddr);
+		}
+		_reservedRegionList[compactGroup]._largestFreeMemoryCandidatesLock.release();
+	}
+	/*
+	 * 2.2 attempt to acquire a region from the tail candidates list
 	 */
 	if ((NULL == result) && (NULL != _reservedRegionList[compactGroup]._tailCandidates)) {
 		_reservedRegionList[compactGroup]._tailCandidatesLock.acquire();
@@ -912,9 +974,9 @@ MM_CopyForwardScheme::reserveMemoryForObject(MM_EnvironmentVLHGC *env, UDATA com
 		if (NULL != result) {
 			/* remove this region from the common tail candidates list and add it to our own sublist */
 			Assert_MM_true(NULL != resultRegion);
-			removeTailCandidate(env, &_reservedRegionList[compactGroup], resultRegion);
+			removeCandidate(env, _reservedRegionList[compactGroup]._tailCandidates, _reservedRegionList[compactGroup]._tailCandidateCount, resultRegion);
 			insertRegionIntoLockedList(env, regionList, resultRegion);
-			convertTailCandidateToSurvivorRegion(env, resultRegion, result);
+			convertCandidateToSurvivorRegion(env, resultRegion, result, NULL, NULL);
 		}
 		_reservedRegionList[compactGroup]._tailCandidatesLock.release();
 	}
@@ -991,7 +1053,45 @@ MM_CopyForwardScheme::reserveMemoryForCache(MM_EnvironmentVLHGC *env, UDATA comp
 	}
 
 	/* 
-	 * 2. attempt to acquire a region from the tail candidates list 
+	 * 2.1 attempt to acquire a region from the largest freememory candidates list
+	 */
+	if ((!result) && (NULL != _reservedRegionList[compactGroup]._largestFreeMemoryCandidates)) {
+		_reservedRegionList[compactGroup]._largestFreeMemoryCandidatesLock.acquire();
+		region = _reservedRegionList[compactGroup]._largestFreeMemoryCandidates;
+		if (NULL != region) {
+			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
+			Assert_MM_true(NULL != memoryPool);
+
+			void *tlhBase = NULL;
+			void *tlhTop = NULL;
+			result = (NULL != memoryPool->collectorAllocateTLH(env, &allocDescription, maxCacheSize, tlhBase, tlhTop, false));
+			/* this region was a tail candidate so it must have had room for at least a minimal TLH */
+			Assert_MM_true(result);
+			*addrBase = tlhBase;
+			*addrTop = tlhTop;
+
+			void *baseAddr =memoryPool->getAllocationPointer();
+			void *lowAddr = memoryPool->getAllocationPointer4Collector();
+			void *highAddr = memoryPool->getAlloctionTop4Collector();
+			if ((UDATA) tlhBase > (UDATA) highAddr) {
+				baseAddr = tlhBase;
+			} else {
+				lowAddr = tlhBase;
+			}
+			if (baseAddr == region->getHighAddress()) {
+				baseAddr = NULL;
+			}
+
+			/* remove this region from the common tail candidates list and add it to our own sublist */
+			removeCandidate(env, _reservedRegionList[compactGroup]._largestFreeMemoryCandidates, _reservedRegionList[compactGroup]._largestFreeMemoryCandidateCount, region);
+
+			insertRegionIntoLockedList(env, regionList, region);
+			convertCandidateToSurvivorRegion(env, region, baseAddr, lowAddr, highAddr);
+		}
+		_reservedRegionList[compactGroup]._largestFreeMemoryCandidatesLock.release();
+	}
+	/*
+	 * 2.2 attempt to acquire a region from the tail candidates list
 	 */
 	if ((!result) && (NULL != _reservedRegionList[compactGroup]._tailCandidates)) {
 		_reservedRegionList[compactGroup]._tailCandidatesLock.acquire();
@@ -1012,9 +1112,9 @@ MM_CopyForwardScheme::reserveMemoryForCache(MM_EnvironmentVLHGC *env, UDATA comp
 			*addrBase = tlhBase;
 			*addrTop = tlhTop;
 			/* remove this region from the common tail candidates list and add it to our own sublist */
-			removeTailCandidate(env, &_reservedRegionList[compactGroup], region);
+			removeCandidate(env, _reservedRegionList[compactGroup]._tailCandidates, _reservedRegionList[compactGroup]._tailCandidateCount, region);
 			insertRegionIntoLockedList(env, regionList, region);
-			convertTailCandidateToSurvivorRegion(env, region, tlhBase);
+			convertCandidateToSurvivorRegion(env, region, tlhBase, NULL, NULL);
 		}
 		_reservedRegionList[compactGroup]._tailCandidatesLock.release();
 	}
@@ -3169,9 +3269,6 @@ MM_CopyForwardScheme::incrementalScanCacheBySlot(MM_EnvironmentVLHGC *env)
 void
 MM_CopyForwardScheme::cleanRegion(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region, U_8 flagToClean)
 {
-	/* At this point, no copying should happen, so that reservingContext is irrelevant */
-	MM_AllocationContextTarok *reservingContext = _commonContext;
-
 	Assert_MM_true(region->containsObjects());
 	/* do we need to clean this region? */
 	U_8 flags = region->_markData._overflowFlags;
@@ -3183,16 +3280,19 @@ MM_CopyForwardScheme::cleanRegion(MM_EnvironmentVLHGC *env, MM_HeapRegionDescrip
 		/* Force our write of the overflow flags from our cache and ensure that we have no stale mark map data before we walk */
 		MM_AtomicOperations::sync();
 		UDATA *heapBase = (UDATA *)region->getLowAddress();
-		/* If it is tail filled region scan only survivor portion of the region */
+		UDATA *heapTop = (UDATA *)region->getHighAddress();
+		/* If it is tail filled region or largest free memory filled region, scan only survivor portions of the region, otherwise scan whole region */
+		if ((UDATA *)region->_copyForwardData._survivorLow > heapBase) {
+			heapBase = (UDATA *)region->_copyForwardData._survivorLow;
+			heapTop = (UDATA *)region->_copyForwardData._survivorHigh;
+			cleanInRange(env, heapBase, heapTop);
+		}
 		if ((UDATA *)region->_copyForwardData._survivorBase > heapBase) {
 			heapBase = (UDATA *)region->_copyForwardData._survivorBase;
+			heapTop = (UDATA *)region->getHighAddress();
 		}
-		UDATA *heapTop = (UDATA *)region->getHighAddress();
-		MM_HeapMapIterator objectIterator = MM_HeapMapIterator(MM_GCExtensions::getExtensions(env), env->_cycleState->_markMap, heapBase, heapTop);
-
-		J9Object *object = NULL;
-		while (NULL != (object = objectIterator.nextObject())) {
-			scanObject(env, reservingContext, object, SCAN_REASON_OVERFLOWED_REGION);
+		if ((UDATA *)region->getHighAddress() == heapTop) {
+			cleanInRange(env, heapBase, heapTop);
 		}
 	}
 }
@@ -4042,12 +4142,25 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 					/* only add regions with pools which could possibly satisfy a TLH allocation */
 					UDATA initialAllocatableBytes = pool->getAllocatableBytes();
 					UDATA minimumEntrySize = pool->getMinimumFreeEntrySize();
-					if (initialAllocatableBytes >= (minimumEntrySize + CARD_SIZE - 1)) {
+					if ((NULL != pool->getAllocationPointer4Collector()) && (pool->getAllocatableBytes4Collector() >= (minimumEntrySize + CARD_SIZE - 1))) {
+						Assert_MM_false(region->isSurvivorRegion());
+						Assert_MM_true(NULL == region->_copyForwardData._survivorLow);
+						Assert_MM_true(NULL == region->_copyForwardData._survivorBase);
+						insertCandidate(env, _reservedRegionList[compactGroup]._largestFreeMemoryCandidates, _reservedRegionList[compactGroup]._largestFreeMemoryCandidateCount, region);
+
+						PORT_ACCESS_FROM_ENVIRONMENT(env);
+						j9tty_printf(PORTLIB, "insertCandidate largestFreeMemoryCandidates region=%p, size=%zu, compactGroup=%zu, cadidatesCount=%zu\n", region, pool->getAllocatableBytes4Collector()+initialAllocatableBytes, compactGroup, _reservedRegionList[compactGroup]._largestFreeMemoryCandidateCount);
+
+					} else if (initialAllocatableBytes >= (minimumEntrySize + CARD_SIZE - 1)) {
 						Assert_MM_true(pool->getActualFreeMemorySize() >= initialAllocatableBytes);
 						Assert_MM_true(pool->getActualFreeMemorySize() < region->getSize());
 						Assert_MM_false(region->isSurvivorRegion());
 						Assert_MM_true(NULL == region->_copyForwardData._survivorBase);
-						insertTailCandidate(env, &_reservedRegionList[compactGroup], region);
+						insertCandidate(env, _reservedRegionList[compactGroup]._tailCandidates, _reservedRegionList[compactGroup]._tailCandidateCount, region);
+
+						PORT_ACCESS_FROM_ENVIRONMENT(env);
+						j9tty_printf(PORTLIB, "insertCandidate tailCandidates region=%p, size=%zu, compactGroup=%zu, cadidatesCount=%zu\n", region, initialAllocatableBytes, compactGroup, _reservedRegionList[compactGroup]._tailCandidateCount);
+
 					}
 				}
 			}
@@ -4284,13 +4397,15 @@ MM_CopyForwardScheme::verifyDumpObjectDetails(MM_EnvironmentVLHGC *env, const ch
 				region->getRegionProperties()
 				);
 
-		j9tty_printf(PORTLIB, "\t\tbitSet:%c externalBitSet:%c shouldMark:%c initialLiveSet:%c survivorSet:%c survivorBase:%p age:%zu\n",
+		j9tty_printf(PORTLIB, "\t\tbitSet:%c externalBitSet:%c shouldMark:%c initialLiveSet:%c survivorSet:%c survivorBase:%p, survivorLow:%p, survivorHigh:%p  age:%zu\n",
 				_markMap->isBitSet(object) ? 'Y' : 'N',
 				(NULL == env->_cycleState->_externalCycleState) ? 'N' : (env->_cycleState->_externalCycleState->_markMap->isBitSet(object) ? 'Y' : 'N'),
 				region->_markData._shouldMark ? 'Y' : 'N',
 				region->_copyForwardData._initialLiveSet ? 'Y' : 'N',
 				region->isSurvivorRegion() ? 'Y' : 'N',
 				region->_copyForwardData._survivorBase,
+				region->_copyForwardData._survivorLow,
+				region->_copyForwardData._survivorHigh,
 				region->getLogicalAge()
 		);
 	}
@@ -4436,40 +4551,36 @@ MM_CopyForwardScheme::verifyCopyForwardResult(MM_EnvironmentVLHGC *env)
 		} else {
 			if(region->containsObjects()) {
 				if(region->isSurvivorRegion()) {
-
-					void *endOfAllocatedObjects = ((MM_MemoryPoolBumpPointer*)region->getMemoryPool())->getAllocationPointer();
-					MM_HeapMapIterator mapIterator(_extensions, _markMap, (UDATA *)region->_copyForwardData._survivorBase, (UDATA *)endOfAllocatedObjects, false);
-					GC_ObjectHeapIteratorAddressOrderedList heapChunkIterator(_extensions, (J9Object *)region->_copyForwardData._survivorBase, (J9Object *)endOfAllocatedObjects, false);
-					J9Object *objectPtr = NULL;
-
-					while(NULL != (objectPtr = heapChunkIterator.nextObject())) {
-						J9Object *mapObjectPtr = mapIterator.nextObject();
-
-						if(objectPtr != mapObjectPtr) {
-							PORT_ACCESS_FROM_ENVIRONMENT(env);
-							j9tty_printf(PORTLIB, "ChunkIterator and mapIterator did not match up during walk of survivor space! ChunkSlot %p MapSlot %p\n", objectPtr, mapObjectPtr);
-							Assert_MM_unreachable();
-							break;
-						}
-						verifyObject(env, objectPtr);
+					UDATA *lowAddress = NULL;
+					UDATA *highAddress = NULL;
+					if (NULL != region->_copyForwardData._survivorLow) {
+						lowAddress = (UDATA *)region->_copyForwardData._survivorLow;
+						highAddress = (UDATA *)region->_copyForwardData._survivorHigh;
+						verifyChunkSlotsAndMapSlotsInRange(env, lowAddress, highAddress);
 					}
-					if(NULL != mapIterator.nextObject()) {
-						PORT_ACCESS_FROM_ENVIRONMENT(env);
-						j9tty_printf(PORTLIB, "Survivor space mapIterator did not end when the chunkIterator did!\n");
-						Assert_MM_unreachable();
+					if(NULL != region->_copyForwardData._survivorBase) {
+						lowAddress = (UDATA *)region->_copyForwardData._survivorBase;
+						highAddress = (UDATA *)((MM_MemoryPoolBumpPointer*)region->getMemoryPool())->getAllocationPointer();
+						verifyChunkSlotsAndMapSlotsInRange(env, lowAddress, highAddress);
 					}
 				}
 
 				if(region->_copyForwardData._initialLiveSet) {
-					UDATA *highAddress = (UDATA *)region->getHighAddress();
+					UDATA *lowAddress = (UDATA *)region->getLowAddress();
+					UDATA *highAddress = NULL;
+					if (NULL != region->_copyForwardData._survivorLow) {
+						highAddress = (UDATA *) region->_copyForwardData._survivorLow;
+
+						verifyObjectInRange(env, lowAddress, highAddress);
+
+						lowAddress = (UDATA *) region->_copyForwardData._survivorHigh;
+					}
+
+					highAddress = (UDATA *)region->getHighAddress();
 					if(NULL != region->_copyForwardData._survivorBase) {
 						highAddress = (UDATA *)region->_copyForwardData._survivorBase;
 					}
-					MM_HeapMapIterator iterator(_extensions, _markMap, (UDATA *)region->getLowAddress(), highAddress, false);
-					J9Object *objectPtr = NULL;
-					while (NULL != (objectPtr = (iterator.nextObject()))) {
-						verifyObject(env, objectPtr);
-					}
+					verifyObjectInRange(env, lowAddress, highAddress);
 				}
 			}
 		}
@@ -4782,13 +4893,11 @@ MM_CopyForwardScheme::verifyExternalState(MM_EnvironmentVLHGC *env)
 				}
 			} else if (region->isSurvivorRegion()) {
 				/* Survivor space - check that anything marked in the GMP map is also marked in the PGC map */
-				MM_HeapMapIterator mapIterator(_extensions, externalMarkMap, (UDATA *)region->_copyForwardData._survivorBase, (UDATA *)region->getHighAddress(), false);
-				J9Object *objectPtr = NULL;
-
-				while(NULL != (objectPtr = mapIterator.nextObject())) {
-					Assert_MM_true(_markMap->isBitSet(objectPtr));
-					Assert_MM_true(objectPtr >= region->getLowAddress());
-					Assert_MM_true(objectPtr < region->getHighAddress());
+				if (region->isLargestFreeMemoryFilledSurvivorRegion()) {
+					checkConsistencyGMPMapAndPGCMap(env, region, (UDATA *)region->_copyForwardData._survivorLow, (UDATA *)region->_copyForwardData._survivorHigh);
+				}
+				if (NULL != region->_copyForwardData._survivorBase) {
+					checkConsistencyGMPMapAndPGCMap(env, region, (UDATA *)region->_copyForwardData._survivorBase, (UDATA *)region->getHighAddress());
 				}
 			}
 		}
@@ -4826,7 +4935,7 @@ MM_CopyForwardScheme::verifyIsPointerInSurvivor(MM_EnvironmentVLHGC *env, J9Obje
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->physicalTableDescriptorForAddress(object);
 
-	return region->isSurvivorRegion() && (object >= region->_copyForwardData._survivorBase);
+	return region->isSurvivorRegion() && (((NULL != region->_copyForwardData._survivorBase) && (object >= region->_copyForwardData._survivorBase)) || ((NULL != region->_copyForwardData._survivorLow) && (object >= region->_copyForwardData._survivorLow) && (object < region->_copyForwardData._survivorHigh)));
 }
 
 bool
@@ -4841,6 +4950,67 @@ MM_CopyForwardScheme::verifyIsPointerInEvacute(MM_EnvironmentVLHGC *env, J9Objec
 	return region->_markData._shouldMark;
 }
 
+void
+MM_CopyForwardScheme::verifyObjectInRange(MM_EnvironmentVLHGC *env, UDATA *lowAddress, UDATA *highAddress)
+{
+	MM_HeapMapIterator iterator(_extensions, _markMap, lowAddress, highAddress, false);
+	J9Object *objectPtr = NULL;
+	while (NULL != (objectPtr = (iterator.nextObject()))) {
+		verifyObject(env, objectPtr);
+	}
+}
+
+void
+MM_CopyForwardScheme::verifyChunkSlotsAndMapSlotsInRange(MM_EnvironmentVLHGC *env, UDATA *lowAddress, UDATA *highAddress)
+{
+	MM_HeapMapIterator mapIterator(_extensions, _markMap, lowAddress, highAddress, false);
+	GC_ObjectHeapIteratorAddressOrderedList heapChunkIterator(_extensions, (J9Object *)lowAddress, (J9Object *)highAddress, false);
+	J9Object *objectPtr = NULL;
+
+	while(NULL != (objectPtr = heapChunkIterator.nextObject())) {
+		J9Object *mapObjectPtr = mapIterator.nextObject();
+
+		if(objectPtr != mapObjectPtr) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "ChunkIterator and mapIterator did not match up during walk of survivor space! ChunkSlot %p MapSlot %p\n", objectPtr, mapObjectPtr);
+			Assert_MM_unreachable();
+			break;
+		}
+		verifyObject(env, objectPtr);
+	}
+	if(NULL != mapIterator.nextObject()) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "Survivor space mapIterator did not end when the chunkIterator did!\n");
+		Assert_MM_unreachable();
+	}
+}
+
+void
+MM_CopyForwardScheme::cleanInRange(MM_EnvironmentVLHGC *env, UDATA *lowAddress, UDATA *highAddress)
+{
+	/* At this point, no copying should happen, so that reservingContext is irrelevant */
+	MM_AllocationContextTarok *reservingContext = _commonContext;
+	MM_HeapMapIterator objectIterator = MM_HeapMapIterator(MM_GCExtensions::getExtensions(env), env->_cycleState->_markMap, lowAddress, highAddress);
+
+	J9Object *object = NULL;
+	while (NULL != (object = objectIterator.nextObject())) {
+		scanObject(env, reservingContext, object, SCAN_REASON_OVERFLOWED_REGION);
+	}
+}
+
+void
+MM_CopyForwardScheme::checkConsistencyGMPMapAndPGCMap(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region, UDATA *lowAddress, UDATA *highAddress)
+{
+	MM_MarkMap *externalMarkMap = env->_cycleState->_externalCycleState->_markMap;
+	MM_HeapMapIterator mapIterator(_extensions, externalMarkMap, lowAddress, highAddress, false);
+	J9Object *objectPtr = NULL;
+
+	while(NULL != (objectPtr = mapIterator.nextObject())) {
+		Assert_MM_true(_markMap->isBitSet(objectPtr));
+		Assert_MM_true(objectPtr >= region->getLowAddress());
+		Assert_MM_true(objectPtr < region->getHighAddress());
+	}
+}
 
 
 void
@@ -5231,16 +5401,16 @@ MM_CopyForwardScheme::scanFinalizableList(MM_EnvironmentVLHGC *env, j9object_t h
 }
 #endif /* J9VM_GC_FINALIZATION */
 
-void 
-MM_CopyForwardScheme::removeTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *tailRegion)
+void
+MM_CopyForwardScheme::removeCandidate(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *&cadidatesListHead, UDATA &cadidatesCount,  MM_HeapRegionDescriptorVLHGC *region)
 {
-	Assert_MM_true(NULL != regionList->_tailCandidates);
-	Assert_MM_true(0 < regionList->_tailCandidateCount);
+	Assert_MM_true(NULL != cadidatesListHead);
+	Assert_MM_true(0 < cadidatesCount);
 
-	regionList->_tailCandidateCount -= 1;
+	cadidatesCount -= 1;
 
-	MM_HeapRegionDescriptorVLHGC *next = tailRegion->_copyForwardData._nextRegion;
-	MM_HeapRegionDescriptorVLHGC *previous = tailRegion->_copyForwardData._previousRegion;
+	MM_HeapRegionDescriptorVLHGC *next = region->_copyForwardData._nextRegion;
+	MM_HeapRegionDescriptorVLHGC *previous = region->_copyForwardData._previousRegion;
 	if (NULL != next) {
 		next->_copyForwardData._previousRegion = previous;
 	}
@@ -5248,46 +5418,67 @@ MM_CopyForwardScheme::removeTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedR
 		previous->_copyForwardData._nextRegion = next;
 		Assert_MM_true(previous != previous->_copyForwardData._nextRegion);
 	} else {
-		Assert_MM_true(tailRegion == regionList->_tailCandidates);
-		regionList->_tailCandidates = next;
+		Assert_MM_true(region == cadidatesListHead);
+		cadidatesListHead = next;
 	}
 }
 
 void
-MM_CopyForwardScheme::insertTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *tailRegion)
+MM_CopyForwardScheme::insertCandidate(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *&cadidatesListHead, UDATA &cadidatesCount,  MM_HeapRegionDescriptorVLHGC *region)
 {
-	tailRegion->_copyForwardData._nextRegion = regionList->_tailCandidates;
-	tailRegion->_copyForwardData._previousRegion = NULL;
-	if(NULL != regionList->_tailCandidates) {
-		regionList->_tailCandidates->_copyForwardData._previousRegion = tailRegion;
+	region->_copyForwardData._nextRegion = cadidatesListHead;
+	region->_copyForwardData._previousRegion = NULL;
+	if(NULL != cadidatesListHead) {
+		cadidatesListHead->_copyForwardData._previousRegion = region;
 	}
-	regionList->_tailCandidates = tailRegion;
-	regionList->_tailCandidateCount += 1;
+	cadidatesListHead = region;
+	cadidatesCount += 1;
 }
 
+//void
+//MM_CopyForwardScheme::convertTailCandidateToSurvivorRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase)
+//{
+//	Trc_MM_CopyForwardScheme_convertTailCandidateToSurvivorRegion_Entry(env->getLanguageVMThread(), region, survivorBase);
+//	Assert_MM_true(NULL != region);
+//	Assert_MM_true(MM_HeapRegionDescriptor::BUMP_ALLOCATED_MARKED == region->getRegionType());
+//	Assert_MM_false(region->isSurvivorRegion());
+//	Assert_MM_true(region->isAddressInRegion(survivorBase));
+//
+//	setRegionAsSurvivor(env, region, survivorBase);
+//
+//	/* TODO: Remembering does not really have to be done under a lock, but dual (prev, current) list implementation indirectly forces us to do it this way. */
+//	rememberAndResetReferenceLists(env, region);
+//
+//	Trc_MM_CopyForwardScheme_convertTailCandidateToSurvivorRegion_Exit(env->getLanguageVMThread());
+//}
+
 void
-MM_CopyForwardScheme::convertTailCandidateToSurvivorRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase)
+MM_CopyForwardScheme::convertCandidateToSurvivorRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase, void* survivorLow, void* survivorHigh)
 {
-	Trc_MM_CopyForwardScheme_convertTailCandidateToSurvivorRegion_Entry(env->getLanguageVMThread(), region, survivorBase);
+	Trc_MM_CopyForwardScheme_convertCandidateToSurvivorRegion_Entry(env->getLanguageVMThread(), region, survivorBase, survivorLow, survivorHigh);
+
 	Assert_MM_true(NULL != region);
 	Assert_MM_true(MM_HeapRegionDescriptor::BUMP_ALLOCATED_MARKED == region->getRegionType());
 	Assert_MM_false(region->isSurvivorRegion());
-	Assert_MM_true(region->isAddressInRegion(survivorBase));
+	Assert_MM_true(((NULL == survivorLow) || region->isAddressInRegion(survivorLow)) && ((NULL == survivorBase) || region->isAddressInRegion(survivorBase)));
 
-	setRegionAsSurvivor(env, region, survivorBase);
+	setRegionAsSurvivor(env, region, survivorBase, survivorLow, survivorHigh);
 
 	/* TODO: Remembering does not really have to be done under a lock, but dual (prev, current) list implementation indirectly forces us to do it this way. */
 	rememberAndResetReferenceLists(env, region);
-
-	Trc_MM_CopyForwardScheme_convertTailCandidateToSurvivorRegion_Exit(env->getLanguageVMThread());
+	Trc_MM_CopyForwardScheme_convertCandidateToSurvivorRegion_Exit(env->getLanguageVMThread());
 }
 
 void
-MM_CopyForwardScheme::setRegionAsSurvivor(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase)
+MM_CopyForwardScheme::setRegionAsSurvivor(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void *survivorBase, void *survivorLow, void *survivorHigh)
 {
 	MM_MemoryPoolBumpPointer *memoryPool =  (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
 	UDATA freeMemorySize = memoryPool->getActualFreeMemorySize();
 	UDATA usedBytes = region->getSize() - freeMemorySize - memoryPool->getDarkMatterBytes();
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "setRegionAsSurvivor region=%p, CompactGroup=%zu, survivorBase=%p, survivorLow=%p, survivorHigh=%p\n", region, MM_CompactGroupManager::getCompactGroupNumber(env, region), survivorBase, survivorLow, survivorHigh);
+
 
 	/* convert allocation age into (usedBytes * age) multiple. it will be converted back to pure age at the end of GC.
 	 * in the mean time as caches are allocated from the region, the age will be merged
@@ -5304,12 +5495,23 @@ MM_CopyForwardScheme::setRegionAsSurvivor(MM_EnvironmentVLHGC* env, MM_HeapRegio
 	}
 
 	/* update the pool so it only knows about the free memory occurring before survivor base.  We will add whatever we don't use at the end of the copy-forward */
-	UDATA survivorSize = (UDATA)region->getHighAddress() - (UDATA)survivorBase;
+	region->_copyForwardData._survivorBase = survivorBase;
+	region->_copyForwardData._survivorLow =  survivorLow;
+	region->_copyForwardData._survivorHigh = survivorHigh;
+	UDATA survivorSize = 0;
+	UDATA survivorCount = 0;
+	if (NULL != survivorBase) {
+		survivorSize += (UDATA)region->getHighAddress() - (UDATA)survivorBase;
+		survivorCount += 1;
+	}
+	if (NULL != survivorLow) {
+		Assert_MM_true(survivorHigh > survivorLow);
+		survivorSize += (UDATA)survivorHigh - (UDATA)survivorLow;
+		survivorCount += 1;
+	}
 	Assert_MM_true(freeMemorySize >= survivorSize);
 	memoryPool->setFreeMemorySize(freeMemorySize - survivorSize);
-
 	Assert_MM_false(region->_copyForwardData._requiresPhantomReferenceProcessing);
-	region->_copyForwardData._survivorBase = survivorBase;
 }
 
 void

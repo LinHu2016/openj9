@@ -81,6 +81,9 @@ MM_HeapRegionDescriptorVLHGC::initialize(MM_EnvironmentBase *env, MM_HeapRegionM
 	_copyForwardData._evacuateSet = false;
 	_copyForwardData._requiresPhantomReferenceProcessing = false;
 	_copyForwardData._survivorBase = NULL;
+	_copyForwardData._survivorLow = NULL;
+	_copyForwardData._survivorHigh = NULL;
+
 	_copyForwardData._nextRegion = NULL;
 	_copyForwardData._previousRegion = NULL;
 
