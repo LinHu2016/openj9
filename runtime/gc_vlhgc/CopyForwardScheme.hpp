@@ -936,6 +936,7 @@ private:
 	 * @return the number of bytes lost by aligning the pool
 	 */
 	UDATA alignMemoryPool(MM_EnvironmentVLHGC *env, MM_MemoryPoolBumpPointer *memoryPool);
+	UDATA alignMemoryPool4Collector(MM_EnvironmentVLHGC *env, MM_MemoryPoolBumpPointer *memoryPool);
 	
 	/**
 	 * Set the specified tail candidate region to be a survivor region.

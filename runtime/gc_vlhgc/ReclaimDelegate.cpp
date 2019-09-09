@@ -311,6 +311,8 @@ MM_ReclaimDelegate::estimateReclaimableRegions(MM_EnvironmentVLHGC *env, double 
 			UDATA defragmentReclaimableRegionsInGeneration = _compactGroups[compactGroup].defragmentRecoverableBytes / regionSize;
 			if (reclaimableRegionsInGeneration > 0) {
 				Trc_MM_ReclaimDelegate_estimateReclaimableRegions_generationSummary(env->getLanguageVMThread(), compactGroup, _compactGroups[compactGroup].regionCount, _compactGroups[compactGroup].freeBytes, _compactGroups[compactGroup].recoverableBytes, reclaimableRegionsInGeneration, defragmentReclaimableRegionsInGeneration);
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "estimateReclaimableRegions compactGroup=%zu, regionCount=%zu, freeBytes=%zu, recoverableBytes=%zu, reclaimableRegionsInGeneration=%zu, defragmentReclaimableRegionsInGeneration=%zu\n", compactGroup, _compactGroups[compactGroup].regionCount, _compactGroups[compactGroup].freeBytes, _compactGroups[compactGroup].recoverableBytes, reclaimableRegionsInGeneration, defragmentReclaimableRegionsInGeneration);
 				reclaimableCompactRegions += reclaimableRegionsInGeneration;
 				defragmentReclaimableCompactRegions += defragmentReclaimableRegionsInGeneration;
 			}

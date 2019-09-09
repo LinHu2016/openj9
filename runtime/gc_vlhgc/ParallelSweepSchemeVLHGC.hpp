@@ -126,11 +126,6 @@ public:
  */
 private:
 	/**
-	 * alignment the address with CARD_SIZE
-	 * @param toFloor = true, align to floor; =false, align to ceiling
-	 */
-	void* alignWithCard(void *address, bool toFloor);
-	/**
 	 * MM_MemoryPoolBumpPointer._heapFreeList hold a list of freeEntries, which is created by sweep after GMP, the free list only be used as survivor during CopyForword
 	 * adjustFreeList() try to align the freeEntries in the freelist with CARD_SIZE(for both start address and end address ) and clear dirty CARD for the free entries.
 	 * @param minimumSize4Reuse remove the freeEntries, whose size are smaller than minimumSize4Reuse, from the freelist.

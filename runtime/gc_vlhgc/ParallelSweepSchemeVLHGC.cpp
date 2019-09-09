@@ -1011,7 +1011,7 @@ MM_ParallelSweepSchemeVLHGC::recoverRegionAllocationPointers(MM_EnvironmentVLHGC
 				}
 				regionPool->alignAllocationPointer(CARD_SIZE);
 				freeBytesFromTail = regionPool->getAllocatableBytes();
-				if (freeBytesFromTail >= regionPool->getMinimumFreeEntrySize()) {
+				if (freeBytesFromTail >= (regionPool->getMinimumFreeEntrySize() + CARD_SIZE - 1)) {
 					isEligibleToRestoreTail = true;
 					MM_CardTable *cardTable = _extensions->cardTable;
 					Card *lowCard = cardTable->heapAddrToCardAddr(env, regionPool->getAllocationPointer());
@@ -1021,36 +1021,36 @@ MM_ParallelSweepSchemeVLHGC::recoverRegionAllocationPointers(MM_EnvironmentVLHGC
 			}
 			if (isEligibleToRestoreTail) {
 //				if (regionPool->getActualFreeMemorySize() < freeBytesFromTail) {
-				regionPool->setFreeMemorySize(freeBytesFromTail);
+//				regionPool->setFreeMemorySize(freeBytesFromTail);
 //				}
-				regionPool->setFreeEntryCount(1);
+//				regionPool->setFreeEntryCount(1);
 				regionPool->setLargestFreeEntry(freeBytesFromTail);
 
 			} else {
 				regionPool->setAllocationPointer(env,region->getHighAddress());
-				regionPool->setFreeMemorySize(0);
-				regionPool->setFreeEntryCount(0);
+//				regionPool->setFreeMemorySize(0);
+//				regionPool->setFreeEntryCount(0);
 				regionPool->setLargestFreeEntry(0);
 			}
 
 			/*  */
-			if (NULL != largestFreeEntry) {
+			if ((_extensions->tarokEnableRecoverRegionLargestFreeMemory) && (NULL != largestFreeEntry)) {
 				void* newStartFreeEntry = NULL;
 				void* newEndFreeEntry = NULL;
 				MM_CardTable *cardTable = _extensions->cardTable;
 				Card *lowCard = NULL;
 				Card *highCard = NULL;
 
-				newStartFreeEntry = alignWithCard((void *) largestFreeEntry, false);
-				newEndFreeEntry = alignWithCard((void *) ((UDATA)largestFreeEntry + largestFreeEntry->getSize()), true);
-				if (((UDATA) newEndFreeEntry > (UDATA) newStartFreeEntry) && (((UDATA) newEndFreeEntry - (UDATA) newStartFreeEntry) >= regionPool->getMinimumFreeEntrySize())) {
+				newStartFreeEntry = regionPool->alignWithCard((void *) largestFreeEntry, false, CARD_SIZE);
+				newEndFreeEntry = regionPool->alignWithCard((void *) ((UDATA)largestFreeEntry + largestFreeEntry->getSize()), true, CARD_SIZE);
+				if (((UDATA) newEndFreeEntry > (UDATA) newStartFreeEntry) && (((UDATA) newEndFreeEntry - (UDATA) newStartFreeEntry) >= (regionPool->getMinimumFreeEntrySize() + CARD_SIZE - 1))) {
 					lowCard = cardTable->heapAddrToCardAddr(env, newStartFreeEntry);
 					highCard = cardTable->heapAddrToCardAddr(env, newEndFreeEntry);
 					memset(lowCard, CARD_CLEAN, (UDATA)highCard - (UDATA)lowCard);
 
 					regionPool->setAllocationPointer4Collector(env, newStartFreeEntry, newEndFreeEntry);
-					regionPool->setFreeMemorySize(regionPool->getActualFreeMemorySize() + ((UDATA)newEndFreeEntry - (UDATA)newStartFreeEntry));
-					regionPool->setFreeEntryCount(regionPool->getActualFreeEntryCount() + 1);
+//					regionPool->setFreeMemorySize(regionPool->getActualFreeMemorySize() + ((UDATA)newEndFreeEntry - (UDATA)newStartFreeEntry));
+//					regionPool->setFreeEntryCount(regionPool->getActualFreeEntryCount() + 1);
 					regionPool->setLargestFreeEntry((UDATA)newEndFreeEntry - (UDATA)newStartFreeEntry);
 				}
 			} else {
@@ -1058,26 +1058,11 @@ MM_ParallelSweepSchemeVLHGC::recoverRegionAllocationPointers(MM_EnvironmentVLHGC
 			}
 
 			PORT_ACCESS_FROM_ENVIRONMENT(env);
-			j9tty_printf(PORTLIB, "recoverRegionAllocationPointers region=%p, FreeMemorySize=%zu, FreeEntryCount=%zu, LargestFreeEntry=%zu\n", region, regionPool->getActualFreeMemorySize(), regionPool->getActualFreeEntryCount(), regionPool->getLargestFreeEntry());
+			j9tty_printf(PORTLIB, "recoverRegionAllocationPointers region=%p, age=%zu, FreeMemorySize=%zu, FreeEntryCount=%zu, LargestFreeEntry=%zu\n", region, region->getLogicalAge(), regionPool->getActualFreeMemorySize(), regionPool->getActualFreeEntryCount(), regionPool->getLargestFreeEntry());
 
 //			adjustFreeList(env, region, regionPool->getMinimumFreeEntrySize());
 		}
 	}
-}
-
-void*
-MM_ParallelSweepSchemeVLHGC::alignWithCard(void *address, bool toFloor)
-{
-	UDATA alignmentMultiple = CARD_SIZE;
-
-	UDATA alignmentMask = alignmentMultiple - 1;
-	UDATA newSum = (UDATA)address + alignmentMask;
-	UDATA alignedValue = newSum & ~alignmentMask;
-	if (((UDATA) address != alignedValue) && toFloor) {
-		alignedValue -= alignmentMultiple;
-	}
-
-	return (void *) alignedValue;
 }
 
 void
@@ -1100,8 +1085,8 @@ MM_ParallelSweepSchemeVLHGC::adjustFreeList(MM_EnvironmentBase *env, MM_HeapRegi
 	minimumSize4Reuse = OMR_MAX(minimumSize4Reuse, CARD_SIZE);
 	while (NULL != currentFreeEntry) {
 		endFreeEntry = (void *) ((UDATA)currentFreeEntry + currentFreeEntry->getSize());
-		newStartFreeEntry = alignWithCard((void *) currentFreeEntry, false);
-		newEndFreeEntry = alignWithCard((void *) endFreeEntry, true);
+		newStartFreeEntry = regionPool->alignWithCard((void *) currentFreeEntry, false, CARD_SIZE);
+		newEndFreeEntry = regionPool->alignWithCard((void *) endFreeEntry, true, CARD_SIZE);
 		nextFreeEntry = currentFreeEntry->getNext(compressed);
 		needClearCard = true;
 

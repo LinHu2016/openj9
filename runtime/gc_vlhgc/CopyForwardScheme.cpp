@@ -536,9 +536,9 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 				holeCount += 1;
 			}
 			region->_sweepData._alreadySwept = true;
-			pool->setFreeMemorySize(remainingBytes);
+			pool->setFreeMemorySize(pool->getActualFreeMemorySize() + remainingBytes);
 
-			pool->setFreeEntryCount(holeCount);
+			pool->setFreeEntryCount(pool->getActualFreeEntryCount() + holeCount);
 			pool->setLargestFreeEntry(largestFreeEntrySize);
 			Assert_MM_true(pool->getActualFreeMemorySize() >= pool->getAllocatableBytes());
 			Assert_MM_true(pool->getActualFreeMemorySize() <= region->getSize());
@@ -927,6 +927,10 @@ MM_CopyForwardScheme::reserveMemoryForObject(MM_EnvironmentVLHGC *env, UDATA com
 			memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
 
+			/* make sure that we can't be copying objects into the area covered by a card which is meant to describe objects which were already in the region */
+			UDATA lostToAlignment = alignMemoryPool4Collector(env, memoryPool);
+			env->_copyForwardCompactGroups[compactGroup]._discardedBytes += lostToAlignment;
+
 			result = memoryPool->collectorAllocate(env, &allocDescription, false);
 			resultRegion = region;
 			region = region->_copyForwardData._nextRegion;
@@ -935,6 +939,7 @@ MM_CopyForwardScheme::reserveMemoryForObject(MM_EnvironmentVLHGC *env, UDATA com
 			/* remove this region from the common largest freememory candidates list and add it to our own sublist */
 			Assert_MM_true(NULL != resultRegion);
 			Assert_MM_true(NULL != memoryPool);
+
 			void *baseAddr =memoryPool->getAllocationPointer();
 			void *lowAddr = memoryPool->getAllocationPointer4Collector();
 			void *highAddr = memoryPool->getAlloctionTop4Collector();
@@ -1061,6 +1066,10 @@ MM_CopyForwardScheme::reserveMemoryForCache(MM_EnvironmentVLHGC *env, UDATA comp
 		if (NULL != region) {
 			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
+
+			/* make sure that we can't be copying objects into the area covered by a card which is meant to describe objects which were already in the region */
+			UDATA lostToAlignment = alignMemoryPool4Collector(env, memoryPool);
+			env->_copyForwardCompactGroups[compactGroup]._discardedBytes += lostToAlignment;
 
 			void *tlhBase = NULL;
 			void *tlhTop = NULL;
@@ -4118,6 +4127,37 @@ MM_CopyForwardScheme::alignMemoryPool(MM_EnvironmentVLHGC *env, MM_MemoryPoolBum
 	return lostToAlignment;
 }
 
+UDATA
+MM_CopyForwardScheme::alignMemoryPool4Collector(MM_EnvironmentVLHGC *env, MM_MemoryPoolBumpPointer *pool)
+{
+	/* make sure that we can't be copying objects into the area covered by a card which is meant to describe objects which were already in the region */
+	UDATA recordedActualFree = pool->getActualFreeMemorySize();
+	UDATA initialAllocatableBytes = pool->getAllocatableBytes();
+	UDATA allocatableBytes4Collector = pool->getAllocatableBytes4Collector();
+
+	Assert_MM_true(recordedActualFree >= (initialAllocatableBytes + allocatableBytes4Collector));
+	UDATA previousFree = recordedActualFree - initialAllocatableBytes - allocatableBytes4Collector;
+	Assert_MM_true(previousFree < _regionManager->getRegionSize());
+	UDATA lostToAlignment = 0;
+	if (0 != allocatableBytes4Collector) {
+		void *newStartFreeEntry = pool->alignWithCard((void *)  pool->getAllocationPointer4Collector(), false, CARD_SIZE);
+		void *newEndFreeEntry = pool->alignWithCard((void *)  pool->getAlloctionTop4Collector(), true, CARD_SIZE);
+		UDATA newAllocatableBytes = (UDATA)newEndFreeEntry - (UDATA)newStartFreeEntry;
+		Assert_MM_true(newAllocatableBytes >= pool->getMinimumFreeEntrySize());
+		Assert_MM_true(newAllocatableBytes <= allocatableBytes4Collector);
+		pool->setAllocationPointer4Collector(env, newStartFreeEntry, newEndFreeEntry);
+		lostToAlignment += allocatableBytes4Collector - newAllocatableBytes;
+	}
+	if (0 != initialAllocatableBytes) {
+		pool->alignAllocationPointer(CARD_SIZE);
+		UDATA newAllocatableBytes = pool->getAllocatableBytes();
+		Assert_MM_true(newAllocatableBytes >= pool->getMinimumFreeEntrySize());
+		Assert_MM_true(newAllocatableBytes <= initialAllocatableBytes);
+		lostToAlignment += initialAllocatableBytes - newAllocatableBytes;
+	}
+	return lostToAlignment;
+}
+
 void
 MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 {
@@ -4141,13 +4181,19 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 					MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
 					/* only add regions with pools which could possibly satisfy a TLH allocation */
 					UDATA initialAllocatableBytes = pool->getAllocatableBytes();
+					UDATA allocatableBytes4Collector = pool->getAllocatableBytes4Collector();
 					UDATA minimumEntrySize = pool->getMinimumFreeEntrySize();
-					if ((NULL != pool->getAllocationPointer4Collector()) && (pool->getAllocatableBytes4Collector() >= (minimumEntrySize + CARD_SIZE - 1))) {
+					if ((NULL != pool->getAllocationPointer4Collector()) && (allocatableBytes4Collector >= (minimumEntrySize + CARD_SIZE - 1))) {
 						Assert_MM_false(region->isSurvivorRegion());
 						Assert_MM_true(NULL == region->_copyForwardData._survivorLow);
 						Assert_MM_true(NULL == region->_copyForwardData._survivorBase);
 						insertCandidate(env, _reservedRegionList[compactGroup]._largestFreeMemoryCandidates, _reservedRegionList[compactGroup]._largestFreeMemoryCandidateCount, region);
-
+						if ((initialAllocatableBytes != 0) && (initialAllocatableBytes < (minimumEntrySize + CARD_SIZE - 1))) {
+							/* clear the tail */
+							pool->setAllocationPointer(env,region->getHighAddress());
+//							pool->setFreeMemorySize(pool->getActualFreeMemorySize() - initialAllocatableBytes);
+//							pool->setFreeEntryCount(pool->getActualFreeEntryCount() - 1);
+						}
 						PORT_ACCESS_FROM_ENVIRONMENT(env);
 						j9tty_printf(PORTLIB, "insertCandidate largestFreeMemoryCandidates region=%p, size=%zu, compactGroup=%zu, cadidatesCount=%zu\n", region, pool->getAllocatableBytes4Collector()+initialAllocatableBytes, compactGroup, _reservedRegionList[compactGroup]._largestFreeMemoryCandidateCount);
 
@@ -4157,7 +4203,12 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 						Assert_MM_false(region->isSurvivorRegion());
 						Assert_MM_true(NULL == region->_copyForwardData._survivorBase);
 						insertCandidate(env, _reservedRegionList[compactGroup]._tailCandidates, _reservedRegionList[compactGroup]._tailCandidateCount, region);
-
+						if (0 != allocatableBytes4Collector) {
+							pool->setAllocationPointer4Collector(env, NULL, NULL);
+//							pool->setFreeMemorySize(pool->getActualFreeMemorySize() - allocatableBytes4Collector);
+//							pool->setFreeEntryCount(pool->getActualFreeEntryCount() - 1);
+							pool->setLargestFreeEntry(initialAllocatableBytes);
+						}
 						PORT_ACCESS_FROM_ENVIRONMENT(env);
 						j9tty_printf(PORTLIB, "insertCandidate tailCandidates region=%p, size=%zu, compactGroup=%zu, cadidatesCount=%zu\n", region, initialAllocatableBytes, compactGroup, _reservedRegionList[compactGroup]._tailCandidateCount);
 
@@ -5511,6 +5562,7 @@ MM_CopyForwardScheme::setRegionAsSurvivor(MM_EnvironmentVLHGC* env, MM_HeapRegio
 	}
 	Assert_MM_true(freeMemorySize >= survivorSize);
 	memoryPool->setFreeMemorySize(freeMemorySize - survivorSize);
+	memoryPool->setFreeEntryCount(memoryPool->getActualFreeEntryCount() - survivorCount);
 	Assert_MM_false(region->_copyForwardData._requiresPhantomReferenceProcessing);
 }
 
