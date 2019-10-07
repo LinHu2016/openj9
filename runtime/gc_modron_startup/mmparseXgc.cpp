@@ -1013,6 +1013,11 @@ j9gc_initialize_parse_gc_colon(J9JavaVM *javaVM, char **scan_start)
 			goto _exit;
 		}
 		
+		/* -Xgc:fvtest=loaResizeHeapAlignmentFloor */
+		if (try_scan(scan_start, "loaResizeHeapAlignmentFloor")) {
+			extensions->fvtest_LOAResizeHeapAlignmentFloor = true;
+			goto _exit;
+		}
 		/* This forces the tenure space to resize - 5 expands followed by 5 contracts */
 		if (try_scan(scan_start, "forceTenureResize")) {
 			extensions->fvtest_forceOldResize = true;
