@@ -508,7 +508,9 @@ j9gc_pools_memory(J9JavaVM *javaVM, UDATA poolIDs, UDATA *totals, UDATA *frees, 
 	MM_HeapMemorySnapshot snapShot;
 	manager->getHeapMemorySnapshot(extensions, &snapShot, (TRUE == gcEnd));
 	UDATA idx = 0;
-	
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "j9gc_pools_memory gcEnd=%zu, _totalHeapSize=%zu, _freeHeapSize=%zu\n", gcEnd, snapShot._totalHeapSize, snapShot._freeHeapSize);
+
 	for (UDATA count = 0, mask = 1; count < J9_GC_MANAGEMENT_MAX_POOL; count++, mask <<= 1)
 	{
 		if (0 != (poolIDs & mask)) {
@@ -516,42 +518,52 @@ j9gc_pools_memory(J9JavaVM *javaVM, UDATA poolIDs, UDATA *totals, UDATA *frees, 
 			case J9_GC_MANAGEMENT_POOL_TENURED :
 				totals[idx] = snapShot._totalTenuredSize;
 				frees[idx] = snapShot._freeTenuredSize;
+				j9tty_printf(PORTLIB, "_totalTenuredSize=%zu, _freeTenuredSize=%zu\n", snapShot._totalTenuredSize, snapShot._freeTenuredSize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_TENURED_SOA :
 				totals[idx] = snapShot._totalTenuredSOASize;
 				frees[idx] = snapShot._freeTenuredSOASize;
+				j9tty_printf(PORTLIB, "_totalTenuredSOASize=%zu, _freeTenuredSOASize=%zu\n", snapShot._totalTenuredSOASize, snapShot._freeTenuredSOASize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_TENURED_LOA :
 				totals[idx] = snapShot._totalTenuredLOASize;
 				frees[idx] = snapShot._freeTenuredLOASize;
+				j9tty_printf(PORTLIB, "_totalTenuredLOASize=%zu, _freeTenuredLOASize=%zu\n", snapShot._totalTenuredLOASize, snapShot._freeTenuredLOASize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_NURSERY_ALLOCATE :
 				totals[idx] = snapShot._totalNurseryAllocateSize;
 				frees[idx] = snapShot._freeNurseryAllocateSize;
+				j9tty_printf(PORTLIB, "_totalNurseryAllocateSize=%zu, _freeNurseryAllocateSize=%zu\n", snapShot._totalNurseryAllocateSize, snapShot._freeNurseryAllocateSize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_NURSERY_SURVIVOR :
 				totals[idx] = snapShot._totalNurserySurvivorSize;
 				frees[idx] = snapShot._freeNurserySurvivorSize;
+				j9tty_printf(PORTLIB, "_totalNurserySurvivorSize=%zu, _freeNurserySurvivorSize=%zu\n", snapShot._totalNurserySurvivorSize, snapShot._freeNurserySurvivorSize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_REGION_OLD :
 				totals[idx] = snapShot._totalRegionOldSize;
 				frees[idx] = snapShot._freeRegionOldSize;
+				j9tty_printf(PORTLIB, "_totalRegionOldSize=%zu, _freeRegionOldSize=%zu\n", snapShot._totalRegionOldSize, snapShot._freeRegionOldSize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_REGION_EDEN :
 				totals[idx] = snapShot._totalRegionEdenSize;
 				frees[idx] = snapShot._freeRegionEdenSize;
+				j9tty_printf(PORTLIB, "_totalRegionEdenSize=%zu, _freeRegionEdenSize=%zu\n", snapShot._totalRegionEdenSize, snapShot._freeRegionEdenSize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_REGION_SURVIVOR :
 				totals[idx] = snapShot._totalRegionSurvivorSize;
 				frees[idx] = snapShot._freeRegionSurvivorSize;
+				j9tty_printf(PORTLIB, "_totalRegionSurvivorSize=%zu, _freeRegionSurvivorSize=%zu\n", snapShot._totalRegionSurvivorSize, snapShot._freeRegionSurvivorSize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_REGION_RESERVED :
 				totals[idx] = snapShot._totalRegionReservedSize;
 				frees[idx] = snapShot._freeRegionReservedSize;
+				j9tty_printf(PORTLIB, "_totalRegionReservedSize=%zu, _freeRegionReservedSize=%zu\n", snapShot._totalRegionReservedSize, snapShot._freeRegionReservedSize);
 				break;
 			case J9_GC_MANAGEMENT_POOL_JAVAHEAP :
 				totals[idx] = snapShot._totalHeapSize;
 				frees[idx] = snapShot._freeHeapSize;
+				j9tty_printf(PORTLIB, "_totalHeapSize=%zu, _freeHeapSize=%zu\n", snapShot._totalHeapSize, snapShot._freeHeapSize);
 				break;
 			default :
 				totals[idx] = 0;
@@ -575,6 +587,9 @@ j9gc_pool_maxmemory(J9JavaVM *javaVM, UDATA poolID)
 	UDATA maxsize = 0;
 	MM_GCExtensionsBase *extensions = MM_GCExtensions::getExtensions(javaVM);
 
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "j9gc_pool_maxmemory memoryMax=%zu\n", extensions->memoryMax);
+
 	switch (poolID) {
 	case J9_GC_MANAGEMENT_POOL_TENURED_SOA :
 		{
@@ -584,6 +599,7 @@ j9gc_pool_maxmemory(J9JavaVM *javaVM, UDATA poolID)
 			UDATA loaSize = (UDATA) (memoryPool->getLOARatio() * extensions->maxOldSpaceSize);
 			loaSize = MM_Math::roundToCeiling(extensions->heapAlignment, loaSize);
 			maxsize = extensions->maxOldSpaceSize - loaSize;
+			j9tty_printf(PORTLIB, "loaSize=%zu, maxsize=%zu, maxOldSpaceSize=%zu\n", loaSize, maxsize, extensions->maxOldSpaceSize);
 		}
 		break;
 	case J9_GC_MANAGEMENT_POOL_TENURED_LOA :
@@ -613,6 +629,7 @@ j9gc_pool_maxmemory(J9JavaVM *javaVM, UDATA poolID)
 			UDATA allocateSize = (UDATA)(tiltRatio * extensions->maxNewSpaceSize);
 			allocateSize = MM_Math::roundToCeiling(extensions->heapAlignment, allocateSize);
 			maxsize = extensions->maxNewSpaceSize - allocateSize;
+			j9tty_printf(PORTLIB, "allocateSize=%zu, maxsize=%zu, maxNewSpaceSize=%zu\n", allocateSize, maxsize, extensions->maxNewSpaceSize);
 		}
 		break;
 	case J9_GC_MANAGEMENT_POOL_REGION_OLD :
