@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2014 IBM Corp. and others
+ * Copyright (c) 1991, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -38,6 +38,7 @@
 #include "GCExtensions.hpp"
 #include "Heap.hpp"
 #include "HeapRegionDescriptor.hpp"
+#include "MarkMap.hpp"
 
 #define BITS_PER_BYTE	8
 #define COMPRESSED_CARDS_PER_WORD	(sizeof(UDATA) * BITS_PER_BYTE)
@@ -160,6 +161,66 @@ MM_CompressedCardTable::setCompressedCardsDirtyForPartialCollect(void *startHeap
 	for (i = compressedCardStartIndex; i < compressedCardEndIndex; i++) {
 		_compressedCardTable[i] = AllCompressedCardsInWordDirty;
 	}
+}
+
+void
+MM_CompressedCardTable::rebuildCompressedCardTableForAfterGMP(MM_EnvironmentBase *env, void *startHeapAddress, void *endHeapAddress)
+{
+	MM_MarkMap *markMap = env->_cycleState->_markMap;
+	uint64_t *map4Card = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) startHeapAddress)];
+	uint64_t *map4CardLast = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) endHeapAddress)];
+	UDATA compressedCardStartOffset = ((UDATA)startHeapAddress - _heapBase) / (CARD_SIZE * COMPRESSED_CARD_TABLE_DIV);
+	UDATA compressedCardStartIndex = compressedCardStartOffset / COMPRESSED_CARDS_PER_WORD;
+	UDATA *compressedCard = &_compressedCardTable[compressedCardStartIndex];
+	UDATA mask = 1;
+	const UDATA endOfWord = ((UDATA)1) << (COMPRESSED_CARDS_PER_WORD - 1);
+	UDATA compressedCardWord = AllCompressedCardsInWordClean;
+	/*
+	 *  To simplify test logic assume here that given addresses are aligned to correspondent compressed card word border
+	 *  So no need to handle side pieces (no split of compressed card table words between regions)
+	 *  However put an assertion here
+	 */
+	Assert_MM_true(0 == (compressedCardStartOffset % COMPRESSED_CARDS_PER_WORD));
+
+	while (map4Card < map4CardLast) {
+#if (1 == COMPRESSED_CARD_TABLE_DIV)
+		if (0 == *map4Card) {
+			/* invert bit */
+			compressedCardWord ^= mask;
+		}
+		map4Card++;
+
+#else /* COMPRESSED_CARD_TABLE_DIV == 1 */
+		/*
+		 * This implementation supports case for COMPRESSED_CARD_TABLE_DIV == 1 as well
+		 * Special implementation above extracted with hope that it is faster
+		 */
+		uint64_t* next = map4Card + COMPRESSED_CARD_TABLE_DIV;
+		/* check cards responsible for this bit until first dirty or value found */
+		for (UDATA j = 0; j < COMPRESSED_CARD_TABLE_DIV; j++) {
+			if (0 == *map4Card) {
+				/* invert bit */
+				compressedCardWord ^= mask;
+				break;
+			}
+			map4Card++;
+		}
+		/* rewind card pointer to first card for next bit */
+		map4Card = next;
+#endif /* COMPRESSED_CARD_TABLE_DIV == 1 */
+
+		if (mask == endOfWord) {
+			/* last bit in word handled - save word and prepare mask for next one */
+			*compressedCard++ = compressedCardWord;
+			mask = 1;
+			compressedCardWord = AllCompressedCardsInWordClean;
+		} else {
+			/* mask for next bit to handle */
+			mask = mask << 1;
+		}
+	}
+	/* end heap address must be aligned*/
+	Assert_MM_true(1 == mask);
 }
 
 void

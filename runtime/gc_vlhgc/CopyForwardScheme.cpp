@@ -97,6 +97,7 @@
 #include "SublistSlotIterator.hpp"
 #include "WorkPacketsIterator.hpp"
 #include "WorkPacketsVLHGC.hpp"
+#include "SchedulingDelegate.hpp"
 
 #define INITIAL_FREE_HISTORY_WEIGHT ((float)0.8)
 #define TENURE_BYTES_HISTORY_WEIGHT ((float)0.8)
@@ -492,6 +493,7 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 		MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
 
 		if (region->_copyForwardData._evacuateSet) {
+			region->_recoverFreeTailAfterSweep = false;
 			if (region->isEden()) {
 				static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._edenEvacuateRegionCount += 1;
 			} else {
@@ -3989,8 +3991,7 @@ MM_CopyForwardScheme::clearCardTableForPartialCollect(MM_EnvironmentVLHGC *env)
 			if (region->_copyForwardData._evacuateSet && !region->_markData._noEvacuation) {
 				if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 					void *low = region->getLowAddress();
-					void *bumpPointer = ((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocationPointer();
-					void *high = (void *)MM_Math::roundToCeiling(CARD_SIZE, (UDATA)bumpPointer);
+					void *high = region->getHighAddress();
 					Card *lowCard = cardTable->heapAddrToCardAddr(env, low);
 					Card *highCard = cardTable->heapAddrToCardAddr(env, high);
 					UDATA cardRangeSize = (UDATA)highCard - (UDATA)lowCard;
@@ -4026,9 +4027,23 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 
 	env->_workStack.prepareForWork(env, env->_cycleState->_workPackets);
 
+	U_64 time = 0;
+	bool skipClearFromRegionReferencesForCopyForward = false;
+	if (static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_schedulingDelegate->isFirstPGCAfterGMP()) {
+		if (_extensions->skipClearReferencesFirstPGCAfterGMP) {
+			skipClearFromRegionReferencesForCopyForward = true;
+		}
+	}
+
 	/* pre-populate the _reservedRegionList with the flushed regions from every context (required to bootstrap tail-filling) */
 	/* this is a simple operation, so do it in one GC thread */
 	if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+
+		if (!skipClearFromRegionReferencesForCopyForward) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			time = j9time_hires_clock();
+		}
+
 		GC_HeapRegionIteratorVLHGC regionIterator(_regionManager, MM_HeapRegionDescriptor::MANAGED);
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
 		while (NULL != (region = regionIterator.nextRegion())) {
@@ -4084,14 +4099,21 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 	/* We want to clear all out-going references from the nursery set since those regions
 	 * will be walked and their precise out-going references will be used to reconstruct the RS
 	 */
-	_interRegionRememberedSet->clearFromRegionReferencesForCopyForward(env);
-
+	if (!skipClearFromRegionReferencesForCopyForward) {
+		_interRegionRememberedSet->clearFromRegionReferencesForCopyForward(env);
+	}
 	clearMarkMapForPartialCollect(env);
 
 	if (NULL != env->_cycleState->_externalCycleState) {
 		rememberReferenceListsFromExternalCycle(env);
 	}
 	((MM_CopyForwardSchemeTask*)env->_currentTask)->synchronizeGCThreadsForInterRegionRememberedSet(env, UNIQUE_ID);
+
+	if (0 != time) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "clearFromRegionReferencesForCopyForward: %zu us\n", j9time_hires_delta(0, j9time_hires_clock()-time, J9PORT_TIME_DELTA_IN_MICROSECONDS));
+
+	}
 
 	/* scan roots before cleaning the card table since the roots give us more concrete NUMA recommendations */
 	scanRoots(env);
@@ -4164,7 +4186,7 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 
 	env->_copyForwardCompactGroups = NULL;
 
-	return ;
+	return;
 }
 
 void

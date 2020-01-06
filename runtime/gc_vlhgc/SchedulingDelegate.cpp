@@ -138,7 +138,7 @@ MM_SchedulingDelegate::globalMarkPhaseCompleted(MM_EnvironmentVLHGC *env)
 	_previousReclaimableRegions = 0;
 
 	_didGMPCompleteSinceLastReclaim = true;
-
+//	_extensions->firstPGCAfterGMP = true;
 	_globalSweepRequired = true;
 
 	_disableCopyForwardDuringCurrentGlobalMarkPhase = false;
@@ -872,6 +872,7 @@ void
 MM_SchedulingDelegate::firstPGCAfterGMPCompleted()
 {
 	_didGMPCompleteSinceLastReclaim = false;
+//	_extensions->firstPGCAfterGMP = false;
 }
 
 void

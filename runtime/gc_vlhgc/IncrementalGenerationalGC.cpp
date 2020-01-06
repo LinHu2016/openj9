@@ -847,6 +847,7 @@ MM_IncrementalGenerationalGC::taxationEntryPoint(MM_EnvironmentBase *envModron, 
 	if(doPartialGarbageCollection) {
 		Assert_MM_true(NULL == env->_cycleState);
 		MM_CycleStateVLHGC cycleState;
+		cycleState._schedulingDelegate = &_schedulingDelegate;
 		env->_cycleState = &cycleState;
 		env->_cycleState->_gcCode = MM_GCCode(J9MMCONSTANT_IMPLICIT_GC_DEFAULT);
 		env->_cycleState->_collectionType = MM_CycleState::CT_PARTIAL_GARBAGE_COLLECTION;
@@ -1295,17 +1296,39 @@ MM_IncrementalGenerationalGC::partialGarbageCollect(MM_EnvironmentVLHGC *env, MM
 	_extensions->allocationStats.clear();
 }
 
+bool
+MM_IncrementalGenerationalGC::isCardCleanForTail(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region)
+{
+	bool ret = true;
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB, "isCardCleanForTail, region=%zu\n", _regionManager->mapDescriptorToRegionTableIndex(region));
+
+	MM_CardTable *cardTable = _extensions->cardTable;
+	MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+	void *lowCardAddress = (void *)MM_Math::roundToCeiling(CARD_SIZE, (UDATA)regionPool->getAllocationPointer());
+	Card *lowCard = cardTable->heapAddrToCardAddr(env, lowCardAddress);
+	Card *highCard = cardTable->heapAddrToCardAddr(env, region->getHighAddress());
+	for (Card *thisCard = lowCard; thisCard < highCard; thisCard++) {
+		if (CARD_CLEAN != *thisCard) {
+			j9tty_printf(PORTLIB, "isCardCleanForTail, region=%zu, no, lowCard=%p, highCard=%p, card=%p(%zu), allocationPointer=%p\n", _regionManager->mapDescriptorToRegionTableIndex(region), lowCard, highCard, thisCard, *thisCard, regionPool->getAllocationPointer());
+			ret = false;
+			break;
+		}
+	}
+	return ret;
+}
+
 void
 MM_IncrementalGenerationalGC::partialGarbageCollectUsingCopyForward(MM_EnvironmentVLHGC *env, MM_AllocateDescription *allocDescription)
 {
 	Trc_MM_IncrementalGenerationalGC_partialGarbageCollectUsingCopyForward_Entry(env->getLanguageVMThread());
-	
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
 
 	/* Record stats before a copy forward */
 	UDATA freeMemoryForSurvivor = _extensions->getHeap()->getActualFreeMemorySize();
 	static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._freeMemoryBefore = freeMemoryForSurvivor;
 	static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._totalMemoryBefore = _extensions->getHeap()->getMemorySize();
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward start\n");
 
 	if (_extensions->tarokUseProjectedSurvivalCollectionSet) {
 		_projectedSurvivalCollectionSetDelegate.createRegionCollectionSetForPartialGC(env);
@@ -1346,20 +1369,41 @@ MM_IncrementalGenerationalGC::partialGarbageCollectUsingCopyForward(MM_Environme
 		static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._externalCompactBytes = 0;
 	}
 
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward partialGarbageCollectStarted before\n");
 	_schedulingDelegate.partialGarbageCollectStarted(env);
 
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward flushRememberedSetIntoCardTable before\n");
 	/* flush the RSList and RSM from our currently selected regions into the card table since we will rebuild them as we process the table */
+	U_64 time = j9time_hires_clock();
 	flushRememberedSetIntoCardTable(env);
+	j9tty_printf(PORTLIB, "flushRememberedSetIntoCardTable: %zu us\n", j9time_hires_delta(0, j9time_hires_clock()-time, J9PORT_TIME_DELTA_IN_MICROSECONDS));
+
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward flushRememberedSetIntoCardTable after\n");
+	/* debug */
+	if (_schedulingDelegate.isFirstPGCAfterGMP()) {
+		GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
+		MM_HeapRegionDescriptorVLHGC *region = NULL;
+		while(NULL != (region = regionIterator.nextRegion())) {
+			if (region->containsObjects() && !region->_markData._shouldMark) {
+				Assert_MM_true(isCardCleanForTail(env, region));
+			}
+		}
+	}
+
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward flushBuffersForDecommitedRegions before\n");
 	_interRegionRememberedSet->flushBuffersForDecommitedRegions(env);
 
 	Assert_MM_true(env->_cycleState->_markMap == _markMapManager->getPartialGCMap());
 	Assert_MM_true(env->_cycleState->_workPackets == _workPacketsForPartialGC);
 	
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward preCopyForwardSetup before\n");
 	_copyForwardDelegate.preCopyForwardSetup(env);
 
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward reportCopyForwardStart before\n");
 	reportCopyForwardStart(env);
 	U_64 startTimeOfCopyForward = j9time_hires_clock();
 
+//	j9tty_printf(PORTLIB, "partialGarbageCollectUsingCopyForward performCopyForwardForPartialGC before\n");
 	bool successful = _copyForwardDelegate.performCopyForwardForPartialGC(env);
 	U_64 endTimeOfCopyForward = j9time_hires_clock();
 

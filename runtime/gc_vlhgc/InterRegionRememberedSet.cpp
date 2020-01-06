@@ -45,6 +45,8 @@
 #include "RememberedSetCardListCardIterator.hpp"
 #include "Task.hpp"
 #include "VMThreadListIterator.hpp"
+#include "MarkMap.hpp"
+#include "SchedulingDelegate.hpp"
 
 MM_InterRegionRememberedSet::MM_InterRegionRememberedSet(MM_HeapRegionManager *heapRegionManager)
 	: _heapRegionManager(heapRegionManager)
@@ -894,6 +896,190 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForCompactOptimized(MM_Env
 	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForCompact_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, env->_irrsStats._rebuildCompressedCardTableTimesus);
 }
 
+
+/* 
+ * 
+ */
+void
+MM_InterRegionRememberedSet::clearReferencesAfterGMP(MM_EnvironmentVLHGC* env)
+{
+//	if(MM_GCExtensions::getExtensions(env)->tarokEnableCompressedCardTable) {
+//		clearReferencesAfterGMPOptimized(env);
+//	} else {
+		clearReferencesAfterGMPDirect(env);
+//	}
+
+	releaseCardBufferControlBlockListForThread(env, env);
+}
+
+void
+MM_InterRegionRememberedSet::clearReferencesAfterGMPDirect(MM_EnvironmentVLHGC* env)
+{
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	MM_CardTable *cardTable = MM_GCExtensions::getExtensions(env)->cardTable;
+	U_64 startTime = j9time_hires_clock();
+
+	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
+	MM_HeapRegionDescriptorVLHGC *region;
+	MM_MarkMap *markMap = env->_cycleState->_markMap;
+
+	UDATA cardsProcessed = 0;
+	UDATA cardsRemoved = 0;
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+			if (!region->getRememberedSetCardList()->isOverflowed()) {
+				UDATA card = 0;
+				UDATA toRemoveCount = 0;
+				UDATA totalCountBefore = 0;
+				GC_RememberedSetCardListCardIterator rsclCardIterator(region->getRememberedSetCardList());
+				while (0 != (card = rsclCardIterator.nextReferencingCard(env))) {
+//					MM_HeapRegionDescriptorVLHGC *fromRegion = tableDescriptorForRememberedSetCard(card);
+//					Card * cardAddress = rememberedSetCardToCardAddr(env, card);
+					void* heapAddress = convertHeapAddressFromRememberedSetCard(card);
+					/* Regions that are completely swept after a GMP, might still have outgoing references (thus we consider empty regions too) */
+//					if (fromRegion->_markData._shouldMark  || !fromRegion->containsObjects() || isDirtyCardForPartialCollect(env, cardTable, cardAddress)) {
+					uint64_t* map4Card = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) heapAddress)];
+					if (0 == *map4Card) {
+//						j9tty_printf(PORTLIB, "clearReferencesAfterGMPDirect, region=%zu, heapAddress=%p, map4Card=%zu\n", _heapRegionManager->mapDescriptorToRegionTableIndex(region), heapAddress, *map4Card);
+						toRemoveCount += 1;
+						rsclCardIterator.removeCurrentCard(env);
+					}
+					totalCountBefore +=1;
+				}
+
+				if (0 != toRemoveCount) {
+					region->getRememberedSetCardList()->compact(env);
+					UDATA totalCountAfter = region->getRememberedSetCardList()->getSize(env);
+//					Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_cardCounts(env->getLanguageVMThread(), MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount, _heapRegionManager->mapDescriptorToRegionTableIndex(region), totalCountBefore, toRemoveCount, totalCountAfter);
+					Assert_MM_true(totalCountBefore == toRemoveCount + totalCountAfter);
+				}
+
+				cardsProcessed += totalCountBefore;
+				cardsRemoved += toRemoveCount;
+
+			} else {
+				region->getRememberedSetCardList()->releaseBuffers(env);
+			}
+		}
+	}
+
+	env->_irrsStats._clearFromRegionReferencesTimesus = j9time_hires_delta(startTime, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS);
+	env->_irrsStats._clearFromRegionReferencesCardsProcessed = cardsProcessed;
+	env->_irrsStats._clearFromRegionReferencesCardsCleared = cardsRemoved;
+
+	j9tty_printf(PORTLIB, "clearReferencesAfterGMPDirect, cardsProcessed=%zu, cardsRemoved=%zu\n", cardsProcessed, cardsRemoved);
+//	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, 0);
+}
+
+void
+MM_InterRegionRememberedSet::clearReferencesAfterGMPOptimized(MM_EnvironmentVLHGC* env)
+{
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	MM_CardTable *cardTable = MM_GCExtensions::getExtensions(env)->cardTable;
+	MM_CompressedCardTable *compressedCardTable = MM_GCExtensions::getExtensions(env)->compressedCardTable;
+	U_64 startTime = j9time_hires_clock();
+
+	rebuildCompressedCardTableAfterGMP(env);
+
+	U_64 timeAfterRebuild = j9time_hires_clock();
+
+	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
+	MM_HeapRegionDescriptorVLHGC *region;
+	MM_MarkMap *markMap = env->_cycleState->_markMap;
+
+	UDATA cardsProcessed = 0;
+	UDATA cardsRemoved = 0;
+	bool tableIsReady = false;
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+			if (!region->getRememberedSetCardList()->isOverflowed()) {
+				UDATA card = 0;
+				UDATA toRemoveCount = 0;
+				UDATA totalCountBefore = 0;
+				GC_RememberedSetCardListCardIterator rsclCardIterator(region->getRememberedSetCardList());
+				while(0 != (card = rsclCardIterator.nextReferencingCard(env))) {
+					void* heapAddress = convertHeapAddressFromRememberedSetCard(card);
+					/* Regions that are completely swept after a GMP, might still have outgoing references (thus we consider empty regions too) */
+					bool remove = true;
+					if (tableIsReady) {
+						/* Rebuild of Compressed Card Table has been completed - use it */
+						remove = compressedCardTable->isCompressedCardDirtyForPartialCollect(env, heapAddress);
+					} else {
+						if (compressedCardTable->isReady()) {
+							tableIsReady = true;
+							/* Rebuild of Compressed Card Table has been completed - use it for first time */
+							remove = compressedCardTable->isCompressedCardDirtyForPartialCollect(env, heapAddress);
+						} else {
+							/* rebuild is not complete - look at the card itself directly */
+							uint64_t* map4Card = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) heapAddress)];
+							if (0 == *map4Card) {
+								remove = true;
+							}
+						}
+					}
+
+					if (remove) {
+						toRemoveCount += 1;
+						rsclCardIterator.removeCurrentCard(env);
+					}
+					totalCountBefore +=1;
+				}
+
+				if (0 != toRemoveCount) {
+					region->getRememberedSetCardList()->compact(env);
+					UDATA totalCountAfter = region->getRememberedSetCardList()->getSize(env);
+
+//					Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_cardCounts(env->getLanguageVMThread(), MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount, _heapRegionManager->mapDescriptorToRegionTableIndex(region), totalCountBefore, toRemoveCount, totalCountAfter);
+					Assert_MM_true(totalCountBefore == toRemoveCount + totalCountAfter);
+				}
+
+				cardsProcessed += totalCountBefore;
+				cardsRemoved += toRemoveCount;
+
+			} else {
+				region->getRememberedSetCardList()->releaseBuffers(env);
+			}
+		}
+	}
+
+	env->_irrsStats._clearFromRegionReferencesTimesus = j9time_hires_delta(startTime, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS);
+	env->_irrsStats._rebuildCompressedCardTableTimesus = j9time_hires_delta(startTime, timeAfterRebuild, J9PORT_TIME_DELTA_IN_MICROSECONDS);
+	env->_irrsStats._clearFromRegionReferencesCardsProcessed = cardsProcessed;
+	env->_irrsStats._clearFromRegionReferencesCardsCleared = cardsRemoved;
+
+	j9tty_printf(PORTLIB, "clearReferencesAfterGMPOptimized, cardsProcessed=%zu, cardsRemoved=%zu\n", cardsProcessed, cardsRemoved);
+//	Trc_MM_InterRegionRememberedSet_clearFromRegionReferencesForMark_timesus(env->getLanguageVMThread(), env->_irrsStats._clearFromRegionReferencesTimesus, env->_irrsStats._rebuildCompressedCardTableTimesus);
+}
+
+void
+MM_InterRegionRememberedSet::rebuildCompressedCardTableAfterGMP(MM_EnvironmentVLHGC* env)
+{
+	MM_CompressedCardTable *compressedCardTable = MM_GCExtensions::getExtensions(env)->compressedCardTable;
+	UDATA totalNumber = 0;
+	UDATA doneByThisThread = 0;
+
+	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
+	MM_HeapRegionDescriptorVLHGC *region;
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		totalNumber += 1;
+		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+			if (!region->containsObjects()) {
+				/* region is empty or chosen for PCG, so set all correspondent compressed cards dirty */
+				compressedCardTable->setCompressedCardsDirtyForPartialCollect(region->getLowAddress(), region->getHighAddress());
+			} else {
+				/* rebuild compressed card table for region */
+				compressedCardTable->rebuildCompressedCardTableForAfterGMP(env, region->getLowAddress(), region->getHighAddress());
+			}
+			doneByThisThread += 1;
+		}
+	}
+
+	compressedCardTable->incrementProcessedRegionsCounter(totalNumber, doneByThisThread);
+}
+
 /*
  * This is temporary helper and will be removed as soon as
  * optimized/non-optimized version is chosen
@@ -914,7 +1100,10 @@ void
 MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkDirect(MM_EnvironmentVLHGC* env)
 {
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
-	MM_CardTable *cardTable = MM_GCExtensions::getExtensions(env)->cardTable;
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+	MM_CardTable *cardTable = extensions->cardTable;
+	MM_MarkMap *markMap = env->_cycleState->_markMap;
+	bool needToCheckMarkMap = static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_schedulingDelegate->isFirstPGCAfterGMP();
 	U_64 startTime = j9time_hires_clock();
 
 	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
@@ -922,6 +1111,7 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkDirect(MM_Environme
 
 	UDATA cardsProcessed = 0;
 	UDATA cardsRemoved = 0;
+	bool needToRemove = false;
 
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
@@ -933,8 +1123,20 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkDirect(MM_Environme
 				while(0 != (card = rsclCardIterator.nextReferencingCard(env))) {
 					MM_HeapRegionDescriptorVLHGC *fromRegion = tableDescriptorForRememberedSetCard(card);
 					Card * cardAddress = rememberedSetCardToCardAddr(env, card);
+					needToRemove = false;
 					/* Regions that are completely swept after a GMP, might still have outgoing references (thus we consider empty regions too) */
 					if (fromRegion->_markData._shouldMark  || !fromRegion->containsObjects() || isDirtyCardForPartialCollect(env, cardTable, cardAddress)) {
+						needToRemove = true;
+					}
+
+					if (!needToRemove && extensions->clearReferencesFirstPGCAfterGMP && needToCheckMarkMap) {
+						void* heapAddress = convertHeapAddressFromRememberedSetCard(card);
+						uint64_t* map4Card = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) heapAddress)];
+						needToRemove = (0 == *map4Card);
+					}
+
+					if (needToRemove)
+					{
 						toRemoveCount += 1;
 						rsclCardIterator.removeCurrentCard(env);
 					}
@@ -969,8 +1171,11 @@ void
 MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkOptimized(MM_EnvironmentVLHGC* env)
 {
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
-	MM_CardTable *cardTable = MM_GCExtensions::getExtensions(env)->cardTable;
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+	MM_CardTable *cardTable = extensions->cardTable;
+	MM_MarkMap *markMap = env->_cycleState->_markMap;
 	MM_CompressedCardTable *compressedCardTable = MM_GCExtensions::getExtensions(env)->compressedCardTable;
+	bool needToCheckMarkMap = static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_schedulingDelegate->isFirstPGCAfterGMP();
 	U_64 startTime = j9time_hires_clock();
 
 	rebuildCompressedCardTableForMark(env);
@@ -1010,6 +1215,12 @@ MM_InterRegionRememberedSet::clearFromRegionReferencesForMarkOptimized(MM_Enviro
 								remove = isDirtyCardForPartialCollect(env, cardTable, cardAddress);
 							}
 						}
+					}
+
+					if (!remove && extensions->clearReferencesFirstPGCAfterGMP && needToCheckMarkMap) {
+						void* heapAddress = convertHeapAddressFromRememberedSetCard(card);
+						uint64_t* map4Card = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) heapAddress)];
+						remove = (0 == *map4Card);
 					}
 
 					if (remove) {

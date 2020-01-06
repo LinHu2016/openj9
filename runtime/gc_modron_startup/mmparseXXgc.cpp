@@ -358,6 +358,14 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			extensions->tarokEnableExpensiveAssertions = false;
 			continue;
 		}
+		if (try_scan(&scan_start, "tarokEnableAllocationPointerAssertion")) {
+			extensions->tarokEnableAllocationPointerAssertion = true;
+			continue;
+		}
+		if (try_scan(&scan_start, "tarokDisableAllocationPointerAssertion")) {
+			extensions->tarokEnableAllocationPointerAssertion = false;
+			continue;
+		}
 		if (try_scan(&scan_start, "tarokTgcEnableRememberedSetDuplicateDetection")) {
 			extensions->tarokTgcEnableRememberedSetDuplicateDetection = true;
 			continue;
@@ -636,6 +644,10 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 
 		if (try_scan(&scan_start, "tarokDisableCopyForwardMarkCompactHybrid")) {
 			extensions->tarokEnableCopyForwardHybrid = false;
+			continue;
+		}
+		if (try_scan(&scan_start, "tarokEnableRecoverRegionTailsAfterSweep")) {
+			extensions->tarokEnableRecoverRegionTailsAfterSweep = true;
 			continue;
 		}
 

@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2019 IBM Corp. and others
+ * Copyright (c) 1991, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -76,6 +76,15 @@ public:
 	 * @param endHeapAddress end heap address
 	 */
 	void rebuildCompressedCardTableForPartialCollect(MM_EnvironmentBase *env, void *startHeapAddress, void *endHeapAddress);
+
+	/**
+	 * Rebuild Compressed Cards for given heap range
+	 * Card is going to be marked dirty if markMap is marked as free
+	 * @param env current thread environment
+	 * @param startHeapAddress start heap address(card alignment)
+	 * @param endHeapAddress end heap address(card alignment)
+	 */
+	void rebuildCompressedCardTableForAfterGMP(MM_EnvironmentBase *env, void *startHeapAddress, void *endHeapAddress);
 
 	/**
 	 * Check is Compressed Card correspondent with heap address dirty for partial collect

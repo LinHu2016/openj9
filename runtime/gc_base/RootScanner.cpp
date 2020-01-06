@@ -1004,7 +1004,8 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 	 * from the remembered set.
 	 * This must after any other marking might occur, e.g. phantom references.
 	 */
-	if(_includeRememberedSetReferences && !_nurseryReferencesOnly && !_nurseryReferencesPossibly) {
+	 /* clean rememberset after GMP */
+	if((_includeRememberedSetReferences && !_nurseryReferencesOnly && !_nurseryReferencesPossibly) || (MM_CycleState::CT_GLOBAL_MARK_PHASE == env->_cycleState->_collectionType)) {
 		scanRememberedSet(env);
 	}
 #endif /* J9VM_GC_MODRON_SCAVENGER */

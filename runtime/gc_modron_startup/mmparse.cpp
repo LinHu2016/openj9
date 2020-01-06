@@ -1233,6 +1233,27 @@ gcParseXXArguments(J9JavaVM *vm)
 			}
 		}
 	}
+	{
+		IDATA clearReferencesAfterGMPIndex = FIND_ARG_IN_VMARGS(EXACT_MATCH, "-XX:+ClearReferencesAfterGMP", NULL);
+		IDATA noClearReferencesAfterGMPIndex = FIND_ARG_IN_VMARGS(EXACT_MATCH, "-XX:-ClearReferencesAfterGMP", NULL);
+		if (clearReferencesAfterGMPIndex != noClearReferencesAfterGMPIndex) {
+			if (clearReferencesAfterGMPIndex > noClearReferencesAfterGMPIndex) {
+				extensions->enableClearReferencesAfterGMP = true;
+			} else {
+				extensions->enableClearReferencesAfterGMP = false;
+			}
+		}
+	}
+
+	if (-1 != FIND_ARG_IN_VMARGS(EXACT_MATCH, "-XX:+SkipClearReferencesFirstPGCAfterGMP", NULL)) {
+		extensions->skipClearReferencesFirstPGCAfterGMP = true;
+	}
+
+	if (-1 != FIND_ARG_IN_VMARGS(EXACT_MATCH, "-XX:+ClearReferencesFirstPGCAfterGMP", NULL)) {
+		extensions->clearReferencesFirstPGCAfterGMP = true;
+		extensions->enableClearReferencesAfterGMP = false;
+		extensions->skipClearReferencesFirstPGCAfterGMP = false;
+	}
 
 	{
 		IDATA useGCStartupHintsIndex = FIND_ARG_IN_VMARGS(EXACT_MATCH, "-XX:+UseGCStartupHints", NULL);

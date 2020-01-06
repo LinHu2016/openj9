@@ -505,6 +505,8 @@ public:
 	 */
 	void flushBuffers(MM_EnvironmentVLHGC *env);
 	
+	MM_InterRegionRememberedSet *getInterRegionRememberedSet() { return _interRegionRememberedSet; }
+
 	/**
 	 * Create a GlobalMarkingScheme object.
 	 */

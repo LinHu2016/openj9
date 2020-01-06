@@ -33,7 +33,6 @@
 #include <string.h>
 
 #include "ParallelSweepSchemeVLHGC.hpp"
-#include "SweepPoolManagerAddressOrderedList.hpp"
 
 #include "AllocateDescription.hpp"
 #include "Bits.hpp"
@@ -138,6 +137,10 @@ MM_ParallelSweepVLHGCTask::masterCleanup(MM_EnvironmentBase *envBase)
 	/* now that sweep is finished, walk the list of regions and recycle any which are completely empty */
 	MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
 	_sweepScheme->recycleFreeRegions(env);
+	if (_sweepScheme->isNoCompactionAfterSweep()) {
+		_sweepScheme->recoverRegionAllocationPointers(env);
+		_sweepScheme->setNoCompactionAfterSweep(false);
+	}
 	_sweepScheme->clearCycleState();
 }
 
@@ -197,6 +200,7 @@ MM_ParallelSweepSchemeVLHGC::MM_ParallelSweepSchemeVLHGC(MM_EnvironmentVLHGC *en
 	, _sweepHeapSectioning(NULL)
 	, _poolSweepPoolState(NULL)
 	, _mutexSweepPoolState(NULL)
+	, _noCompactionAfterSweep(false)
 {
 	_typeId = __FUNCTION__;
 }
@@ -862,6 +866,7 @@ MM_ParallelSweepSchemeVLHGC::internalSweep(MM_EnvironmentVLHGC *env)
 		while (NULL != (region = regionIterator.nextRegion())) {
 			if (!region->_sweepData._alreadySwept && region->hasValidMarkMap()) {
 				((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->reset(MM_MemoryPool::forSweep);
+				region->_recoverFreeTailAfterSweep = false;
 			}
 		}
 
@@ -979,6 +984,96 @@ MM_ParallelSweepSchemeVLHGC::replenishPoolForAllocate(MM_EnvironmentBase *env, M
 	return false;
 }
 #endif /* J9VM_GC_CONCURRENT_SWEEP */
+
+void
+MM_ParallelSweepSchemeVLHGC::recoverRegionAllocationPointers(MM_EnvironmentVLHGC *env)
+{
+	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	while(NULL != (region = regionIterator.nextRegion())) {
+		/* Region must be marked for sweep */
+		if (!region->_sweepData._alreadySwept && region->hasValidMarkMap() && region->containsObjects()) {
+			MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			MM_HeapLinkedFreeHeader *lastFreeEntry = regionPool->getLastFreeEntry();
+			if ((NULL != lastFreeEntry) && ((UDATA) lastFreeEntry + lastFreeEntry->getSize()) != (UDATA)region->getHighAddress()) {
+				lastFreeEntry = NULL;
+			}
+			bool isEligibleToRestoreTail = false;
+			UDATA freeBytesFromTail = 0;
+			if (NULL != lastFreeEntry) {
+				regionPool->setAllocationPointer(env, (void *)lastFreeEntry);
+				if (_extensions->tarokEnableAllocationPointerAssertion) {
+					Assert_MM_true(verifyRegionAllocationPointer(env, region));
+				}
+				regionPool->alignAllocationPointer(CARD_SIZE);
+				freeBytesFromTail = regionPool->getAllocatableBytes();
+				if (freeBytesFromTail >= regionPool->getMinimumFreeEntrySize()) {
+					isEligibleToRestoreTail = true;
+					MM_CardTable *cardTable = _extensions->cardTable;
+					Card *lowCard = cardTable->heapAddrToCardAddr(env, regionPool->getAllocationPointer());
+					Card *highCard = cardTable->heapAddrToCardAddr(env, region->getHighAddress());
+					memset(lowCard, CARD_CLEAN, (UDATA)highCard - (UDATA)lowCard);
+				}
+			}
+			if (isEligibleToRestoreTail) {
+				if (regionPool->getActualFreeMemorySize() < freeBytesFromTail) {
+					regionPool->setFreeMemorySize(freeBytesFromTail);
+				}
+				regionPool->setFreeEntryCount(1);
+				regionPool->setLargestFreeEntry(freeBytesFromTail);
+
+				region->_recoverFreeTailAfterSweep = true;
+			} else {
+				regionPool->setAllocationPointer(env,region->getHighAddress());
+			}
+		}
+	}
+}
+
+bool
+MM_ParallelSweepSchemeVLHGC::verifyRegionAllocationPointer(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region)
+{
+	/* Region must be marked for sweep */
+	MM_MarkMap *markMap = env->_cycleState->_markMap;
+	UDATA lowIndex = markMap->getSlotIndex((J9Object *)region->getLowAddress());
+	UDATA highIndex = markMap->getSlotIndex((J9Object *)region->getHighAddress());
+	UDATA currentIndex = highIndex - 1;
+	UDATA bitIndex = 0;
+	UDATA currentSlot = 0;
+
+	while (currentIndex >= lowIndex) {
+		currentSlot = markMap->getSlot(currentIndex);
+		if (0 != currentSlot) {
+			UDATA mask = 1;
+			mask <<= (J9BITS_BITS_IN_SLOT - 1);
+			for (UDATA cnt = 0; cnt < J9BITS_BITS_IN_SLOT; cnt++, mask>>=1) {
+				if (0 != (currentSlot&mask)) {
+					bitIndex = cnt;
+					break;
+				}
+			}
+			break;
+		}
+		currentIndex -= 1;
+	}
+
+	UDATA freeBytesFromTail = ((highIndex - 1 - currentIndex) * J9BITS_BITS_IN_SLOT + bitIndex + 1) * J9MODRON_HEAP_BYTES_PER_HEAPMAP_BIT;
+	J9Object *lastObject = (J9Object *)(((uintptr_t)region->getHighAddress()) - freeBytesFromTail);
+	Assert_MM_true(NULL != lastObject);
+	Assert_MM_mustBeClass(J9GC_J9OBJECT_CLAZZ(lastObject, env));
+	UDATA lastObjectSize = _extensions->objectModel.getConsumedSizeInBytesWithHeader(lastObject);
+	if (freeBytesFromTail > lastObjectSize) {
+		freeBytesFromTail -= lastObjectSize;
+	} else {
+		freeBytesFromTail = 0;
+	}
+	void * allocPointer = (void *)(((uintptr_t)region->getHighAddress()) - freeBytesFromTail);
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB,"verifyRegionAllocationPointer() freeBytesFromTail=%zu\n", freeBytesFromTail);
+
+	MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+	return (regionPool->getAllocationPointer() == allocPointer);
+}
 
 void
 MM_ParallelSweepSchemeVLHGC::recycleFreeRegions(MM_EnvironmentVLHGC *env)

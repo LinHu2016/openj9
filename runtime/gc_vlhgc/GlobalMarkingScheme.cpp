@@ -86,6 +86,8 @@
 #include "WorkPacketsVLHGC.hpp"
 #include "WorkStack.hpp"
 
+#include "CompressedCardTable.hpp"
+
 void
 MM_ParallelGlobalMarkTask::masterSetup(MM_EnvironmentBase *env)
 {
@@ -1190,6 +1192,24 @@ private:
 		reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
 	}
 
+
+	/*
+	 *
+	 */
+	virtual void scanRememberedSet(MM_EnvironmentBase *envBase)
+	{
+		MM_EnvironmentVLHGC* env = MM_EnvironmentVLHGC::getEnvironment(envBase);
+
+		if (MM_CycleState::CT_GLOBAL_MARK_PHASE == env->_cycleState->_collectionType && _extensions->enableClearReferencesAfterGMP) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			U_64 time = j9time_hires_clock();
+			MM_InterRegionRememberedSet *interRegionRememberedSet = _markingScheme->getInterRegionRememberedSet();
+			interRegionRememberedSet->clearReferencesAfterGMP(env);
+			j9tty_printf(PORTLIB, "clearReferencesAfterGMP: %zu us\n", j9time_hires_delta(0, j9time_hires_clock()-time, J9PORT_TIME_DELTA_IN_MICROSECONDS));
+		}
+	}
+
+
 	virtual void doMonitorReference(J9ObjectMonitor *objectMonitor, GC_HashTableIterator *monitorReferenceIterator) {
 		J9ThreadAbstractMonitor * monitor = (J9ThreadAbstractMonitor*)objectMonitor->monitor;
 		if(!_markingScheme->isMarked((J9Object *)monitor->userData)) {
@@ -1425,6 +1445,14 @@ MM_GlobalMarkingScheme::markLiveObjectsComplete(MM_EnvironmentVLHGC *env)
 				region->getReferenceObjectList()->startWeakReferenceProcessing();
 				region->getUnfinalizedObjectList()->startUnfinalizedProcessing();
 				region->getOwnableSynchronizerObjectList()->startOwnableSynchronizerProcessing();
+			}
+		}
+
+		/*  */
+		if (MM_CycleState::CT_GLOBAL_MARK_PHASE == env->_cycleState->_collectionType) {
+			if(MM_GCExtensions::getExtensions(env)->tarokEnableCompressedCardTable) {
+				MM_CompressedCardTable *compressedCardTable = MM_GCExtensions::getExtensions(env)->compressedCardTable;
+				compressedCardTable->clearRegionsProcessedCounter();
 			}
 		}
 		env->_currentTask->releaseSynchronizedGCThreads(env);

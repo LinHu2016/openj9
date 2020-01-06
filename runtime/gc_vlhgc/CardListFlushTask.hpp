@@ -36,6 +36,7 @@
 
 #include "EnvironmentBase.hpp"
 #include "ParallelTask.hpp"
+#include "EnvironmentVLHGC.hpp"
 
 class MM_CycleState;
 class MM_HeapRegionManager;
@@ -63,6 +64,20 @@ public:
 
 	/* Member Functions */
 private:
+	/**
+	 * Converts a remembered set card to the heap address it refers to
+	 * @param card the card which we wish to convert
+	 * @return the heap address which the card refers to
+	 */
+	MMINLINE void *
+	convertHeapAddressFromRememberedSetCard(MM_EnvironmentBase *envBase, UDATA card)
+	{
+		void *address = (void *)card;
+		if (envBase->compressObjectReferences()) {
+			address = (void *)(card << CARD_SIZE_SHIFT);
+		}
+		return address;
+	}
 protected:
 public:
 	virtual UDATA getVMStateID() { return OMRVMSTATE_GC_MARK; }

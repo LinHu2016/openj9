@@ -1850,6 +1850,7 @@ MM_WriteOnceCompactor::recycleFreeRegionsAndFixFreeLists(MM_EnvironmentVLHGC *en
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	while(NULL != (region = regionIterator.nextRegion())) {
 		if (region->_compactData._shouldCompact) {
+			region->_recoverFreeTailAfterSweep = false;
 			MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
 			Assert_MM_true(NULL != regionPool);
 			Assert_MM_true(region->isCommitted());

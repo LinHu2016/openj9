@@ -152,6 +152,8 @@ private:
 	void reportClassUnloadingEnd(MM_EnvironmentBase *env);
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 
+	bool isCardCleanForTail(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region);
+
 protected:
 	bool initialize(MM_EnvironmentVLHGC *env);
 	void tearDown(MM_EnvironmentVLHGC *env);

@@ -153,6 +153,7 @@ private:
 	 * @param env current thread environment
 	 */
 	void rebuildCompressedCardTableForMark(MM_EnvironmentVLHGC* env);
+	void rebuildCompressedCardTableAfterGMP(MM_EnvironmentVLHGC* env);
 
 	/**
 	 * Rebuild Compressed Card Table for Compact (multithreaded, by regions)
@@ -184,7 +185,10 @@ private:
 	 */
 	void clearFromRegionReferencesForCompactOptimized(MM_EnvironmentVLHGC* env);
 	MM_InterRegionRememberedSet(MM_HeapRegionManager *heapRegionManager);
-	
+
+	void clearReferencesAfterGMPDirect(MM_EnvironmentVLHGC* env);
+	void clearReferencesAfterGMPOptimized(MM_EnvironmentVLHGC* env);
+
 protected:
 public:
 
@@ -490,6 +494,8 @@ public:
 	 * temporary call until optimized or not optimized version is chosen
 	 */
 	void clearFromRegionReferencesForCompact(MM_EnvironmentVLHGC* env);
+
+	void clearReferencesAfterGMP(MM_EnvironmentVLHGC* env);
 
 	/**
 	 * Clears references from Collection Set and from dirty cards

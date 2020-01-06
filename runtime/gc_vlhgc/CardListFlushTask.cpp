@@ -38,6 +38,8 @@
 #include "InterRegionRememberedSet.hpp"
 #include "RememberedSetCardListBufferIterator.hpp"
 #include "RememberedSetCardListCardIterator.hpp"
+#include "MarkMap.hpp"
+#include "SchedulingDelegate.hpp"
 
 
 void
@@ -96,6 +98,8 @@ MM_CardListFlushTask::run(MM_EnvironmentBase *envBase)
 {
 	MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+	MM_MarkMap *markMap = envBase->_cycleState->_markMap;
+	bool needToCheckMarkMap = static_cast<MM_CycleStateVLHGC*>(envBase->_cycleState)->_schedulingDelegate->isFirstPGCAfterGMP();
 
 	/* this function has knowledge of the collection set, which is only valid during a PGC */
 	Assert_MM_true(MM_CycleState::CT_PARTIAL_GARBAGE_COLLECTION == env->_cycleState->_collectionType);
@@ -119,8 +123,16 @@ MM_CardListFlushTask::run(MM_EnvironmentBase *envBase)
 						/* For Marking purposes we do not need to track references within Collection Set */
 						MM_HeapRegionDescriptorVLHGC *referencingRegion = interRegionRememberedSet->tableDescriptorForRememberedSetCard(card);
 						if (referencingRegion->containsObjects() && !referencingRegion->_markData._shouldMark) {
-							Card *cardAddress = interRegionRememberedSet->rememberedSetCardToCardAddr(env, card);
-							writeFlushToCardState(cardAddress, gmpIsActive);
+							bool needToFlush = true;
+							if (extensions->clearReferencesFirstPGCAfterGMP && needToCheckMarkMap) {
+								void* heapAddress = convertHeapAddressFromRememberedSetCard(envBase, card);
+								uint64_t* map4Card = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) heapAddress)];
+								needToFlush = (0 != *map4Card);
+							}
+							if (needToFlush) {
+								Card *cardAddress = interRegionRememberedSet->rememberedSetCardToCardAddr(env, card);
+								writeFlushToCardState(cardAddress, gmpIsActive);
+							}
 						}
 					}
 	
@@ -149,8 +161,16 @@ MM_CardListFlushTask::run(MM_EnvironmentBase *envBase)
 								UDATA card = MM_RememberedSetCard::readCard(cardSlot, compressed);
 								MM_HeapRegionDescriptorVLHGC *referencingRegion = interRegionRememberedSet->tableDescriptorForRememberedSetCard(card);
 								if (referencingRegion->containsObjects() && !referencingRegion->_markData._shouldMark) {
-									Card *cardAddress = interRegionRememberedSet->rememberedSetCardToCardAddr(env, card);
-									writeFlushToCardState(cardAddress, gmpIsActive);
+									bool needToFlush = true;
+									if (extensions->clearReferencesFirstPGCAfterGMP && needToCheckMarkMap) {
+										void* heapAddress = convertHeapAddressFromRememberedSetCard(envBase, card);
+										uint64_t* map4Card = (uint64_t*) &((uintptr_t *)(markMap->getMarkBits()))[markMap->getSlotIndex((omrobjectptr_t) heapAddress)];
+										needToFlush = (0 != *map4Card);
+									}
+									if (needToFlush) {
+										Card *cardAddress = interRegionRememberedSet->rememberedSetCardToCardAddr(env, card);
+										writeFlushToCardState(cardAddress, gmpIsActive);
+									}
 								}
 								toRemoveCount += 1;
 							}

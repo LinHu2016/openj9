@@ -87,7 +87,7 @@ public:
 	J9PortVmemIdentifier _arrayletDoublemapID;	/**< Contiguous address identifier associate with double mapped region of arraylet */
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	bool _defragmentationTarget;		/**< indicates whether this region should be considered for defragmentation, currently this means the region has been GMPed but not collected yet */
-
+	bool _recoverFreeTailAfterSweep;
 protected:
 	MM_GCExtensions * _extensions;
 
