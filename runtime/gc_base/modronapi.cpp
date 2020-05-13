@@ -868,7 +868,7 @@ j9gc_allocation_threshold_changed(J9VMThread *currentThread)
  *		j9gc_set_allocation_sampling_interval(vm, (UDATA)0);
  *	To disable allocation sampling
  *		j9gc_set_allocation_sampling_interval(vm, UDATA_MAX);
- * The initial MM_GCExtensions::objectSamplingBytesGranularity value is 512KB.
+ * The initial MM_GCExtensionsBase::objectSamplingBytesGranularity value is UDATA_MAX.
  * 
  * @parm[in] vm The J9JavaVM
  * @parm[in] samplingInterval The allocation sampling interval.
@@ -881,16 +881,9 @@ j9gc_set_allocation_sampling_interval(J9JavaVM *vm, UDATA samplingInterval)
 		/* avoid (env->_traceAllocationBytes) % 0 which could be undefined. */
 		samplingInterval = 1;
 	}
-	extensions->objectSamplingBytesGranularity = samplingInterval;
-	bool needToChange = false;
-	if ((UDATA_MAX != samplingInterval) && !extensions->disableInlineAllocationForSamplingBytesGranularity) {
-		extensions->disableInlineAllocationForSamplingBytesGranularity = true;
-		needToChange = true;
-	} else if ((UDATA_MAX == samplingInterval) && extensions->disableInlineAllocationForSamplingBytesGranularity) {
-		extensions->disableInlineAllocationForSamplingBytesGranularity = false;
-		needToChange = true;
-	}
-	if (needToChange) {
+
+	if (samplingInterval != extensions->objectSamplingBytesGranularity) {
+		extensions->objectSamplingBytesGranularity = samplingInterval;
 		J9VMThread *currentThread = vm->internalVMFunctions->currentVMThread(vm);
 		j9gc_allocation_threshold_changed(currentThread);
 	}

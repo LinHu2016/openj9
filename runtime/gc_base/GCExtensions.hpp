@@ -187,8 +187,6 @@ public:
 	double maxRAMPercent; /**< Value of -XX:MaxRAMPercentage specified by the user */
 	double initialRAMPercent; /**< Value of -XX:InitialRAMPercentage specified by the user */
 
-	UDATA objectSamplingBytesGranularity; /**< How often (in bytes) we do an allocation trace (for triggering J9HOOK_MM_OBJECT_ALLOCATION_SAMPLING) */
-
 protected:
 private:
 protected:
@@ -319,7 +317,6 @@ public:
 #endif
 		, maxRAMPercent(0.0) /* this would get overwritten by user specified value */
 		, initialRAMPercent(0.0) /* this would get overwritten by user specified value */
-		, objectSamplingBytesGranularity(512 * 1024) /* default 512KB */
 	{
 		_typeId = __FUNCTION__;
 	}

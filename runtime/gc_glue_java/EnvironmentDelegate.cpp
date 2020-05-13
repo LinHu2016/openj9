@@ -252,8 +252,8 @@ MM_EnvironmentDelegate::forceOutOfLineVMAccess()
 
 #if defined (J9VM_GC_THREAD_LOCAL_HEAP)
 /**
- * Disable inline TLH allocates by hiding the real heap allocation address from
- * JIT/Interpreter in realHeapAlloc and setting heapALloc == HeapTop so TLH
+ * Disable inline TLH allocates by hiding the real heap top address from
+ * JIT/Interpreter in realHeapTop and setting HeapTop == heapALloc so TLH
  * looks full.
  *
  */
@@ -261,49 +261,151 @@ void
 MM_EnvironmentDelegate::disableInlineTLHAllocate()
 {
 	J9ModronThreadLocalHeap *tlh = (J9ModronThreadLocalHeap *)&_vmThread->allocateThreadLocalHeap;
-	tlh->realHeapAlloc = _vmThread->heapAlloc;
-	_vmThread->heapAlloc = _vmThread->heapTop;
+//	tlh->realHeapAlloc = _vmThread->heapAlloc;
+//	_vmThread->heapAlloc = _vmThread->heapTop;
+	if (NULL == tlh->realHeapTop) {
+		tlh->realHeapTop = _vmThread->heapTop;
+	}
+	_vmThread->heapTop = _vmThread->heapAlloc;
 
 #if defined(J9VM_GC_NON_ZERO_TLH)
 	tlh = (J9ModronThreadLocalHeap *)&_vmThread->nonZeroAllocateThreadLocalHeap;
-	tlh->realHeapAlloc = _vmThread->nonZeroHeapAlloc;
-	_vmThread->nonZeroHeapAlloc = _vmThread->nonZeroHeapTop;
+//	tlh->realHeapAlloc = _vmThread->nonZeroHeapAlloc;
+//	_vmThread->nonZeroHeapAlloc = _vmThread->nonZeroHeapTop;
+	if (NULL == tlh->realHeapTop) {
+		tlh->realHeapTop = _vmThread->nonZeroHeapTop;
+	}
+	_vmThread->nonZeroHeapTop = _vmThread->nonZeroHeapAlloc;
 #endif /* defined(J9VM_GC_NON_ZERO_TLH) */
 }
 
 /**
- * Re-enable inline TLH allocate by restoring heapAlloc from realHeapAlloc
+ * Re-enable inline TLH allocate by restoring heapTop from realHeapTop
  */
 void
 MM_EnvironmentDelegate::enableInlineTLHAllocate()
 {
 	J9ModronThreadLocalHeap *tlh = (J9ModronThreadLocalHeap *)&_vmThread->allocateThreadLocalHeap;
-	_vmThread->heapAlloc =  tlh->realHeapAlloc;
-	tlh->realHeapAlloc = NULL;
+//	_vmThread->heapAlloc =  tlh->realHeapAlloc;
+//	tlh->realHeapAlloc = NULL;
+	if (NULL != tlh->realHeapTop) {
+		_vmThread->heapTop =  tlh->realHeapTop;
+		tlh->realHeapTop = NULL;
+	}
 
 #if defined(J9VM_GC_NON_ZERO_TLH)
 	tlh = (J9ModronThreadLocalHeap *)&_vmThread->nonZeroAllocateThreadLocalHeap;
-	_vmThread->nonZeroHeapAlloc =  tlh->realHeapAlloc;
-	tlh->realHeapAlloc = NULL;
+//	_vmThread->nonZeroHeapAlloc =  tlh->realHeapAlloc;
+//	tlh->realHeapAlloc = NULL;
+	if (NULL != tlh->realHeapTop) {
+		_vmThread->nonZeroHeapTop =  tlh->realHeapTop;
+		tlh->realHeapTop = NULL;
+	}
 #endif /* defined(J9VM_GC_NON_ZERO_TLH) */
 }
 
 /**
- * Determine if inline TLH allocate is enabled; its enabled if realheapAlloc is NULL.
+ * Determine if inline TLH allocate is enabled; its enabled if realheapTop is NULL.
  * @return TRUE if inline TLH allocates currently enabled for this thread; FALSE otherwise
  */
 bool
 MM_EnvironmentDelegate::isInlineTLHAllocateEnabled()
 {
 	J9ModronThreadLocalHeap *tlh = (J9ModronThreadLocalHeap *)&_vmThread->allocateThreadLocalHeap;
-	bool result = (NULL == tlh->realHeapAlloc);
+//	bool result = (NULL == tlh->realHeapAlloc);
+	bool result = (NULL == tlh->realHeapTop);
 
 #if defined(J9VM_GC_NON_ZERO_TLH)
 	tlh = (J9ModronThreadLocalHeap *)&_vmThread->nonZeroAllocateThreadLocalHeap;
-	result = result && (NULL == tlh->realHeapAlloc);
+//	result = result && (NULL == tlh->realHeapAlloc);
+	result = result && (NULL == tlh->realHeapTop);
 #endif /* defined(J9VM_GC_NON_ZERO_TLH) */
 
 	return result;
 }
+
+
+void
+MM_EnvironmentDelegate::setTLHSamplingTop(uintptr_t size)
+{
+	uintptr_t max = 0;
+	J9ModronThreadLocalHeap *tlh = (J9ModronThreadLocalHeap *)&_vmThread->allocateThreadLocalHeap;
+	if (NULL != tlh->realHeapTop) {
+		max = tlh->realHeapTop - _vmThread->heapAlloc;
+	} else {
+		max = _vmThread->heapTop - _vmThread->heapAlloc;
+	}
+
+//	PORT_ACCESS_FROM_ENVIRONMENT(_env);
+//	j9tty_printf(PORTLIB, "setTLHSamplingTop _vmThread->heapTop=%p, _vmThread->heapAlloc=%p, tlh->realHeapTop=%p, size=%zu, max=%zu\n", _vmThread->heapTop, _vmThread->heapAlloc, tlh->realHeapTop, size, max);
+
+	if (max > size) {
+		if (NULL == tlh->realHeapTop) {
+			tlh->realHeapTop = _vmThread->heapTop;
+		}
+		_vmThread->heapTop = _vmThread->heapAlloc + size;
+	} else {
+		if (NULL != tlh->realHeapTop) {
+			_vmThread->heapTop =  tlh->realHeapTop;
+			tlh->realHeapTop = NULL;
+		}
+	}
+
+#if defined(J9VM_GC_NON_ZERO_TLH)
+	tlh = (J9ModronThreadLocalHeap *)&_vmThread->nonZeroAllocateThreadLocalHeap;
+	if (NULL != tlh->realHeapTop) {
+		max = tlh->realHeapTop - _vmThread->nonZeroHeapAlloc;
+	} else {
+		max = _vmThread->nonZeroHeapTop - _vmThread->nonZeroHeapAlloc;
+	}
+//	j9tty_printf(PORTLIB, "setTLHSamplingTop nonZero _vmThread->nonZeroHeapTop=%p, _vmThread->nonZeroHeapAlloc=%p, tlh->realHeapTop=%p, size=%zu, max=%zu\n", _vmThread->nonZeroHeapTop, _vmThread->nonZeroHeapAlloc, tlh->realHeapTop, size, max);
+
+	if (max > size) {
+		if (NULL == tlh->realHeapTop) {
+			tlh->realHeapTop = _vmThread->nonZeroHeapTop;
+		}
+		_vmThread->nonZeroHeapTop = _vmThread->nonZeroHeapAlloc + size;
+	} else {
+		if (NULL != tlh->realHeapTop) {
+			_vmThread->nonZeroHeapTop =  tlh->realHeapTop;
+			tlh->realHeapTop = NULL;
+		}
+	}
+
+#endif /* defined(J9VM_GC_NON_ZERO_TLH) */
+}
+
+void
+MM_EnvironmentDelegate::resetTLHSamplingTop()
+{
+	enableInlineTLHAllocate();
+//	J9ModronThreadLocalHeap *tlh = (J9ModronThreadLocalHeap *)&_vmThread->allocateThreadLocalHeap;
+//	if (NULL != tlh->realHeapTop) {
+//		_vmThread->heapTop =  tlh->realHeapTop;
+//		tlh->realHeapTop = NULL;
+//	}
+//
+//#if defined(J9VM_GC_NON_ZERO_TLH)
+//	tlh = (J9ModronThreadLocalHeap *)&_vmThread->nonZeroAllocateThreadLocalHeap;
+//	if (NULL != tlh->realHeapTop) {
+//		_vmThread->nonZeroHeapTop =  tlh->realHeapTop;
+//		tlh->realHeapTop = NULL;
+//	}
+//#endif /* defined(J9VM_GC_NON_ZERO_TLH) */
+}
+
+uintptr_t
+MM_EnvironmentDelegate::getAllocSizeInsideTLH()
+{
+	uintptr_t ret = 0;
+	J9ModronThreadLocalHeap *tlh = (J9ModronThreadLocalHeap *)&_vmThread->allocateThreadLocalHeap;
+	ret += _vmThread->heapAlloc - tlh->heapBase;
+#if defined(J9VM_GC_NON_ZERO_TLH)
+	tlh = (J9ModronThreadLocalHeap *)&_vmThread->nonZeroAllocateThreadLocalHeap;
+	ret += _vmThread->nonZeroHeapAlloc - tlh->heapBase;
+#endif /* defined(J9VM_GC_NON_ZERO_TLH) */
+	return ret;
+}
+
 #endif /* J9VM_GC_THREAD_LOCAL_HEAP */
 

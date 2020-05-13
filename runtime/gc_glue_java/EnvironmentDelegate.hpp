@@ -161,23 +161,28 @@ public:
 
 #if defined (OMR_GC_THREAD_LOCAL_HEAP)
 	/**
-	 * Disable inline TLH allocates by hiding the real heap allocation address from
-	 * JIT/Interpreter in realHeapAlloc and setting heapALloc == HeapTop so TLH
+	 * Disable inline TLH allocates by hiding the real heap top address from
+	 * JIT/Interpreter in realHeapTop and setting HeapTop == heapALloc so TLH
 	 * looks full.
 	 *
 	 */
 	void disableInlineTLHAllocate();
 
 	/**
-	 * Re-enable inline TLH allocate by restoring heapAlloc from realHeapAlloc
+	 * Re-enable inline TLH allocate by restoring heapTop from realHeapTop
 	 */
 	void enableInlineTLHAllocate();
 
 	/**
-	 * Determine if inline TLH allocate is enabled; its enabled if realheapAlloc is NULL.
+	 * Determine if inline TLH allocate is enabled; its enabled if realheapTop is NULL.
 	 * @return TRUE if inline TLH allocates currently enabled for this thread; FALSE otherwise
 	 */
 	bool isInlineTLHAllocateEnabled();
+
+	void setTLHSamplingTop(uintptr_t size);
+	void resetTLHSamplingTop();
+	uintptr_t getAllocSizeInsideTLH();
+
 #endif /* OMR_GC_THREAD_LOCAL_HEAP */
 
 	MM_EnvironmentDelegate()
