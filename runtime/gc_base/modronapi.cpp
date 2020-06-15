@@ -884,6 +884,8 @@ j9gc_set_allocation_sampling_interval(J9JavaVM *vm, UDATA samplingInterval)
 
 	if (samplingInterval != extensions->objectSamplingBytesGranularity) {
 		extensions->objectSamplingBytesGranularity = samplingInterval;
+		PORT_ACCESS_FROM_JAVAVM(vm);
+		j9tty_printf(PORTLIB, "j9gc_set_allocation_sampling_interval samplingInterval=%zu\n", samplingInterval);
 		J9VMThread *currentThread = vm->internalVMFunctions->currentVMThread(vm);
 		j9gc_allocation_threshold_changed(currentThread);
 	}

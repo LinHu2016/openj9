@@ -92,6 +92,8 @@ J9AllocateObjectNoGC(J9VMThread *vmThread, J9Class *clazz, uintptr_t allocateFla
 		 * Note that we can't handle hooked allocates since we might be called without a JIT resolve frame and that is required for us to
 		 * report the allocation event.
 		 */
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "J9AllocateObjectNoGC \n");
 		return NULL;
 	}
 #endif /* J9VM_GC_THREAD_LOCAL_HEAP */
@@ -103,7 +105,7 @@ J9AllocateObjectNoGC(J9VMThread *vmThread, J9Class *clazz, uintptr_t allocateFla
 
 	J9Object *objectPtr = NULL;
 	
-	if(!traceObjectCheck(vmThread)){
+	if(!traceObjectCheck(vmThread, NULL)){
 		allocateFlags |= OMR_GC_ALLOCATE_OBJECT_NO_GC;
 		MM_MixedObjectAllocationModel mixedOAM(env, clazz, allocateFlags);
 		if (mixedOAM.initializeAllocateDescription(env)) {
@@ -227,7 +229,10 @@ traceAllocateObject(J9VMThread *vmThread, J9Object * object, J9Class* clazz, uin
 {
 	bool shouldTrigggerObjectAllocationSampling = false;
 	uintptr_t byteGranularity = 0;
-
+	{
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "traceAllocateObject\n");
+	}
 	if (traceObjectCheck(vmThread, &shouldTrigggerObjectAllocationSampling)){
 		MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
 		MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
@@ -263,8 +268,12 @@ traceAllocateObject(J9VMThread *vmThread, J9Object * object, J9Class* clazz, uin
 
 		if (!extensions->needDisableInlineAllocation()) {
 
+			j9tty_printf(PORTLIB, "shouldTrigggerObjectAllocationSampling setTLHSamplingTop() env=%p, byteGranularity=%zu, remainder=%zu, allocSizeInsideTLH=%zu, env->_traceAllocationBytes=%zu\n", env, byteGranularity, remainder, allocSizeInsideTLH, env->_traceAllocationBytes);
+
 			env->setTLHSamplingTop(byteGranularity - remainder);
 		}
+
+		j9tty_printf(PORTLIB, "TRIGGER_J9HOOK_MM_OBJECT_ALLOCATION_SAMPLING\n");
 
 		TRIGGER_J9HOOK_MM_OBJECT_ALLOCATION_SAMPLING(
 			extensions->hookInterface,
@@ -292,7 +301,16 @@ traceObjectCheck(J9VMThread *vmThread, bool *shouldTriggerAllocationSampling)
 
 	if (NULL != shouldTriggerAllocationSampling) {
 		byteGranularity = extensions->objectSamplingBytesGranularity;
-		*shouldTriggerAllocationSampling = (env->_traceAllocationBytes + env->getAllocatedSizeInsideTLH() - env->_traceAllocationBytesCurrentTLH) >= byteGranularity;
+		if (UDATA_MAX == byteGranularity) {
+			*shouldTriggerAllocationSampling = false;
+		} else {
+			*shouldTriggerAllocationSampling = (env->_traceAllocationBytes + env->getAllocatedSizeInsideTLH() - env->_traceAllocationBytesCurrentTLH) >= byteGranularity;
+
+
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "traceObjectCheck env=%p, byteGranularity=%zu, env->_traceAllocationBytes=%zu, allocSizeInsideTLH=%zu, env->_traceAllocationBytesCurrentTLH=%zu\n", env, byteGranularity, env->_traceAllocationBytes, env->getAllocatedSizeInsideTLH(), env->_traceAllocationBytesCurrentTLH);
+
+		}
 	}
 
 	if (extensions->doOutOfLineAllocationTrace){
@@ -344,7 +362,7 @@ J9AllocateIndexableObjectNoGC(J9VMThread *vmThread, J9Class *clazz, uint32_t num
 	}
 
 	J9Object *objectPtr = NULL;
-	if(!traceObjectCheck(vmThread)){
+	if(!traceObjectCheck(vmThread, NULL)){
 		allocateFlags |= OMR_GC_ALLOCATE_OBJECT_NO_GC;
 		MM_IndexableObjectAllocationModel indexableOAM(env, clazz, numberOfIndexedFields, allocateFlags);
 		if (indexableOAM.initializeAllocateDescription(env)) {
@@ -382,6 +400,10 @@ J9AllocateIndexableObjectNoGC(J9VMThread *vmThread, J9Class *clazz, uint32_t num
 J9Object *
 J9AllocateObject(J9VMThread *vmThread, J9Class *clazz, uintptr_t allocateFlags)
 {
+	{
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "J9AllocateObject \n");
+	}
 	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
 
 #if defined(J9VM_GC_THREAD_LOCAL_HEAP)	
