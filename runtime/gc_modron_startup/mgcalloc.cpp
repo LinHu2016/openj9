@@ -355,6 +355,10 @@ J9AllocateIndexableObjectNoGC(J9VMThread *vmThread, J9Class *clazz, uint32_t num
 J9Object *
 J9AllocateObject(J9VMThread *vmThread, J9Class *clazz, uintptr_t allocateFlags)
 {
+	{
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "J9AllocateObject \n");
+	}
 	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
 
 #if defined(J9VM_GC_THREAD_LOCAL_HEAP)	
