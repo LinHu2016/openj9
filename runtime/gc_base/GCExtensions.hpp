@@ -179,6 +179,7 @@ public:
 	IDATA _TLHAsyncCallbackKey;
 
 	bool _HeapManagementMXBeanBackCompatibilityEnabled;
+	bool _adjustCollectionSet;
 
 #if defined(OMR_GC_IDLE_HEAP_MANAGER)
 	MM_IdleGCManager* idleGCManager; /**< Manager which registers for VM Runtime State notification & manages free heap on notification */
@@ -312,6 +313,7 @@ public:
 		, _asyncCallbackKey(-1)
 		, _TLHAsyncCallbackKey(-1)
 		, _HeapManagementMXBeanBackCompatibilityEnabled(false)
+		, _adjustCollectionSet(false)
 #if defined(OMR_GC_IDLE_HEAP_MANAGER)
 		, idleGCManager(NULL)
 #endif

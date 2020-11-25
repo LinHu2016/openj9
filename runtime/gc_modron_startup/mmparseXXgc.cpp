@@ -630,6 +630,10 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			continue;
 		}
 #endif /* defined (J9VM_GC_VLHGC) */
+		if (try_scan(&scan_start, "adjustCollectionSet")) {
+			extensions->_adjustCollectionSet = true;
+			continue;
+		}
 
 		if(try_scan(&scan_start, "packetListLockSplit=")) {
 			if(!scan_udata_helper(vm, &scan_start, &extensions->packetListSplit, "packetListLockSplit=")) {
