@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2014 IBM Corp. and others
+ * Copyright (c) 1991, 2021 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -38,9 +38,7 @@
 #include "GCExtensions.hpp"
 #include "Heap.hpp"
 #include "HeapRegionDescriptor.hpp"
-
-#define BITS_PER_BYTE	8
-#define COMPRESSED_CARDS_PER_WORD	(sizeof(UDATA) * BITS_PER_BYTE)
+//#include "MarkMap.hpp"
 
 /*
  * Bit 1 meaning may be dirty (traditional) or clear (inverted)
@@ -96,6 +94,14 @@ MM_CompressedCardTable::initialize(MM_EnvironmentBase *env, MM_Heap *heap)
 
 	/* Allocate compressed card table */
 	_compressedCardTable = (UDATA *)env->getForge()->allocate(compressedCardTableSize, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+//	if (NULL != _compressedCardTable) {
+//		Assert_MM_true(1 == COMPRESSED_CARD_TABLE_DIV);
+//		_compressedSurvivorTable  = (UDATA *)env->getForge()->allocate(compressedCardTableSize, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+//		if (NULL == _compressedSurvivorTable) {
+//			env->getForge()->free(_compressedCardTable);
+//			_compressedCardTable = NULL;
+//		}
+//	}
 
 	_heapBase = (UDATA)heap->getHeapBase();
 
@@ -114,6 +120,7 @@ MM_CompressedCardTable::tearDown(MM_EnvironmentBase *env)
 {
 	if (NULL != _compressedCardTable) {
 		env->getForge()->free(_compressedCardTable);
+//		env->getForge()->free(_compressedSurvivorTable);
 	}
 }
 
@@ -174,7 +181,6 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 	UDATA mask = 1;
 	const UDATA endOfWord = ((UDATA)1) << (COMPRESSED_CARDS_PER_WORD - 1);
 	UDATA compressedCardWord = AllCompressedCardsInWordClean;
-
 	/*
 	 *  To simplify test logic assume here that given addresses are aligned to correspondent compressed card word border
 	 *  So no need to handle side pieces (no split of compressed card table words between regions)
@@ -214,8 +220,8 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 		if (mask == endOfWord) {
 			/* last bit in word handled - save word and prepare mask for next one */
 			*compressedCard++ = compressedCardWord;
-			mask = 1;
 			compressedCardWord = AllCompressedCardsInWordClean;
+			mask = 1;
 		} else {
 			/* mask for next bit to handle */
 			mask = mask << 1;

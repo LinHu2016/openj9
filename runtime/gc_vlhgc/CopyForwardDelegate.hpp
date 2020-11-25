@@ -115,6 +115,13 @@ public:
 		return ret;
 	}
 
+	void updateCollectionSet(MM_EnvironmentVLHGC *env)
+	{
+		if (NULL != _breadthFirstCopyForwardScheme) {
+			_breadthFirstCopyForwardScheme->updateCollectionSet(env);
+		}
+	}
+
 	/**
 	 * Set the number of regions, which are need to be reserved for Mark/Compact only in CollectionSet due to short of survivor regions for CopyForward
 	 */

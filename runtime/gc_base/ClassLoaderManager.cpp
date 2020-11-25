@@ -272,6 +272,10 @@ MM_ClassLoaderManager::identifyClassLoadersToUnload(MM_EnvironmentBase *env, MM_
 			J9Object *classLoaderObject = classLoader->classLoaderObject;
 			if( (NULL != classLoaderObject) && (!markMap->isBitSet(classLoaderObject)) ) {
 				/* Anonymous classloader should not be unloaded */
+				if (0 != (classLoader->flags & J9CLASSLOADER_ANON_CLASS_LOADER)) {
+					PORT_ACCESS_FROM_ENVIRONMENT(env);
+					j9tty_printf(PORTLIB, "identifyClassLoadersToUnload classLoaderObject=%p\n", classLoaderObject);
+				}
 				Assert_MM_true(0 == (classLoader->flags & J9CLASSLOADER_ANON_CLASS_LOADER));
 				Assert_MM_true( 0 == (classLoader->gcFlags & J9_GC_CLASS_LOADER_SCANNED) ); 
 

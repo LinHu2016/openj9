@@ -28,7 +28,7 @@ import com.ibm.j9ddr.vm29.pointer.AbstractPointer;
 import com.ibm.j9ddr.vm29.pointer.U8Pointer;
 import com.ibm.j9ddr.vm29.pointer.VoidPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.MM_HeapRegionDescriptorPointer;
-import com.ibm.j9ddr.vm29.pointer.generated.MM_MemoryPoolBumpPointerPointer;
+//import com.ibm.j9ddr.vm29.pointer.generated.MM_MemoryPoolBumpPointerPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.MM_MemoryPoolPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.MM_MemorySubSpacePointer;
 import com.ibm.j9ddr.vm29.structure.J9MemorySegment;
@@ -139,12 +139,12 @@ class GCHeapRegionDescriptor_V1 extends GCHeapRegionDescriptor
 
 	protected VoidPointer getWalkableHighAddress() throws CorruptDataException
 	{
-		if ((MM_HeapRegionDescriptor$RegionType.BUMP_ALLOCATED == regionType) ||
-			(MM_HeapRegionDescriptor$RegionType.BUMP_ALLOCATED_MARKED == regionType)) {
-			return MM_MemoryPoolBumpPointerPointer.cast(heapRegionDescriptor._memoryPool())._allocatePointer();
-		} else {
+//		if ((MM_HeapRegionDescriptor$RegionType.BUMP_ALLOCATED == regionType) ||
+//			(MM_HeapRegionDescriptor$RegionType.BUMP_ALLOCATED_MARKED == regionType)) {
+//			return MM_MemoryPoolBumpPointerPointer.cast(heapRegionDescriptor._memoryPool())._allocatePointer();
+//		} else {
 			return getHighAddress();
-		}
+//		}
 	}
 	
 	@Override

@@ -456,8 +456,8 @@ MM_MemorySubSpaceTarok::recycleRegion(MM_EnvironmentBase *env, MM_HeapRegionDesc
 	}
 
 	switch (region->getRegionType()) {
-		case MM_HeapRegionDescriptor::BUMP_ALLOCATED:
-		case MM_HeapRegionDescriptor::BUMP_ALLOCATED_MARKED:
+		case MM_HeapRegionDescriptor::ADDRESS_ORDERED:
+		case MM_HeapRegionDescriptor::ADDRESS_ORDERED_MARKED:
 			/* declare previous mark map cleared, except if the region is arraylet leaf.
 			 * leaving _nextMarkMapCleared unchanged
 			 */

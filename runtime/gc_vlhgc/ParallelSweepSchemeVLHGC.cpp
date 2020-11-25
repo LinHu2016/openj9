@@ -33,7 +33,6 @@
 #include <string.h>
 
 #include "ParallelSweepSchemeVLHGC.hpp"
-#include "SweepPoolManagerAddressOrderedList.hpp"
 
 #include "AllocateDescription.hpp"
 #include "Bits.hpp"
@@ -51,7 +50,7 @@
 #include "MarkMap.hpp"
 #include "Math.hpp"
 #include "MemoryPool.hpp"
-#include "MemoryPoolBumpPointer.hpp"
+#include "MemoryPoolAddressOrderedList.hpp"
 #include "MemorySpace.hpp"
 #include "MemorySubSpace.hpp"
 #include "ObjectModel.hpp"
@@ -59,7 +58,7 @@
 #include "ParallelSweepChunk.hpp"
 #include "ParallelTask.hpp"
 #include "SweepHeapSectioningVLHGC.hpp"
-#include "SweepPoolManagerVLHGC.hpp"
+#include "SweepPoolManagerAddressOrderedList.hpp"
 #include "SweepPoolState.hpp"
 
 
@@ -102,6 +101,8 @@ MM_ParallelSweepVLHGCTask::setup(MM_EnvironmentBase *envBase)
 	
 	/* record that this thread is participating in this cycle */
 	env->_sweepVLHGCStats._gcCount = MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount;
+
+	env->_freeEntrySizeClassStats.resetCounts();
 }
 
 /**
@@ -138,6 +139,7 @@ MM_ParallelSweepVLHGCTask::mainCleanup(MM_EnvironmentBase *envBase)
 	/* now that sweep is finished, walk the list of regions and recycle any which are completely empty */
 	MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
 	_sweepScheme->recycleFreeRegions(env);
+	_cycleState->_noCompactionAfterSweep = false;
 	_sweepScheme->clearCycleState();
 }
 
@@ -197,6 +199,7 @@ MM_ParallelSweepSchemeVLHGC::MM_ParallelSweepSchemeVLHGC(MM_EnvironmentVLHGC *en
 	, _sweepHeapSectioning(NULL)
 	, _poolSweepPoolState(NULL)
 	, _mutexSweepPoolState(NULL)
+//	, _noCompactionAfterSweep(false)
 {
 	_typeId = __FUNCTION__;
 }
@@ -716,6 +719,7 @@ MM_ParallelSweepSchemeVLHGC::sweepAllChunks(MM_EnvironmentVLHGC *env, UDATA tota
 #endif /* J9MODRON_TGC_PARALLEL_STATISTICS */
 
 	MM_ParallelSweepChunk *chunk;
+	MM_ParallelSweepChunk *prevChunk = NULL;
 	MM_SweepHeapSectioningIterator sectioningIterator(_sweepHeapSectioning);
 
 	for (UDATA chunkNum = 0; chunkNum < totalChunkCount; chunkNum++) {
@@ -729,9 +733,20 @@ if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 #if defined(J9MODRON_TGC_PARALLEL_STATISTICS)                           
 			chunksProcessed += 1;
 #endif /* J9MODRON_TGC_PARALLEL_STATISTICS */
- 
+
+ 			/* if we are changing memory pool, flush the thread local stats to appropriate (previous) pool */
+			if ((NULL != prevChunk) && (prevChunk->memoryPool != chunk->memoryPool)) {
+				prevChunk->memoryPool->getLargeObjectAllocateStats()->getFreeEntrySizeClassStats()->mergeLocked(&env->_freeEntrySizeClassStats);
+			}
+
+ 			/* if we are starting or changing memory pool, setup frequent allocation sizes in free entry stats for the pool we are about to sweep */
+			if ((NULL == prevChunk) || (prevChunk->memoryPool != chunk->memoryPool)) {
+				env->_freeEntrySizeClassStats.initializeFrequentAllocation(chunk->memoryPool->getLargeObjectAllocateStats());
+			}
+
 			/* Sweep the chunk */
 			sweepChunk(env, chunk);
+			prevChunk = chunk;
 		}	
 	}
 
@@ -739,6 +754,11 @@ if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 	env->_sweepVLHGCStats.sweepChunksProcessed = chunksProcessed;
 	env->_sweepVLHGCStats.sweepChunksTotal = totalChunkCount;
 #endif /* J9MODRON_TGC_PARALLEL_STATISTICS */
+
+	/* flush the remaining stats (since the the last pool switch) */
+	if (NULL != prevChunk) {
+		prevChunk->memoryPool->getLargeObjectAllocateStats()->getFreeEntrySizeClassStats()->mergeLocked(&env->_freeEntrySizeClassStats);
+	}
 	
 }
 
@@ -754,7 +774,7 @@ if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 void
 MM_ParallelSweepSchemeVLHGC::connectChunk(MM_EnvironmentVLHGC *env, MM_ParallelSweepChunk *chunk)
 {
-	MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)chunk->memoryPool;
+	MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList *)chunk->memoryPool;
 	MM_SweepPoolManager *sweepPoolManager = memoryPool->getSweepPoolManager();
 	sweepPoolManager->connectChunk(env, chunk);
 }
@@ -831,6 +851,10 @@ MM_ParallelSweepSchemeVLHGC::flushAllFinalChunks(MM_EnvironmentBase *env)
 				/* Find any unaccounted for free entries and flush them to the free list */
 				sweepPoolManager->flushFinalChunk(env, memoryPool);
 				sweepPoolManager->connectFinalChunk(env, memoryPool);
+
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "flushAllFinalChunks region=%p, ActualFreeMemorySize=%zu, ActualFreeEntryCount=%zu, DarkMatterBytes=%zu, LargestFreeEntry=%zu\n", region, memoryPool->getActualFreeMemorySize(), memoryPool->getActualFreeEntryCount(), memoryPool->getDarkMatterBytes(), memoryPool->getLargestFreeEntry());
+
 				/* clear card table if empty */
 				if (region->getSize() == memoryPool->getActualFreeMemorySize()) {
 					void *low = region->getLowAddress();
@@ -861,7 +885,7 @@ MM_ParallelSweepSchemeVLHGC::internalSweep(MM_EnvironmentVLHGC *env)
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
 		while (NULL != (region = regionIterator.nextRegion())) {
 			if (!region->_sweepData._alreadySwept && region->hasValidMarkMap()) {
-				((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->reset(MM_MemoryPool::forSweep);
+				((MM_MemoryPoolAddressOrderedList *)region->getMemoryPool())->reset(MM_MemoryPool::forSweep);
 			}
 		}
 
@@ -990,7 +1014,7 @@ MM_ParallelSweepSchemeVLHGC::recycleFreeRegions(MM_EnvironmentVLHGC *env)
 	while(NULL != (region = regionIterator.nextRegion())) {
 		/* Region must be marked for sweep */
 		if (!region->_sweepData._alreadySwept && region->hasValidMarkMap()) {
-			MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *regionPool = (MM_MemoryPoolAddressOrderedList *)region->getMemoryPool();
 			Assert_MM_true(NULL != regionPool);
 			MM_HeapRegionDescriptorVLHGC *walkRegion = region;
 			MM_HeapRegionDescriptorVLHGC *next = walkRegion->_allocateData.getNextArrayletLeafRegion();
@@ -1032,7 +1056,7 @@ MM_ParallelSweepSchemeVLHGC::updateProjectedLiveBytesAfterSweep(MM_EnvironmentVL
 	
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if (region->containsObjects() && !region->_sweepData._alreadySwept) {
-			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList *)region->getMemoryPool();
 			UDATA actualLiveBytes = regionSize - memoryPool->getFreeMemoryAndDarkMatterBytes();
 			region->_projectedLiveBytesDeviation = actualLiveBytes - region->_projectedLiveBytes;
 			region->_projectedLiveBytes = actualLiveBytes;

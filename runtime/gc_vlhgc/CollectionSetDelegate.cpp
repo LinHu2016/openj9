@@ -46,7 +46,7 @@
 #include "HeapRegionManager.hpp"
 #include "HeapRegionManagerTarok.hpp"
 #include "MarkMap.hpp"
-#include "MemoryPoolBumpPointer.hpp"
+#include "MemoryPoolAddressOrderedList.hpp"
 #include "RegionValidator.hpp"
 
 MM_CollectionSetDelegate::MM_CollectionSetDelegate(MM_EnvironmentBase *env, MM_HeapRegionManager *manager)
@@ -222,7 +222,7 @@ MM_CollectionSetDelegate::selectRegionsForBudget(MM_EnvironmentVLHGC *env, UDATA
 
 			UDATA tableIndex = _regionManager->mapDescriptorToRegionTableIndex(regionSelectionPtr);
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, regionSelectionPtr);
-			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)regionSelectionPtr->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList *)regionSelectionPtr->getMemoryPool();
 			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
 			_extensions->compactGroupPersistentStats[compactGroup]._regionsInRegionCollectionSetForPGC += 1;
 
@@ -456,7 +456,7 @@ MM_CollectionSetDelegate::deleteRegionCollectionSetForPartialGC(MM_EnvironmentVL
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	while (NULL != (region = regionIterator.nextRegion())) {
 		/* there shouldn't be any regions that have some occupancy but not marked left if the increment is done */
-		Assert_MM_false(MM_HeapRegionDescriptor::BUMP_ALLOCATED == region->getRegionType());
+		Assert_MM_false(MM_HeapRegionDescriptor::ADDRESS_ORDERED == region->getRegionType());
 		Assert_MM_true(MM_RegionValidator(region).validate(env));
 
 		region->_markData._shouldMark = false;
@@ -491,7 +491,7 @@ MM_CollectionSetDelegate::deleteRegionCollectionSetForGlobalGC(MM_EnvironmentVLH
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	while (NULL != (region = regionIterator.nextRegion())) {
 		/* there shouldn't be any regions that have some occupancy but not marked left */
-		Assert_MM_false(MM_HeapRegionDescriptor::BUMP_ALLOCATED == region->getRegionType());
+		Assert_MM_false(MM_HeapRegionDescriptor::ADDRESS_ORDERED == region->getRegionType());
 		Assert_MM_true(MM_RegionValidator(region).validate(env));
 
 		region->_reclaimData._shouldReclaim = false;
@@ -528,7 +528,7 @@ MM_CollectionSetDelegate::rateOfReturnCalculationBeforeSweep(MM_EnvironmentVLHGC
 		while (NULL != (region = regionIterator.nextRegion())) {
 			if(region->containsObjects()) {
 				SetSelectionData *stats = &_setSelectionDataTable[MM_CompactGroupManager::getCompactGroupNumber(env, region)];
-				MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+				MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList *)region->getMemoryPool();
 
 				stats->_reclaimStats._regionCountBefore += 1;
 				if(!region->_sweepData._alreadySwept) {
@@ -571,7 +571,7 @@ MM_CollectionSetDelegate::rateOfReturnCalculationAfterSweep(MM_EnvironmentVLHGC 
 			if(region->containsObjects()) {
 				UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 				SetSelectionData *stats = &_setSelectionDataTable[compactGroup];
-				MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+				MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList *)region->getMemoryPool();
 
 				stats->_reclaimStats._regionCountAfter += 1;
 

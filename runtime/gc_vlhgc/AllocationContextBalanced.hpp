@@ -58,7 +58,7 @@ private:
 	MM_RegionListTarok _discardRegionList; /**< The list of MPBP regions currently privately owned by this context but either too full or too fragmented to be used to satisfy allocations.  These regions must be flushed back to the subspace before a collection */
 	MM_RegionListTarok _flushedRegions; /**< The list of MPBP regions which have been flushed from active use, for a GC, and have unknown stats (at any point after the GC, however, these regions could all be migrated to _ownedRegions) */
 	MM_RegionListTarok _freeRegions; /**< The list regions which are owned by this context but currently marked as FREE */
-	MM_RegionListTarok _idleMPBPRegions; /**< The list regions which are owned by this context, currently marked as BUMP_ALLOCATED_IDLE, but contain no objects (this also implies that they can migrate to other contexts on this node, for free, since the receiver isn't using them) */
+	MM_RegionListTarok _idleMPBPRegions; /**< The list regions which are owned by this context, currently marked as ADDRESS_ORDERED_IDLE, but contain no objects (this also implies that they can migrate to other contexts on this node, for free, since the receiver isn't using them) */
 	UDATA _freeMemorySize;	/**< The amount of free memory currently managed by the context in the _ownedRegions list only (note that dark matter and small holes are not considered free memory).  This value is always accurate (that is, there is no time when it becomes out of sync with the actual amount of free memory managed by the context). */
 	UDATA _regionCount[MM_HeapRegionDescriptor::LAST_REGION_TYPE]; /**< Count of regions that are owned by this AC (accurate only for TGC purposes) */
 	UDATA _threadCount;/**< Count of mutator threads that allocate from this AC (accurate only for TGC purposes) */
@@ -312,7 +312,7 @@ private:
 	void unlockCommon();
 
 	/**
-	 * Tries to acquire an MPBP region from the receiver (either from an existing, but idle, BUMP_ALLOCATED or by converting a free region).
+	 * Tries to acquire an MPBP region from the receiver (either from an existing, but idle, ADDRESS_ORDERED or by converting a free region).
 	 * If the receiver does not have a valid candidate it will check its siblings and cousins for one.
 	 * The region that this method returns will have been removed from the receiver's management and its owning context is set to requestingContext.
 	 *
@@ -338,14 +338,14 @@ private:
 	MM_HeapRegionDescriptorVLHGC *acquireFreeRegionFromHeap(MM_EnvironmentBase *env);
 	
 	/**
-	 * Returns a region descriptor of BUMP_ALLOCATED type on the node where the receiver is resident.  The region may not have been found
+	 * Returns a region descriptor of ADDRESS_ORDERED type on the node where the receiver is resident.  The region may not have been found
 	 * in the receiver (it may have been managed by a sibling) but it will be placed under the management of the given requestingContext
 	 * before this call returns.
 	 * @note The caller must own the receiver's _contextLock
 	 * @param env[in] The thread requesting the region
 	 * @param subSpace[in] The subSpace to which the allocated pool must be attached
 	 * @param requestingContext[in] The context which is requesting the region and asking this context to search its node
-	 * @return A region of type BUMP_ALLOCATED (or NULL if no BUMP_ALLOCATED regions could be found or created on the receiver's node)
+	 * @return A region of type ADDRESS_ORDERED (or NULL if no ADDRESS_ORDERED regions could be found or created on the receiver's node)
 	 */
 	MM_HeapRegionDescriptorVLHGC *acquireMPBPRegionFromNode(MM_EnvironmentBase *env, MM_MemorySubSpace *subSpace, MM_AllocationContextTarok *requestingContext);
 
@@ -360,7 +360,7 @@ private:
 	MM_HeapRegionDescriptorVLHGC *acquireFreeRegionFromNode(MM_EnvironmentBase *env);
 
 	/**
-	 * Tries to acquire an MPBP region from the receiver (either from an existing, but idle, BUMP_ALLOCATED or by converting a free region).
+	 * Tries to acquire an MPBP region from the receiver (either from an existing, but idle, ADDRESS_ORDERED or by converting a free region).
 	 * The region that this method returns will have been removed from the receiver's management and its owning context is set to requestingContext.
 	 *
 	 * @param env[in] The thread attempting the allocation

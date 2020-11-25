@@ -440,6 +440,10 @@ MM_RootScanner::scanClassLoaders(MM_EnvironmentBase *env)
 
 		J9ClassLoader *classLoader;
 
+//		PORT_ACCESS_FROM_ENVIRONMENT(env);
+//		j9tty_printf(PORTLIB, "scanClassLoaders env=%p, classLoaderBlocks=%p\n",
+//				env, static_cast<J9JavaVM*>(_omrVM->_language_vm)->classLoaderBlocks);
+//
 		GC_ClassLoaderIterator classLoaderIterator(static_cast<J9JavaVM*>(_omrVM->_language_vm)->classLoaderBlocks);
 		while((classLoader = classLoaderIterator.nextSlot()) != NULL) {
 			doClassLoader(classLoader);
