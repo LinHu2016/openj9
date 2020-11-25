@@ -28,11 +28,11 @@
 #include "ModronAssertions.h"
 
 #include "Base.hpp"
-#include "MemoryPoolBumpPointer.hpp"
+#include "MemoryPoolAddressOrderedList.hpp"
 
 class MM_EnvironmentBase;
 class MM_EnvironmentVLHGC;
-class MM_MemoryPoolBumpPointer;
+class MM_MemoryPoolAddressOrderedList;
 class MM_HeapRegionDescriptorVLHGC;
 class MM_AllocationContextTarok;
 
@@ -52,12 +52,12 @@ private:
 	J9IndexableObject *_spine; /**< If this region contains an arraylet leaf, this points to the spine which owns the leaf */
 	MM_HeapRegionDescriptorVLHGC *_nextArrayletLeafRegion; /**< If this region has a spine in it, this is a list of regions which represent the leaves of the region.  If this is a leaf region, it is the next leaf region in the list */
 	MM_HeapRegionDescriptorVLHGC *_previousArrayletLeafRegion; /**< If this region has a spine in it, this is NULL.  If this is a leaf region, it is the previous leaf region in the list */
-	UDATA _backingStore[((sizeof(MM_MemoryPoolBumpPointer) - 1)/sizeof(UDATA)) + 1]; /**< Allocate space for Memory Pool List */
+	UDATA _backingStore[((sizeof(MM_MemoryPoolAddressOrderedList) - 1)/sizeof(UDATA)) + 1]; /**< Allocate space for Memory Pool List */
 	
 public:
 
 	/**
-	 * If the receiver is FREE:  Initializes the _backingStore as an MM_MemoryPoolBumpPointer and sets the _region->_memoryPool to point at this pool.
+	 * If the receiver is FREE:  Initializes the _backingStore as an MM_MemoryPoolAddressOrderedList and sets the _region->_memoryPool to point at this pool.
 	 * If the receiver is BUMP_ALLOCATED_IDLE:  converts the receiver into BUMP_ALLOCATED.
 	 * 
 	 * @param[in] env - the current env

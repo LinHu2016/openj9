@@ -2117,13 +2117,14 @@ MM_IncrementalGenerationalGC::exportStats(MM_EnvironmentVLHGC *env, MM_Collectio
 				/* Eden and NUMA stats */
 				UDATA usedMemory = 0;
 				if (region->containsObjects()) {
-					MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+					MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 					Assert_MM_true(NULL != memoryPool);
 					/* Eden region containing objects, Allocation Age must be smaller then amount allocated since last PGC,
 					 * more accurately, its logical age must be equal to zero */
 					if (0 == region->getLogicalAge()) {
-						/* region is not collected yet, so getActualFreeMemorySize might not be accurate - using getAllocatableBytes instead */
-						UDATA size = memoryPool->getAllocatableBytes();
+//						/* region is not collected yet, so getActualFreeMemorySize might not be accurate - using getAllocatableBytes instead */
+//						UDATA size = memoryPool->getAllocatableBytes();
+						UDATA size = memoryPool->getActualFreeMemorySize();
 						stats->_edenFreeHeapSize += size;
 						usedMemory = regionSize - size;
 						allocateEdenTotal += regionSize;

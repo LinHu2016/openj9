@@ -46,7 +46,7 @@
 #include "HeapRegionManager.hpp"
 #include "HeapRegionManagerTarok.hpp"
 #include "MarkMap.hpp"
-#include "MemoryPoolBumpPointer.hpp"
+#include "MemoryPoolAddressOrderedList.hpp"
 #include "RegionValidator.hpp"
 
 MM_ProjectedSurvivalCollectionSetDelegate::MM_ProjectedSurvivalCollectionSetDelegate(MM_EnvironmentBase *env, MM_HeapRegionManager *manager)
@@ -206,7 +206,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::selectRegion(MM_EnvironmentVLHGC *env
 	UDATA regionSize = _regionManager->getRegionSize();
 	UDATA tableIndex = _regionManager->mapDescriptorToRegionTableIndex(region);
 	UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
-	MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+	MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 	UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
 	UDATA projectedFreeMemoryAfterGC = regionSize - region->_projectedLiveBytes;
 	UDATA projectedReclaimableBytes = region->getProjectedReclaimableBytes();
@@ -529,7 +529,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::rateOfReturnCalculationBeforeSweep(MM
 		while (NULL != (region = regionIterator.nextRegion())) {
 			if(region->containsObjects()) {
 				SetSelectionData *stats = &_setSelectionDataTable[MM_CompactGroupManager::getCompactGroupNumber(env, region)];
-				MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+				MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 
 				stats->_reclaimStats._regionCountBefore += 1;
 				if(!region->_sweepData._alreadySwept) {
@@ -572,7 +572,7 @@ MM_ProjectedSurvivalCollectionSetDelegate::rateOfReturnCalculationAfterSweep(MM_
 			if(region->containsObjects()) {
 				UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 				SetSelectionData *stats = &_setSelectionDataTable[compactGroup];
-				MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+				MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 
 				stats->_reclaimStats._regionCountAfter += 1;
 

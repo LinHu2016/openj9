@@ -116,6 +116,7 @@ private:
 
 	J9Pool *_poolSweepPoolState;				/**< Memory pools for SweepPoolState*/ 
 	omrthread_monitor_t _mutexSweepPoolState;	/**< Monitor to protect memory pool operations for sweepPoolState*/
+	bool _noCompactionAfterSweep;	/**< if true, no compaction would be expected after current sweep */
 	
 protected:
 public:
@@ -191,6 +192,13 @@ protected:
 	static void hookMemoryPoolKill(J9HookInterface** hook, UDATA eventNum, void* eventData, void* userData);
 
 	void updateProjectedLiveBytesAfterSweep(MM_EnvironmentVLHGC *env);
+
+//	/**
+//	 * MM_MemoryPoolAddressOrderedList._heapFreeList hold a list of freeEntries, which is created by sweep, the free list only be used as survivor during CopyForword
+//	 * adjustFreeLists() try to align the freeEntries in the freelist with CARD_SIZE(for both start address and end address ) and clear dirty CARD for the free entries.
+//	 * @param minimumSize4Reuse remove the freeEntries, whose size are smaller than minimumSize4Reuse, from the freelist.
+//	 */
+//	void adjustFreeLists(MM_EnvironmentBase *env, UDATA minimumSize4Reuse);
 
 public:
 	static MM_ParallelSweepSchemeVLHGC *newInstance(MM_EnvironmentVLHGC *env); 

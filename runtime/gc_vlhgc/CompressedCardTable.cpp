@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2014 IBM Corp. and others
+ * Copyright (c) 1991, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -38,9 +38,7 @@
 #include "GCExtensions.hpp"
 #include "Heap.hpp"
 #include "HeapRegionDescriptor.hpp"
-
-#define BITS_PER_BYTE	8
-#define COMPRESSED_CARDS_PER_WORD	(sizeof(UDATA) * BITS_PER_BYTE)
+#include "MarkMap.hpp"
 
 /*
  * Bit 1 meaning may be dirty (traditional) or clear (inverted)
@@ -96,6 +94,14 @@ MM_CompressedCardTable::initialize(MM_EnvironmentBase *env, MM_Heap *heap)
 
 	/* Allocate compressed card table */
 	_compressedCardTable = (UDATA *)env->getForge()->allocate(compressedCardTableSize, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+	if (NULL != _compressedCardTable) {
+		Assert_MM_true(1 == COMPRESSED_CARD_TABLE_DIV);
+		_compressedSurvivorTable  = (UDATA *)env->getForge()->allocate(compressedCardTableSize, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+		if (NULL == _compressedSurvivorTable) {
+			env->getForge()->free(_compressedCardTable);
+			_compressedCardTable = NULL;
+		}
+	}
 
 	_heapBase = (UDATA)heap->getHeapBase();
 
@@ -114,6 +120,7 @@ MM_CompressedCardTable::tearDown(MM_EnvironmentBase *env)
 {
 	if (NULL != _compressedCardTable) {
 		env->getForge()->free(_compressedCardTable);
+		env->getForge()->free(_compressedSurvivorTable);
 	}
 }
 
@@ -159,6 +166,7 @@ MM_CompressedCardTable::setCompressedCardsDirtyForPartialCollect(void *startHeap
 	UDATA i;
 	for (i = compressedCardStartIndex; i < compressedCardEndIndex; i++) {
 		_compressedCardTable[i] = AllCompressedCardsInWordDirty;
+//		_compressedSurvivorTable[i] =  AllCompressedCardsInWordDirty;
 	}
 }
 
@@ -171,10 +179,13 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 	UDATA compressedCardStartOffset = ((UDATA)startHeapAddress - _heapBase) / (CARD_SIZE * COMPRESSED_CARD_TABLE_DIV);
 	UDATA compressedCardStartIndex = compressedCardStartOffset / COMPRESSED_CARDS_PER_WORD;
 	UDATA *compressedCard = &_compressedCardTable[compressedCardStartIndex];
+	UDATA *compressedSurvivor = &_compressedSurvivorTable[compressedCardStartIndex];
 	UDATA mask = 1;
 	const UDATA endOfWord = ((UDATA)1) << (COMPRESSED_CARDS_PER_WORD - 1);
 	UDATA compressedCardWord = AllCompressedCardsInWordClean;
-
+	UDATA compressedSurvivorWord = AllCompressedCardsInWordClean;
+	uint64_t *markMapSlots = (uint64_t*)env->_cycleState->_markMap->getSlotPtrForAddress((omrobjectptr_t) startHeapAddress);
+	bool shouldRunCopyForward = env->_cycleState->_shouldRunCopyForward;
 	/*
 	 *  To simplify test logic assume here that given addresses are aligned to correspondent compressed card word border
 	 *  So no need to handle side pieces (no split of compressed card table words between regions)
@@ -190,6 +201,13 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 		if (isDirtyCardForPartialCollect(state)) {
 			/* invert bit */
 			compressedCardWord ^= mask;
+		}
+		if (shouldRunCopyForward) {
+			if ((NULL != markMapSlots) && (0 == *markMapSlots)) {
+				/* invert bit */
+				compressedSurvivorWord ^= mask;
+			}
+			markMapSlots++;
 		}
 
 #else /* COMPRESSED_CARD_TABLE_DIV == 1 */
@@ -214,8 +232,12 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 		if (mask == endOfWord) {
 			/* last bit in word handled - save word and prepare mask for next one */
 			*compressedCard++ = compressedCardWord;
-			mask = 1;
 			compressedCardWord = AllCompressedCardsInWordClean;
+			if (shouldRunCopyForward) {
+				*compressedSurvivor++ = compressedSurvivorWord;
+				compressedSurvivorWord = AllCompressedCardsInWordClean;
+			}
+			mask = 1;
 		} else {
 			/* mask for next bit to handle */
 			mask = mask << 1;
@@ -224,6 +246,21 @@ MM_CompressedCardTable::rebuildCompressedCardTableForPartialCollect(MM_Environme
 
 	/* end heap address must be aligned*/
 	Assert_MM_true(1 == mask);
+}
+
+bool
+MM_CompressedCardTable::isCompressedSurvivorForPartialCollect(void *heapAddr)
+{
+	UDATA compressedCardOffset = ((UDATA)heapAddr - _heapBase) / (CARD_SIZE * COMPRESSED_CARD_TABLE_DIV);
+	UDATA compressedCardIndex = compressedCardOffset / COMPRESSED_CARDS_PER_WORD;
+	UDATA compressedSurvivorWord = _compressedSurvivorTable[compressedCardIndex];
+	bool isSurvivor = false;
+
+	if (AllCompressedCardsInWordClean != compressedSurvivorWord) {
+		UDATA bit = compressedCardOffset % COMPRESSED_CARDS_PER_WORD;
+		isSurvivor = (CompressedCardDirty == ((compressedSurvivorWord >> bit) & 1));
+	}
+	return isSurvivor;
 }
 
 bool

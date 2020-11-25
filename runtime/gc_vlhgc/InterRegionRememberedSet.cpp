@@ -509,7 +509,7 @@ MM_InterRegionRememberedSet::overflowIfStableRegion(MM_EnvironmentVLHGC *env, MM
 		MM_RememberedSetCardList *rscl = region->getRememberedSetCardList();
 
 		if (rscl->isAccurate()) {
-			MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *pool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 			IDATA unusedSize = pool->getDarkMatterBytes() + pool->getActualFreeMemorySize();
 			if (unusedSize < (IDATA)(_regionSize * _unusedRegionThreshold)) {
 				rscl->setAsStable();

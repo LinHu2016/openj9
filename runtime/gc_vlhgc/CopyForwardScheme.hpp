@@ -52,7 +52,7 @@ class MM_HeapRegionManager;
 class MM_HeapRegionDescriptorVLHGC;
 class MM_InterRegionRememberedSet;
 class MM_MarkMap;
-class MM_MemoryPoolBumpPointer;
+class MM_MemoryPoolAddressOrderedList;
 class MM_ReferenceStats;
 
 /* Forward declaration of classes defined within the cpp */
@@ -95,10 +95,9 @@ private:
 		UDATA _evacuateRegionCount; /**< The number of evacuate regions in this group */
 		UDATA _maxSublistCount; /**< The highest value _sublistCount is permitted to reach in this group */
 		volatile UDATA _sublistCount; /**< The number of active sublists in this list */
-		MM_HeapRegionDescriptorVLHGC *_tailCandidates; /**< A linked list of regions in this compact group which have empty tails */
-		MM_LightweightNonReentrantLock _tailCandidatesLock; /**< Lock to protect _tailCandidates */
-		UDATA _tailCandidateCount; /**< The number of regions in the _tailCandidates list */
-	protected:
+		MM_HeapRegionDescriptorVLHGC *_freeMemoryCandidates; /**< A linked list of regions in this compact group which have free memory */
+		MM_LightweightNonReentrantLock _freeMemoryCandidatesLock; /**< Lock to protect _freeMemoryCandidates */
+		UDATA _freeMemoryCandidateCount; /**< The number of regions in the _freeMemoryCandidates list */	protected:
 	private:
 		/* Methods */
 	public:
@@ -349,12 +348,12 @@ private:
 	void scanPhantomReferenceObjects(MM_EnvironmentVLHGC *env);
 	
 	/**
-	 * Set region as survivor (and its survivor base address). Also set the special state if region was created by phantom reference processing.
+	 * Set region as survivor. Also set the special state if region was created by phantom reference processing.
 	 * @param env[in] the current thread
 	 * @param region[in] region to set as survivor
-	 * @param survivorBase[in] survivor base address (all object below this address, if different than low region address are not part of survivor)
+	 * @param freshSurvivor[in] if true, it is survivor region from free region
 	 */
-	void setRegionAsSurvivor(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase);
+	void setRegionAsSurvivor(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, bool freshSurvivor);
 
 	/**
 	 * Process the list of reference objects recorded in the specified list.
@@ -499,22 +498,22 @@ private:
 	void releaseRegion(MM_EnvironmentVLHGC *env, MM_ReservedRegionListHeader::Sublist *regionList, MM_HeapRegionDescriptorVLHGC *region);
 
 	/**
-	 * Insert the specified tail candidate into the tail candidate list.  The implementation assumes that the calling thread can modify 
+	 * Insert the specified free memory candidate into the candidate list.  The implementation assumes that the calling thread can modify
 	 * regionList without locking it so the callsite either needs to have locked the list or be single-threaded.
 	 * @param env[in] The GC thread
-	 * @param regionList[in] The region list to which tailRegion should be added as a tail candidate
-	 * @param tailRegion[in] The region to add
+	 * @param regionList[in] The region list to which Region should be added as a candidate
+	 * @param region[in] The region to add
 	 */
-	void insertTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *tailRegion);
+	void insertCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *region);
 
 	/**
-	 * Remove the specified tail candidate from the tail candidate list.  The implementation assumes that the calling thread can modify 
+	 * Remove the specified free memory candidate from the candidate list.  The implementation assumes that the calling thread can modify
 	 * regionList without locking it so the callsite either needs to have locked the list or be single-threaded.
 	 * @param env[in] The GC thread
-	 * @param regionList[in] The region list which tailRegion belongs to
-	 * @param tailRegion[in] The region to remove
+	 * @param regionList[in] The region list which Region belongs to
+	 * @param region[in] The region to remove
 	 */
-	void removeTailCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *tailRegion);
+	void removeCandidate(MM_EnvironmentVLHGC* env, MM_ReservedRegionListHeader* regionList, MM_HeapRegionDescriptorVLHGC *region);
 	
 	/**
 	 * Reserve memory for an object to be copied to survivor space.
@@ -931,8 +930,7 @@ private:
 	 * @param memoryPool[in] the memoryPool to align
 	 * @return the number of bytes lost by aligning the pool
 	 */
-	UDATA alignMemoryPool(MM_EnvironmentVLHGC *env, MM_MemoryPoolBumpPointer *memoryPool);
-	
+	UDATA alignMemoryPool4Collector(MM_EnvironmentVLHGC *env, MM_MemoryPoolAddressOrderedList *regionPool);
 	/**
 	 * Set the specified tail candidate region to be a survivor region.
 	 * 1. Set its _survivorBase to survivorBase (essentially set survivorSet to true).
@@ -941,9 +939,8 @@ private:
 	 * The caller is responsible for calling rememberAndResetReferenceLists() on the list once it's released all locks.
 	 * @param env[in] the current thread
 	 * @param region[in] the tail region to convert
-	 * @param survivorBase the lowest address in the region where survivor objects can be found
 	 */
-	void convertTailCandidateToSurvivorRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region, void* survivorBase);
+	void convertCandidateToSurvivorRegion(MM_EnvironmentVLHGC* env, MM_HeapRegionDescriptorVLHGC *region);
 
 	/**
 	 * Scan the root set, copying-and-forwarding any objects found.
@@ -981,6 +978,10 @@ private:
 	 */
 	MMINLINE bool iterateAndCopyforwardSlotReference(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *reservingContext, J9Object *objectPtr);
 
+	void verifyObjectInRange(MM_EnvironmentVLHGC *env, UDATA *lowAddress, UDATA *highAddress);
+	void verifyChunkSlotsAndMapSlotsInRange(MM_EnvironmentVLHGC *env, UDATA *lowAddress, UDATA *highAddress);
+	void checkConsistencyGMPMapAndPGCMap(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region, UDATA *lowAddress, UDATA *highAddress);
+	void cleanInRange(MM_EnvironmentVLHGC *env, UDATA *lowAddress, UDATA *highAddress);
 protected:
 
 	MM_CopyForwardScheme(MM_EnvironmentVLHGC *env, MM_HeapRegionManager *manager);

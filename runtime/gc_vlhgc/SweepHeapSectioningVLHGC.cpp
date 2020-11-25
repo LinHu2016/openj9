@@ -112,7 +112,7 @@ MM_SweepHeapSectioningVLHGC::reassignChunks(MM_EnvironmentBase *env)
 
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if (!region->_sweepData._alreadySwept && region->hasValidMarkMap()) {
-			MM_MemoryPoolBumpPointer *regionPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *regionPool = (MM_MemoryPoolAddressOrderedList *)region->getMemoryPool();
 			Assert_MM_true(NULL != regionPool);
 			/* TODO:  this must be rethought for Tarok since it treats all regions identically but some might require different sweep logic */
 			UDATA *heapChunkBase = (UDATA *)region->getLowAddress();  /* Heap chunk base pointer */

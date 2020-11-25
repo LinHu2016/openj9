@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2019 IBM Corp. and others
+ * Copyright (c) 1991, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -37,7 +37,7 @@
 #include "EnvironmentVLHGC.hpp"
 #include "HeapRegionDescriptorVLHGC.hpp"
 #include "HeapRegionManager.hpp"
-#include "MemoryPoolBumpPointer.hpp"
+#include "MemoryPoolAddressOrderedList.hpp"
 #include "MemorySubSpaceTarok.hpp"
 #include "ObjectAllocationInterface.hpp"
 
@@ -123,9 +123,9 @@ MM_AllocationContextBalanced::flushInternal(MM_EnvironmentBase *env)
 {
 	/* flush all the regions we own for active allocation */
 	if (NULL != _allocationRegion){
-		MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer*)_allocationRegion->getMemoryPool();
+		MM_MemoryPoolAddressOrderedList *pool = (MM_MemoryPoolAddressOrderedList*)_allocationRegion->getMemoryPool();
 		Assert_MM_true(NULL != pool);
-		UDATA allocatableBytes = pool->getAllocatableBytes();
+		UDATA allocatableBytes = pool->getActualFreeMemorySize();
 		_freeMemorySize -= allocatableBytes;
 		_flushedRegions.insertRegion(_allocationRegion);
 		_allocationRegion = NULL;
@@ -136,9 +136,9 @@ MM_AllocationContextBalanced::flushInternal(MM_EnvironmentBase *env)
 		Assert_MM_true(this == walk->_allocateData._owningContext);
 		MM_HeapRegionDescriptorVLHGC *next = _nonFullRegions.peekRegionAfter(walk);
 		_nonFullRegions.removeRegion(walk);
-		MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer*)walk->getMemoryPool();
+		MM_MemoryPoolAddressOrderedList *pool = (MM_MemoryPoolAddressOrderedList*)walk->getMemoryPool();
 		Assert_MM_true(NULL != pool);
-		UDATA allocatableBytes = pool->getAllocatableBytes();
+		UDATA allocatableBytes = pool->getActualFreeMemorySize();
 		_freeMemorySize -= allocatableBytes;
 		_flushedRegions.insertRegion(walk);
 		walk = next;
@@ -149,7 +149,7 @@ MM_AllocationContextBalanced::flushInternal(MM_EnvironmentBase *env)
 		Assert_MM_true(this == walk->_allocateData._owningContext);
 		MM_HeapRegionDescriptorVLHGC *next = _discardRegionList.peekRegionAfter(walk);
 		_discardRegionList.removeRegion(walk);
-		MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer*)walk->getMemoryPool();
+		MM_MemoryPoolAddressOrderedList *pool = (MM_MemoryPoolAddressOrderedList*)walk->getMemoryPool();
 		Assert_MM_true(NULL != pool);
 		pool->recalculateMemoryPoolStatistics(env);
 		_flushedRegions.insertRegion(walk);
@@ -195,11 +195,11 @@ MM_AllocationContextBalanced::lockedAllocateTLH(MM_EnvironmentBase *env, MM_Allo
 	void *result = NULL;
 	/* first, try allocating the TLH in our _allocationRegion (fast-path) */
 	if (NULL != _allocationRegion) {
-		MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)_allocationRegion->getMemoryPool();
+		MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)_allocationRegion->getMemoryPool();
 		Assert_MM_true(NULL != memoryPool);
-		UDATA spaceBefore = memoryPool->getAllocatableBytes();
+		UDATA spaceBefore = memoryPool->getActualFreeMemorySize();
 		result = objectAllocationInterface->allocateTLH(env, allocateDescription, _subspace, memoryPool);
-		UDATA spaceAfter = memoryPool->getAllocatableBytes();
+		UDATA spaceAfter = memoryPool->getActualFreeMemorySize();
 		if (NULL == result) {
 			/* this region isn't useful so remove it from our list for consideration and add it to our discard list */
 			Assert_MM_true(spaceAfter < memoryPool->getMinimumFreeEntrySize());
@@ -218,11 +218,11 @@ MM_AllocationContextBalanced::lockedAllocateTLH(MM_EnvironmentBase *env, MM_Allo
 		/* scan through our regions which are still active for allocation and attempt the TLH allocation in each.  Any which are too full or fragmented to satisfy a TLH allocation must be moved to the "discard" list so we won't consider them for allocation until after the next collection */
 		MM_HeapRegionDescriptorVLHGC *region = _nonFullRegions.peekFirstRegion();
 		while ((NULL == result) && (NULL != region)) {
-			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
-			UDATA spaceBefore = memoryPool->getAllocatableBytes();
+			UDATA spaceBefore = memoryPool->getActualFreeMemorySize();
 			result = objectAllocationInterface->allocateTLH(env, allocateDescription, _subspace, memoryPool);
-			UDATA spaceAfter = memoryPool->getAllocatableBytes();
+			UDATA spaceAfter = memoryPool->getActualFreeMemorySize();
 			MM_HeapRegionDescriptorVLHGC *next = _nonFullRegions.peekRegionAfter(region);
 			/* remove this region from the list since we are either discarding it or re-promoting it to the fast-path */
 			_nonFullRegions.removeRegion(region);
@@ -274,11 +274,11 @@ MM_AllocationContextBalanced::lockedAllocateObject(MM_EnvironmentBase *env, MM_A
 	void *result = NULL;
 	/* first, try allocating the object in our _allocationRegion (fast-path) */
 	if (NULL != _allocationRegion) {
-		MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)_allocationRegion->getMemoryPool();
+		MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)_allocationRegion->getMemoryPool();
 		Assert_MM_true(NULL != memoryPool);
-		UDATA spaceBefore = memoryPool->getAllocatableBytes();
+		UDATA spaceBefore = memoryPool->getActualFreeMemorySize();
 		result = memoryPool->allocateObject(env, allocateDescription);
-		UDATA spaceAfter = memoryPool->getAllocatableBytes();
+		UDATA spaceAfter = memoryPool->getActualFreeMemorySize();
 		if (NULL == result) {
 			Assert_MM_true(spaceBefore == spaceAfter);
 			/* if we failed the allocate, move the region into the non-full list since a TLH allocate can consume any space remaining, prior to discarding */
@@ -296,12 +296,12 @@ MM_AllocationContextBalanced::lockedAllocateObject(MM_EnvironmentBase *env, MM_A
 		/* scan through our active region list and attempt the allocation in each.  Failing to satisfy a one-off object allocation, such as this, will not force a region into the discard list, however */
 		MM_HeapRegionDescriptorVLHGC *region = _nonFullRegions.peekFirstRegion();
 		while ((NULL == result) && (NULL != region)) {
-			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
-			UDATA spaceBefore = memoryPool->getAllocatableBytes();
-			result = memoryPool->allocateObject(env, allocateDescription);
+			UDATA spaceBefore = memoryPool->getActualFreeMemorySize();
+		result = memoryPool->allocateObject(env, allocateDescription);
 			if (NULL != result) {
-				UDATA spaceAfter = memoryPool->getAllocatableBytes();
+				UDATA spaceAfter = memoryPool->getActualFreeMemorySize();
 				Assert_MM_true(spaceBefore > spaceAfter);
 				_freeMemorySize -= (spaceBefore - spaceAfter);
 			}
@@ -545,7 +545,7 @@ MM_AllocationContextBalanced::recycleRegion(MM_EnvironmentVLHGC *env, MM_HeapReg
 void
 MM_AllocationContextBalanced::tearDownRegion(MM_EnvironmentBase *env, MM_HeapRegionDescriptorVLHGC *region)
 {
-	MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
+	MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 	if (NULL != memoryPool) {
 		memoryPool->tearDown(env);
 		region->setMemoryPool(NULL);
@@ -735,7 +735,7 @@ MM_AllocationContextBalanced::acquireMPBPRegionFromContext(MM_EnvironmentBase *e
 			if (region->_allocateData.taskAsMemoryPoolBumpPointer(env, requestingContext)) {
 				/* this is a new region. Initialize it for the given pool */
 				region->resetAge(env, (U_64)_subspace->getBytesRemainingBeforeTaxation());
-				MM_MemoryPoolBumpPointer *mpaol = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
+				MM_MemoryPoolAddressOrderedList *mpaol = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 				mpaol->setSubSpace(subSpace);
 				mpaol->expandWithRange(env, region->getSize(), region->getLowAddress(), region->getHighAddress(), false);
 				mpaol->recalculateMemoryPoolStatistics(env);
@@ -751,7 +751,7 @@ MM_AllocationContextBalanced::acquireMPBPRegionFromContext(MM_EnvironmentBase *e
 			/* also add this region into our owned region list */
 			region->resetAge(env, (U_64)_subspace->getBytesRemainingBeforeTaxation());
 			region->_allocateData._owningContext = requestingContext;
-			MM_MemoryPoolBumpPointer *pool = (MM_MemoryPoolBumpPointer*)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *pool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 			Assert_MM_true(subSpace == pool->getSubSpace());
 			pool->rebuildFreeListInRegion(env, region, NULL);
 			pool->recalculateMemoryPoolStatistics(env);
@@ -975,7 +975,7 @@ MM_AllocationContextBalanced::internalReplenishActiveRegion(MM_EnvironmentBase *
 			Trc_MM_AllocationContextBalanced_internalReplenishActiveRegion_convertedFreeRegion(env->getLanguageVMThread(), newRegion, regionSize);
 			_allocationRegion = newRegion;
 			Trc_MM_AllocationContextBalanced_internalReplenishActiveRegion_setAllocationRegion(env->getLanguageVMThread(), this, newRegion);
-			_freeMemorySize += ((MM_MemoryPoolBumpPointer *)newRegion->getMemoryPool())->getAllocatableBytes();
+			_freeMemorySize += ((MM_MemoryPoolAddressOrderedList *)newRegion->getMemoryPool())->getActualFreeMemorySize();
 		}
 	}
 	

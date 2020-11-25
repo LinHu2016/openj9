@@ -249,7 +249,8 @@ MM_MarkMapManager::reportDeletedObjects(MM_EnvironmentVLHGC *env, MM_MarkMap *ol
 				}
 			}
 		} else if (region->containsObjects()) {
-			GC_ObjectHeapIteratorAddressOrderedList iterator(extensions, (J9Object *)region->getLowAddress(), (J9Object *)((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocationPointer(), false, false);
+//			GC_ObjectHeapIteratorAddressOrderedList iterator(extensions, (J9Object *)region->getLowAddress(), (J9Object *)((MM_MemoryPoolBumpPointer *)region->getMemoryPool())->getAllocationPointer(), false, false);
+			GC_ObjectHeapIteratorAddressOrderedList iterator(extensions, (J9Object *)region->getLowAddress(), (J9Object *)region->getHighAddress(), false, false);
 			J9Object *object = NULL;
 			while (NULL != (object = iterator.nextObject())) {
 				if (!newMap->isBitSet(object)) {

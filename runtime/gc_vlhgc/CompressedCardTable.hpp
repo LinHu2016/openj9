@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2019 IBM Corp. and others
+ * Copyright (c) 1991, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -42,6 +42,8 @@ class MM_EnvironmentBase;
 class MM_Heap;
 class MM_HeapRegionDescriptor;
 
+#define BITS_PER_BYTE	8
+#define COMPRESSED_CARDS_PER_WORD	(sizeof(UDATA) * BITS_PER_BYTE)
 
 class MM_CompressedCardTable : public MM_BaseNonVirtual
 {
@@ -49,6 +51,7 @@ public:
 protected:
 private:
 	UDATA *_compressedCardTable;	/**< start address of compressed card table */
+	UDATA *_compressedSurvivorTable;
 	UDATA _heapBase;	/**< Store heap base locally. Use UDATA type because need it for arithmetic only */
 	volatile UDATA _totalRegions;	/**< total number of regions discovered at table rebuild time */
 	volatile UDATA _regionsProcessed; /**< number of regions completed while table is being rebuilt */
@@ -84,7 +87,7 @@ public:
 	 * @return true if fast card is set dirty
 	 */
 	bool isCompressedCardDirtyForPartialCollect(MM_EnvironmentBase *env, void *heapAddr);
-
+	bool isCompressedSurvivorForPartialCollect(void *heapAddr);
 	/**
 	 * Cleaning cards for range
 	 * Iterate Compressed Cards and clean marked dirty
@@ -125,6 +128,8 @@ public:
 		}
 	}
 
+	MMINLINE UDATA *getCompressedSurvivorTable() { return _compressedSurvivorTable; }
+
 	/**
 	 * General class kill
 	 * @param env current thread environment
@@ -151,6 +156,7 @@ protected:
 	MM_CompressedCardTable()
 		: MM_BaseNonVirtual()
 		, _compressedCardTable(NULL)
+		,_compressedSurvivorTable(NULL)
 		, _heapBase(0)
 		, _totalRegions(1)
 		, _regionsProcessed(0)
