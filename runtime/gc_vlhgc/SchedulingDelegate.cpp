@@ -45,7 +45,7 @@
 #include "HeapRegionIteratorVLHGC.hpp"
 #include "HeapRegionManager.hpp"
 #include "IncrementalGenerationalGC.hpp"
-#include "MemoryPoolBumpPointer.hpp"
+#include "MemoryPoolAddressOrderedList.hpp"
 
 /* NOTE: old logic for determining incremental thresholds has been deleted. Please 
  * see CVS history, version 1.14, if you need to find this logic
@@ -198,6 +198,9 @@ MM_SchedulingDelegate::determineNextPGCType(MM_EnvironmentVLHGC *env)
 	if (0.0 == _scanRateStats.microSecondsPerByteScanned) {
 		env->_cycleState->_reasonForMarkCompactPGC = MM_CycleState::reason_calibration;
 		_nextPGCShouldCopyForward = false;
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "_nextPGCShouldCopyForward=false, MM_CycleState::reason_calibration\n");
 	}
 
 	/* Aborted CopyForward happened in near past. The rest of PGCs until GMP completes, should not try CopyForward. */
@@ -425,6 +428,7 @@ MM_SchedulingDelegate::measureScanRate(MM_EnvironmentVLHGC *env, double historic
 		scantime = markStats->getScanTime();
 	}
 
+
 	if (0 != currentBytesScanned) {
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
 		UDATA historicalBytesScanned = _scanRateStats.historicalBytesScanned;
@@ -466,7 +470,7 @@ MM_SchedulingDelegate::estimateMacroDefragmentationWork(MM_EnvironmentVLHGC *env
 void
 MM_SchedulingDelegate::updateCurrentMacroDefragmentationWork(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region)
 {
-	MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+	MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 	UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
 	UDATA liveData = _regionManager->getRegionSize() - freeMemory;
 
@@ -494,7 +498,7 @@ MM_SchedulingDelegate::updateLiveBytesAfterPartialCollect()
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if (region->containsObjects()) {
-			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
 			_liveSetBytesAfterPartialCollect += region->getSize();
 			_liveSetBytesAfterPartialCollect -= memoryPool->getActualFreeMemorySize();
@@ -665,7 +669,7 @@ MM_SchedulingDelegate::calculateScannableBytesRatio(MM_EnvironmentVLHGC *env)
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if (region->containsObjects()) {
-			MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+			MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 			scannableBytes += memoryPool->getScannableBytes();
 			nonScannableBytes += memoryPool->getNonScannableBytes();
 		}
@@ -787,10 +791,11 @@ MM_SchedulingDelegate::calculatePGCCompactionRate(MM_EnvironmentVLHGC *env, UDAT
 
 	while (NULL != (region = regionIterator.nextRegion())) {
 		region->_defragmentationTarget = false;
-		MM_MemoryPoolBumpPointer *memoryPool = (MM_MemoryPoolBumpPointer *)region->getMemoryPool();
+		MM_MemoryPoolAddressOrderedList *memoryPool = (MM_MemoryPoolAddressOrderedList*)region->getMemoryPool();
 		if (region->containsObjects()) {
 			Assert_MM_true(region->_sweepData._alreadySwept);
 			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+//			UDATA darkMatterBytes = memoryPool->getDarkMatterBytes();
 			if (!region->getRememberedSetCardList()->isAccurate()) {
 				/* Overflowed regions or those that RSCL is being rebuilt will not be compacted */
 				nonCollectibleRegions += 1;
@@ -798,10 +803,13 @@ MM_SchedulingDelegate::calculatePGCCompactionRate(MM_EnvironmentVLHGC *env, UDAT
 				totalLiveDataInNonCollectibleRegions += (regionSize - freeMemory);
 			} else {
 				double emptiness = (double)freeMemory / (double)regionSize;
+//				double emptiness4DarkMatter = (double)darkMatterBytes / (double)regionSize;
 				Assert_MM_true( (emptiness >= 0.0) && (emptiness <= 1.0) );
+//				Assert_MM_true( (emptiness4DarkMatter >= 0.0) && (emptiness4DarkMatter <= 1.0) );
 
 				/* Only consider regions which are likely to become more dense if we copy-and-forward them */
 				if (emptiness > defragmentEmptinessThreshold) {
+//				if (emptiness4DarkMatter > defragmentEmptinessThreshold) {
 					collectibleRegions += 1;
 					freeMemoryInCollectibleRegions += freeMemory;
 					/* see ReclaimDelegate::deriveCompactScore() for an explanation of potentialWastedWork */

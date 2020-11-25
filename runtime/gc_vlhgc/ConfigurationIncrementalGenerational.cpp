@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2021 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -51,8 +51,7 @@
 #include "InterRegionRememberedSet.hpp"
 #include "PhysicalArenaRegionBased.hpp"
 #include "PhysicalSubArenaRegionBased.hpp"
-#include "SweepPoolManagerVLHGC.hpp"
-
+#include "SweepPoolManagerAddressOrderedList.hpp"
 
 #define TAROK_MINIMUM_REGION_SIZE_BYTES (512 * 1024)
 
@@ -203,9 +202,9 @@ MM_ConfigurationIncrementalGenerational::createDefaultMemorySpace(MM_Environment
 	MM_HeapRegionManager *regionManager = extensions->heapRegionManager;
 	Assert_MM_true(NULL != regionManager);
 
-	/* Create Sweep Pool Manager for MemoryPoolBumpPointer */
-	extensions->sweepPoolManagerBumpPointer = MM_SweepPoolManagerVLHGC::newInstance(MM_EnvironmentVLHGC::getEnvironment(env));
-	if (NULL == extensions->sweepPoolManagerBumpPointer) {
+	/* Create Sweep Pool Manager for MPAOL */
+	extensions->sweepPoolManagerAddressOrderedList = MM_SweepPoolManagerAddressOrderedList::newInstance(env);
+	if (NULL == extensions->sweepPoolManagerAddressOrderedList) {
 		return NULL;
 	}
 
@@ -320,9 +319,9 @@ MM_ConfigurationIncrementalGenerational::tearDown(MM_EnvironmentBase *env)
 {
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
 
-	if (NULL != extensions->sweepPoolManagerBumpPointer) {
-		extensions->sweepPoolManagerBumpPointer->kill(env);
-		extensions->sweepPoolManagerBumpPointer = NULL;
+	if (NULL != extensions->sweepPoolManagerAddressOrderedList) {
+		extensions->sweepPoolManagerAddressOrderedList->kill(env);
+		extensions->sweepPoolManagerAddressOrderedList = NULL;
 	}
 	
 	if (NULL != extensions->cardTable) {
