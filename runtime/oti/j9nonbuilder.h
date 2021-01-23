@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2021 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -2912,11 +2912,17 @@ typedef struct J9IndexableObjectContiguous {
 #if defined(J9VM_ENV_DATA64) && defined(OMR_GC_FULL_POINTERS)
 	U_32 padding;
 #endif /* J9VM_ENV_DATA64 && !OMR_GC_COMPRESSED_POINTERS */
+#if defined(J9VM_ENV_DATA64)
+	void *dataAddr;
+#endif /* J9VM_ENV_DATA64 */
 } J9IndexableObjectContiguous;
 
 typedef struct J9IndexableObjectContiguousCompressed {
 	U_32 clazz;
 	U_32 size;
+#if defined(J9VM_ENV_DATA64)
+	void *dataAddr;
+#endif /* J9VM_ENV_DATA64 */
 } J9IndexableObjectContiguousCompressed;
 
 typedef struct J9IndexableObjectContiguousFull {
@@ -2924,6 +2930,7 @@ typedef struct J9IndexableObjectContiguousFull {
 	U_32 size;
 #if defined(J9VM_ENV_DATA64)
 	U_32 padding;
+	void *dataAddr;
 #endif /* J9VM_ENV_DATA64 */
 } J9IndexableObjectContiguousFull;
 
@@ -2934,6 +2941,9 @@ typedef struct J9IndexableObjectDiscontiguous {
 #if defined(OMR_GC_COMPRESSED_POINTERS) || !defined(J9VM_ENV_DATA64)
 	U_32 padding;
 #endif /* OMR_GC_COMPRESSED_POINTERS || !J9VM_ENV_DATA64 */
+#if defined(J9VM_ENV_DATA64)
+	void *dataAddr;
+#endif /* J9VM_ENV_DATA64 */
 } J9IndexableObjectDiscontiguous;
 
 typedef struct J9IndexableObjectDiscontiguousCompressed {
@@ -2941,6 +2951,9 @@ typedef struct J9IndexableObjectDiscontiguousCompressed {
 	U_32 mustBeZero;
 	U_32 size;
 	U_32 padding;
+#if defined(J9VM_ENV_DATA64)
+	void *dataAddr;
+#endif /* J9VM_ENV_DATA64 */
 } J9IndexableObjectDiscontiguousCompressed;
 
 typedef struct J9IndexableObjectDiscontiguousFull {
@@ -2949,6 +2962,8 @@ typedef struct J9IndexableObjectDiscontiguousFull {
 	U_32 size;
 #if !defined(J9VM_ENV_DATA64)
 	U_32 padding;
+#else /* J9VM_ENV_DATA64 */
+	void *dataAddr;
 #endif /* !J9VM_ENV_DATA64 */
 } J9IndexableObjectDiscontiguousFull;
 
