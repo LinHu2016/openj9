@@ -132,6 +132,7 @@ private:
 	void *_heapTop;  /**< Cached top pointer of heap */
 
 	volatile bool _abortFlag;  /**< Flag indicating whether the current copy forward cycle should be aborted due to insufficient heap to complete */
+	volatile bool _leaking;
 	bool _abortInProgress;  /**< Flag indicating that the copy forward mechanism is now operating in abort mode, which is attempting to secure integrity of the heap to continue execution */
 
 	UDATA _regionCountCannotBeEvacuated; /**<The number of regions, which can not be copyforward in collectionSet */
@@ -1096,7 +1097,8 @@ public:
 
 	void setReservedNonEvacuatedRegions(UDATA regionCount)
 	{
-		_regionCountReservedNonEvacuated = regionCount;
+//		_regionCountReservedNonEvacuated = regionCount;
+		_regionCountReservedNonEvacuated = 0;
 	}
 
 	friend class MM_CopyForwardGMPCardCleaner;

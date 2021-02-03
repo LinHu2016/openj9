@@ -19,6 +19,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 OR LicenseRef-GPL-2.0 WITH Assembly-exception
  *******************************************************************************/
+#include "omrthread.h"
 
 #include "j9.h"
 #include "j9cfg.h"
@@ -153,6 +154,7 @@ MM_CopyForwardScheme::MM_CopyForwardScheme(MM_EnvironmentVLHGC *env, MM_HeapRegi
 	, _heapBase(NULL)
 	, _heapTop(NULL)
 	, _abortFlag(false)
+	, _leaking(false)
 	, _abortInProgress(false)
 	, _regionCountCannotBeEvacuated(0)
 	, _regionCountReservedNonEvacuated(0)
@@ -299,7 +301,8 @@ MM_CopyForwardScheme::initialize(MM_EnvironmentVLHGC *env)
 	/* Note: this value should divide evenly into the arraylet leaf size so that each chunk
 	 * is a block of contiguous memory
 	 */
-	_arraySplitSize = 4096;
+//	_arraySplitSize = 4096;
+	_arraySplitSize = 512;
 	
 	/* allocate the per-thread, per-compact-group data structures */
 	Assert_MM_true(0 != _extensions->gcThreadCount);
@@ -1358,6 +1361,15 @@ MM_CopyForwardScheme::copyAndForwardPointerArray(MM_EnvironmentVLHGC *env, MM_Al
 		void *element2 = (void *)((startIndex << PACKET_ARRAY_SPLIT_SHIFT) | PACKET_ARRAY_SPLIT_TAG | PACKET_ARRAY_SPLIT_CURRENT_UNIT_ONLY_TAG);
 		Assert_MM_true(startIndex == (((UDATA)element2) >> PACKET_ARRAY_SPLIT_SHIFT));
 		env->_workStack.push(env, element1, element2);
+		/* for debug only */
+		env->_workStack.flushOutputPacket(env);
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "copyAndForwardPointerArray push only the current split unit startIndex=%zu, arrayPtr=%p, env=%p\n", startIndex, arrayPtr, env);
+//		UDATA pause = (UDATA)(rand() % 10);
+//		if (0 == (pause % 2)) { pause = 0;}
+//		if (pause) {
+//			omrthread_sleep(pause);
+//		}
 	}
 
 	return success;
@@ -1414,6 +1426,7 @@ void
 MM_CopyForwardScheme::mainSetupForCopyForward(MM_EnvironmentVLHGC *env)
 {
 	clearAbortFlag();
+	_leaking = true;
 	_abortInProgress = false;
 	_clearableProcessingStarted = false;
 	_failedToExpand = false;
@@ -2442,11 +2455,16 @@ MM_CopyForwardScheme::createNextSplitArrayWorkUnit(MM_EnvironmentVLHGC *env, J9I
 				noEvacuation = isObjectInNoEvacuationRegions(env, (J9Object *) arrayPtr);
 			}
 
-			if (_abortInProgress || noEvacuation) {
+			if (abortFlagRaised() || noEvacuation) {
+//			if (_abortInProgress || noEvacuation) {
 				if (!currentSplitUnitOnly) {
 					/* work stack driven */
 					env->_workStack.push(env, (void *)arrayPtr, (void *)((nextIndex << PACKET_ARRAY_SPLIT_SHIFT) | PACKET_ARRAY_SPLIT_TAG));
 					env->_workStack.flushOutputPacket(env);
+					if (abortFlagRaised() && !(_abortInProgress || noEvacuation)) {
+						PORT_ACCESS_FROM_ENVIRONMENT(env);
+						j9tty_printf(PORTLIB, "createNextSplitArrayWorkUnit case1 nextIndex=%zu, arrayPtr=%p, env=%p\n", nextIndex, arrayPtr, env);
+					}
 #if defined(J9MODRON_TGC_PARALLEL_STATISTICS)
 					env->_copyForwardStats._markedArraysSplit += 1;
 #endif /* J9MODRON_TGC_PARALLEL_STATISTICS */
@@ -2468,6 +2486,8 @@ MM_CopyForwardScheme::createNextSplitArrayWorkUnit(MM_EnvironmentVLHGC *env, J9I
 					Assert_MM_true(nextIndex == (((UDATA)element2) >> PACKET_ARRAY_SPLIT_SHIFT));
 					env->_workStack.push(env, element1, element2);
 					env->_workStack.flushOutputPacket(env);
+					PORT_ACCESS_FROM_ENVIRONMENT(env);
+					j9tty_printf(PORTLIB, "createNextSplitArrayWorkUnit case2 _abortFlag nextIndex=%zu, arrayPtr=%p, env=%p\n", nextIndex, arrayPtr, env);
 #if defined(J9MODRON_TGC_PARALLEL_STATISTICS)
 					env->_copyForwardStats._markedArraysSplit += 1;
 #endif /* J9MODRON_TGC_PARALLEL_STATISTICS */
@@ -2646,7 +2666,8 @@ MM_CopyForwardScheme::isAnyScanCacheWorkAvailable()
 bool
 MM_CopyForwardScheme::isAnyScanWorkAvailable(MM_EnvironmentVLHGC *env)
 {
-	return (isAnyScanCacheWorkAvailable() || ((0 != _regionCountCannotBeEvacuated) && !_abortInProgress && !abortFlagRaised() && env->_workStack.inputPacketAvailableFromWorkPackets(env)));
+	return (isAnyScanCacheWorkAvailable() || ((0 != _regionCountCannotBeEvacuated) && !abortFlagRaised() && env->_workStack.inputPacketAvailableFromWorkPackets(env)));
+//	return (isAnyScanCacheWorkAvailable() || ((0 != _regionCountCannotBeEvacuated) && !_abortInProgress && env->_workStack.inputPacketAvailableFromWorkPackets(env)));
 }
 
 MM_CopyScanCacheVLHGC *
@@ -2780,7 +2801,26 @@ MM_CopyForwardScheme::getNextWorkUnitNoWait(MM_EnvironmentVLHGC *env, UDATA pref
 			nextNode = (nextNode + 1) % nodeLists;
 		}
 	}
-	if (SCAN_REASON_NONE == ret && (0 != _regionCountCannotBeEvacuated) && !_abortInProgress && !abortFlagRaised()) {
+//	if (SCAN_REASON_NONE == ret && (0 != _regionCountCannotBeEvacuated) && !_abortInProgress && !abortFlagRaised()) {
+	if ((SCAN_REASON_NONE == ret) && !_abortInProgress && (((0 != _regionCountCannotBeEvacuated) && !abortFlagRaised()) || (_leaking && (0 == _regionCountCannotBeEvacuated) && abortFlagRaised()))) {
+//		UDATA pause = (UDATA)(rand() % 2);
+//		if (pause) {
+//			omrthread_sleep(pause);
+//		}
+		if (abortFlagRaised()) {
+			_leaking = false;
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "getNextWorkUnitNoWait abortFlagRaised()=%zu, env=%p\n", abortFlagRaised(), env);
+		}
+//		PORT_ACCESS_FROM_ENVIRONMENT(env);
+//		j9tty_printf(PORTLIB, "getNextWorkUnitNoWait env=%p start\n", env);
+//		for(UDATA cnt=0; cnt<20000; cnt++) {
+//			if (abortFlagRaised()) {
+//				j9tty_printf(PORTLIB, "getNextWorkUnitNoWait abortFlagRaised()=%zu, env=%p\n", abortFlagRaised(), env);
+//				break;
+//			}
+//		}
+//		j9tty_printf(PORTLIB, "getNextWorkUnitNoWait env=%p end\n", env);
 		if (env->_workStack.retrieveInputPacket(env)) {
 			ret = SCAN_REASON_PACKET;
 		}
@@ -2906,7 +2946,12 @@ MM_CopyForwardScheme::updateScanStats(MM_EnvironmentVLHGC *env, J9Object *object
 		noEvacuation = isObjectInNoEvacuationRegions(env, objectPtr);
 	}
 
-	if ((_abortInProgress || noEvacuation) && isObjectInEvacuateMemory(objectPtr)) {
+	if (SCAN_REASON_DIRTY_CARD == reason) {
+		UDATA objectSize = _extensions->objectModel.getSizeInBytesWithHeader(objectPtr);
+		env->_copyForwardStats._objectsCardClean += 1;
+		env->_copyForwardStats._bytesCardClean += objectSize;
+	} else if (abortFlagRaised() || noEvacuation) {
+//	if ((_abortInProgress || noEvacuation || abortFlagRaised()) && isObjectInEvacuateMemory(objectPtr)) {
 		UDATA objectSize = _extensions->objectModel.getSizeInBytesWithHeader(objectPtr);
 		Assert_MM_false(SCAN_REASON_DIRTY_CARD == reason);
 		MM_HeapRegionDescriptorVLHGC * region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(objectPtr);
@@ -2922,10 +2967,10 @@ MM_CopyForwardScheme::updateScanStats(MM_EnvironmentVLHGC *env, J9Object *object
 			env->_copyForwardCompactGroups[compactGroup]._nonEdenStats._scannedObjects += 1;
 			env->_copyForwardCompactGroups[compactGroup]._nonEdenStats._scannedBytes += objectSize;
 		}
-	} else if (SCAN_REASON_DIRTY_CARD == reason) {
-		UDATA objectSize = _extensions->objectModel.getSizeInBytesWithHeader(objectPtr);
-		env->_copyForwardStats._objectsCardClean += 1;
-		env->_copyForwardStats._bytesCardClean += objectSize;
+//	} else if (SCAN_REASON_DIRTY_CARD == reason) {
+//		UDATA objectSize = _extensions->objectModel.getSizeInBytesWithHeader(objectPtr);
+//		env->_copyForwardStats._objectsCardClean += 1;
+//		env->_copyForwardStats._bytesCardClean += objectSize;
 	}
 
 	/* else:
@@ -2946,17 +2991,29 @@ MM_CopyForwardScheme::scanPointerArrayObjectSlots(MM_EnvironmentVLHGC *env, MM_A
 		noEvacuation = isObjectInNoEvacuationRegions(env, (J9Object *) arrayPtr);
 	}
 	
-	if (_abortInProgress || noEvacuation) {
+//	if (_abortInProgress || noEvacuation) {
+	if (SCAN_REASON_PACKET == reason) {
 		UDATA peekValue = (UDATA)env->_workStack.peek(env);
 		if ((PACKET_ARRAY_SPLIT_TAG == (peekValue & PACKET_ARRAY_SPLIT_TAG))) {
 			UDATA workItem = (UDATA)env->_workStack.pop(env);
 			index = workItem >> PACKET_ARRAY_SPLIT_SHIFT;
 			currentSplitUnitOnly = ((PACKET_ARRAY_SPLIT_CURRENT_UNIT_ONLY_TAG == (peekValue & PACKET_ARRAY_SPLIT_CURRENT_UNIT_ONLY_TAG)));
+			if (abortFlagRaised() && !(_abortInProgress || noEvacuation)) {
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "scanPointerArrayObjectSlots index=%zu, arrayPtr=%p, noEvacuation=%zu, _abortInProgress=%zu, env=%p\n", index, arrayPtr, noEvacuation, _abortInProgress, env);
+			}
 		}
-	} else {
+	}
+//	else {
+	if (0 == index) {
 		/* make sure we only record stats for the object once -- note that this means we might
 		 * attribute the scanning cost to the wrong thread, but that's not really important
 		 */
+//		if (SCAN_REASON_PACKET == reason) {
+//			UDATA peekValue = (UDATA)env->_workStack.peek(env);
+//			PORT_ACCESS_FROM_ENVIRONMENT(env);
+//			j9tty_printf(PORTLIB, "scanPointerArrayObjectSlots SCAN_REASON_PACKET peekValue=%p, arrayPtr=%p, env=%p\n", peekValue, arrayPtr, env);
+//		}
 		updateScanStats(env, (J9Object*)arrayPtr, reason);
 	}
 	
