@@ -30,7 +30,7 @@
 #include "ParallelSweepChunk.hpp"
 #include "SweepPoolManagerVLHGC.hpp"
 #include "SweepPoolState.hpp"
-
+#include "GCExtensions.hpp"
 
 MM_SweepPoolManagerVLHGC *
 MM_SweepPoolManagerVLHGC::newInstance(MM_EnvironmentBase *env)
@@ -50,6 +50,8 @@ MM_SweepPoolManagerVLHGC::newInstance(MM_EnvironmentBase *env)
 bool
 MM_SweepPoolManagerVLHGC::initialize(MM_EnvironmentBase *env)
 {
+	MM_GCExtensions* extensions = MM_GCExtensions::getExtensions(env);
+	_minimumFreeSize = OMR_MAX((extensions->minimumFreeSizeForSurvivor, (extensions->getMinimumFreeEntrySize());
 	return MM_SweepPoolManager::initialize(env);
 }
 
