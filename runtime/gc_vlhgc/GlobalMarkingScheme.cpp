@@ -864,6 +864,12 @@ MM_GlobalMarkingScheme::scanObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr
 		Assert_MM_true(SCAN_REASON_PACKET == reason);
 	} else {
 		J9Class* clazz = J9GC_J9OBJECT_CLAZZ(objectPtr, env);
+		if (0== (UDATA)clazz) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			MM_HeapRegionDescriptorVLHGC *region = (MM_HeapRegionDescriptorVLHGC *)_heapRegionManager->tableDescriptorForAddress(objectPtr);
+			j9tty_printf(PORTLIB,"objectPtr=%p region=%p, env=%p, _extensions=%p\n", objectPtr, region, env, _extensions);
+			Assert_MM_true(false);
+		}
 		Assert_MM_mustBeClass(clazz);
 		switch(_extensions->objectModel.getScanType(clazz)) {
 			case GC_ObjectModel::SCAN_MIXED_OBJECT_LINKED:

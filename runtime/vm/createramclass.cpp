@@ -2201,7 +2201,9 @@ nativeOOM:
 			&& (0 == J9ROMCLASS_IS_PRIMITIVE_OR_ARRAY(romClass))
 			&& J9_ARE_NO_BITS_SET(options, J9_FINDCLASS_FLAG_ANON)
 		) {
-			if (hashClassTableAtPut(vmThread, classLoader, J9UTF8_DATA(className), J9UTF8_LENGTH(className), state->ramClass)) {
+//			if (hashClassTableAtPut(vmThread, classLoader, J9UTF8_DATA(className), J9UTF8_LENGTH(className), state->ramClass)) {
+			static int x = 1;
+			if (((0 == (x++ % 100)) && !hotswapping) || hashClassTableAtPut(vmThread, classLoader, J9UTF8_DATA(className), J9UTF8_LENGTH(className), state->ramClass)) {
 				if (hotswapping) {
 					omrthread_monitor_exit(javaVM->classTableMutex);
 					state->ramClass = NULL;
