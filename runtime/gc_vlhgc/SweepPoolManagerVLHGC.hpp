@@ -40,6 +40,7 @@ class MM_MemoryPool;
 class MM_SweepPoolManagerVLHGC : public MM_SweepPoolManagerAddressOrderedList
 {
 private:
+	uintptr_t _minimumFreeSize;
 protected:
 public:
 
@@ -51,6 +52,7 @@ protected:
 	 * if the size of free memory is changed, oldAddrTop will be set.
 	 */
 	MMINLINE virtual void addFreeMemoryPostProcess(MM_EnvironmentBase *env, MM_MemoryPoolAddressOrderedListBase *memoryPool, void *addrBase, void *addrTop, bool needSync, void *oldAddrTop = NULL);
+	MMINLINE virtual bool isEligibleForFreeMemory(MM_EnvironmentBase *env, MM_MemoryPoolAddressOrderedListBase *memoryPool, void* address, uintptr_t size);
 
 public:
 	static MM_SweepPoolManagerVLHGC *newInstance(MM_EnvironmentBase *env);
@@ -60,6 +62,7 @@ public:
 	 */
 	MM_SweepPoolManagerVLHGC(MM_EnvironmentBase *env)
 		: MM_SweepPoolManagerAddressOrderedList(env)
+		, _minimumFreeSize(0)
 	{
 		_typeId = __FUNCTION__;
 	}
