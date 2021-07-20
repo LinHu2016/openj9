@@ -69,6 +69,8 @@ public:
 		bool _requiresPhantomReferenceProcessing; /**< Set to true by main thread if this region must be processed during parallel phantom reference processing */
 		bool _survivor;
 		bool _freshSurvivor;
+		uintptr_t _lastGcIDForReclaim;  /**< last gc cycle, which reclaim(sweep/compact/free) the region. */
+		uintptr_t _TLHRemainderBytes;
 		MM_HeapRegionDescriptorVLHGC *_nextRegion;  /**< Region list link for compact group resource management during a copyforward operation */
 		MM_HeapRegionDescriptorVLHGC *_previousRegion;  /**< Region list link for compact group resource management during a copyforward operation */
 	} _copyForwardData;
@@ -271,6 +273,21 @@ public:
 	 * @return True if region is in survivor set (there is explicit flag)
 	 */
 	MMINLINE bool isSurvivorRegion() { return _copyForwardData._survivor; }
+
+	MMINLINE void incrementTLHRemainderBytes(uintptr_t bytes)
+	{
+		MM_AtomicOperations::add(&_copyForwardData._TLHRemainderBytes, bytes);
+	}
+
+	MMINLINE uintptr_t getFreeMemoryAndDarkMatterBytes()
+	{
+		return getMemoryPool()->getFreeMemoryAndDarkMatterBytes() + _copyForwardData._TLHRemainderBytes;
+	}
+
+	MMINLINE uintptr_t getActualFreeMemorySize()
+	{
+		return getMemoryPool()->getActualFreeMemorySize() +  _copyForwardData._TLHRemainderBytes;
+	}
 
 	/**
 	 * Allocate supporting resources (large enough to justify not to preallocate them for all regions at the startup) when region is being committed.

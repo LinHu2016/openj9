@@ -108,7 +108,8 @@ MM_CopyForwardDelegate::estimateRequiredSurvivorBytes(MM_EnvironmentVLHGC *env)
 		if (region->_markData._shouldMark) {
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 			double survivalRate = persistentStats[compactGroup]._historicalSurvivalRate;
-			UDATA freeMemory =  region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//			UDATA freeMemory =  region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+			UDATA freeMemory =  region->getFreeMemoryAndDarkMatterBytes();
 			estimatedSurvivorRequired += (UDATA)((double)(region->getSize() - freeMemory) * survivalRate);
 		}
 	}

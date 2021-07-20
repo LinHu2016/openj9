@@ -2243,7 +2243,8 @@ MM_IncrementalGenerationalGC::exportStats(MM_EnvironmentVLHGC *env, MM_Collectio
 						usedMemory = regionSize - size;
 						allocateEdenTotal += regionSize;
 					} else {
-						usedMemory = regionSize - memoryPool->getFreeMemoryAndDarkMatterBytes();
+//						usedMemory = regionSize - memoryPool->getFreeMemoryAndDarkMatterBytes();
+						usedMemory = regionSize - region->getFreeMemoryAndDarkMatterBytes();
 					}
 				} else {
 					Assert_MM_true(region->isArrayletLeaf());

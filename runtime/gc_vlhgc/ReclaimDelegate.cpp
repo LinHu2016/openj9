@@ -44,6 +44,7 @@
 #include "EnvironmentVLHGC.hpp"
 #include "GlobalAllocationManagerTarok.hpp"
 #include "InterRegionRememberedSet.hpp"
+#include "IncrementalGenerationalGC.hpp"
 #include "MemorySubSpace.hpp"
 #include "HeapRegionDescriptorVLHGC.hpp"
 #include "HeapRegionIteratorVLHGC.hpp"
@@ -218,7 +219,8 @@ MM_ReclaimDelegate::tagRegionsBeforeCompactWithWorkGoal(MM_EnvironmentVLHGC *env
 
 			MM_MemoryPool *memoryPool = region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
-			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+//			UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+			UDATA freeMemory = region->getFreeMemoryAndDarkMatterBytes();
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 			Assert_MM_true(compactGroup < _compactGroupMaxCount);
 
@@ -238,6 +240,9 @@ MM_ReclaimDelegate::tagRegionsBeforeCompactWithWorkGoal(MM_EnvironmentVLHGC *env
 			} else {
 				Assert_MM_true(0 == region->_criticalRegionsInUse);
 				region->_compactData._shouldCompact = true;
+
+				region->_copyForwardData._lastGcIDForReclaim = MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount;
+				region->_copyForwardData._TLHRemainderBytes = 0;
 			}
 			Assert_MM_true(region->_defragmentationTarget);
 			/* Collected regions are no longer targets for defragmentation until next GMP */
@@ -279,7 +284,8 @@ MM_ReclaimDelegate::estimateReclaimableRegions(MM_EnvironmentVLHGC *env, double 
 			if (region->hasValidMarkMap() && region->getRememberedSetCardList()->isAccurate()) {
 				MM_MemoryPool *memoryPool = region->getMemoryPool();
 				Assert_MM_true(NULL != memoryPool);
-				UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+//				UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+				UDATA freeMemory = region->getFreeMemoryAndDarkMatterBytes();
 			
 				/* keep track of the recoverable memory in each compact group, since we don't compact between groups */
 				UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
@@ -335,8 +341,10 @@ compareEmptinessFunc(const void *element1, const void *element2)
 	MM_HeapRegionDescriptorVLHGC *region1 = *(MM_HeapRegionDescriptorVLHGC **)element1;
 	MM_HeapRegionDescriptorVLHGC *region2 = *(MM_HeapRegionDescriptorVLHGC **)element2;
 
-	UDATA emptiness1 = region1->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
-	UDATA emptiness2 = region2->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//	UDATA emptiness1 = region1->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//	UDATA emptiness2 = region2->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+	UDATA emptiness1 = region1->getFreeMemoryAndDarkMatterBytes();
+	UDATA emptiness2 = region2->getFreeMemoryAndDarkMatterBytes();
 
 	if (emptiness1 == emptiness2) {
 		 return 0;
@@ -427,7 +435,8 @@ MM_ReclaimDelegate::calculateOptimalEmptinessRegionThreshold(MM_EnvironmentVLHGC
 			}
 
 			MM_HeapRegionDescriptorVLHGC * region = _regionsSortedByEmptinessArray[regionSortedByEmptinessIndex++];
-			freeAndDarkMatterBytes = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//			freeAndDarkMatterBytes = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+			freeAndDarkMatterBytes = region->getFreeMemoryAndDarkMatterBytes();
 			bytesRecovered += freeAndDarkMatterBytes;
 			defragmentBytesCopyForwardedPerGMP += (regionSize - freeAndDarkMatterBytes);
 		}
@@ -481,7 +490,7 @@ MM_ReclaimDelegate::runGlobalSweepBeforePGC(MM_EnvironmentVLHGC *env, MM_Allocat
 }
 
 void 
-MM_ReclaimDelegate::untagRegionsAfterSweep()
+MM_ReclaimDelegate::untagRegionsAfterSweep(MM_EnvironmentVLHGC *env)
 {
 	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
@@ -490,6 +499,9 @@ MM_ReclaimDelegate::untagRegionsAfterSweep()
 			/* the region may still be in use or it may have been recycled during sweep */
 			Assert_MM_true(region->hasValidMarkMap() || region->isFreeOrIdle());
 			region->_sweepData._alreadySwept = true;
+
+			region->_copyForwardData._lastGcIDForReclaim = MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount;
+			region->_copyForwardData._TLHRemainderBytes = 0;
 		}
 	}
 }
@@ -526,7 +538,7 @@ MM_ReclaimDelegate::performAtomicSweep(MM_EnvironmentVLHGC *env, MM_AllocateDesc
 
 	MM_CompactGroupPersistentStats::updateStatsAfterSweep(env, persistentStats);
 
-	untagRegionsAfterSweep();
+	untagRegionsAfterSweep(env);
 }
 
 void
@@ -581,7 +593,8 @@ MM_ReclaimDelegate::deriveCompactScore(MM_EnvironmentVLHGC *env)
 			} else {
 				UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 				MM_MemoryPool *memoryPool = region->getMemoryPool();
-				UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+//				UDATA freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+				UDATA freeMemory = region->getFreeMemoryAndDarkMatterBytes();
 
 				if (region->_markData._shouldMark) {
 					/* Skipping regions that are already selected by DCS */
@@ -643,7 +656,8 @@ MM_ReclaimDelegate::deriveCompactScore(MM_EnvironmentVLHGC *env)
 	/* Walk the sorted list bottom up, and remove regions that do not contribute to recovering a full free region */
 	for (IDATA i = _currentSortedRegionCount - 1; i >= 0; i--) {
 		region = _regionSortedByCompactScore[i];
-		UDATA freeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//		UDATA freeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+		UDATA freeMemory = region->getFreeMemoryAndDarkMatterBytes();
 
 		UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 		Assert_MM_true(compactGroup < _compactGroupMaxCount);
@@ -717,6 +731,7 @@ MM_ReclaimDelegate::runReclaimCompleteSweep(MM_EnvironmentVLHGC *env, MM_Allocat
 	UDATA freeBefore = globalAllocationManager->getFreeRegionCount();
 	Trc_MM_ReclaimDelegate_runReclaimComplete_freeBeforeReclaim(env->getLanguageVMThread(), freeBefore);
 	performAtomicSweep(env, allocDescription, activeSubSpace, gcCode);
+
 	UDATA freeAfterSweep = globalAllocationManager->getFreeRegionCount();
 	Trc_MM_ReclaimDelegate_runReclaimComplete_freeAfterSweep(env->getLanguageVMThread(), freeAfterSweep);
 }

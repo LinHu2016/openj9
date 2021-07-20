@@ -594,8 +594,9 @@ MM_SchedulingDelegate::estimateMacroDefragmentationWork(MM_EnvironmentVLHGC *env
 void
 MM_SchedulingDelegate::updateCurrentMacroDefragmentationWork(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region)
 {
-	MM_MemoryPool *memoryPool = region->getMemoryPool();
-	uintptr_t freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+//	MM_MemoryPool *memoryPool = region->getMemoryPool();
+//	uintptr_t freeMemory = memoryPool->getFreeMemoryAndDarkMatterBytes();
+	uintptr_t freeMemory = region->getFreeMemoryAndDarkMatterBytes();
 	uintptr_t liveData = _regionManager->getRegionSize() - freeMemory;
 
 	double bytesDiscardedPerByteCopied = (_averageCopyForwardBytesCopied > 0.0) ? (_averageCopyForwardBytesDiscarded / _averageCopyForwardBytesCopied) : 0.0;
@@ -625,7 +626,8 @@ MM_SchedulingDelegate::updateLiveBytesAfterPartialCollect()
 			MM_MemoryPool *memoryPool = region->getMemoryPool();
 			Assert_MM_true(NULL != memoryPool);
 			_liveSetBytesAfterPartialCollect += region->getSize();
-			_liveSetBytesAfterPartialCollect -= memoryPool->getActualFreeMemorySize();
+//			_liveSetBytesAfterPartialCollect -= memoryPool->getActualFreeMemorySize();
+			_liveSetBytesAfterPartialCollect -= region->getActualFreeMemorySize();
 			_liveSetBytesAfterPartialCollect -= memoryPool->getDarkMatterBytes();
 		} else if (region->isArrayletLeaf()) {
 			if (_extensions->objectModel.isObjectArray(region->_allocateData.getSpine())) {
@@ -1105,7 +1107,8 @@ MM_SchedulingDelegate::calculatePGCCompactionRate(MM_EnvironmentVLHGC *env, uint
 		region->_defragmentationTarget = false;
 		if (region->containsObjects()) {
 			Assert_MM_true(region->_sweepData._alreadySwept);
-			uintptr_t freeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//			uintptr_t freeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+			uintptr_t freeMemory = region->getFreeMemoryAndDarkMatterBytes();
 			if (!region->getRememberedSetCardList()->isAccurate()) {
 				/* Overflowed regions or those that RSCL is being rebuilt will not be compacted */
 				nonCollectibleRegions += 1;
@@ -1219,6 +1222,10 @@ MM_SchedulingDelegate::copyForwardCompleted(MM_EnvironmentVLHGC *env)
 	_averageSurvivorSetRegionCount = (_averageSurvivorSetRegionCount * historicWeight) + ((double)survivorSetRegionCount * (1.0 - historicWeight));
 	_averageCopyForwardRate = (_averageCopyForwardRate * historicWeight) + (copyForwardRate * (1.0 - historicWeight));
 
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB, "copyForwardCompleted _TLHRemainderCount=%zu, _preparedRemainderBytes=%zu, _unusedPreservedRemainderBytes=%zu, _preservedRemainderBytes=%zu\n",
+//			copyForwardStats->_TLHRemainderCount, copyForwardStats->_preparedRemainderBytes, copyForwardStats->_unusedPreservedRemainderBytes, copyForwardStats->_preservedRemainderBytes);
+//
 	Trc_MM_SchedulingDelegate_copyForwardCompleted_efficiency(
 		env->getLanguageVMThread(),
 		bytesCopied,

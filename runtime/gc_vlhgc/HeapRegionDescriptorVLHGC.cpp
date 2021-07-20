@@ -82,6 +82,8 @@ MM_HeapRegionDescriptorVLHGC::initialize(MM_EnvironmentBase *env, MM_HeapRegionM
 	_copyForwardData._requiresPhantomReferenceProcessing = false;
 	_copyForwardData._survivor = false;
 	_copyForwardData._freshSurvivor = false;
+	_copyForwardData._lastGcIDForReclaim = MM_GCExtensions::getExtensions(env)->globalVLHGCStats.gcCount;
+	_copyForwardData._TLHRemainderBytes = 0;
 	_copyForwardData._nextRegion = NULL;
 	_copyForwardData._previousRegion = NULL;
 
@@ -157,7 +159,8 @@ UDATA
 MM_HeapRegionDescriptorVLHGC::getProjectedReclaimableBytes() 
 {
 	UDATA regionSize = _extensions->regionSize;
-	UDATA consumedBytes = regionSize - getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//	UDATA consumedBytes = regionSize - getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+	UDATA consumedBytes = regionSize - getFreeMemoryAndDarkMatterBytes();
 	UDATA projectedReclaimableBytes = consumedBytes - _projectedLiveBytes;
 	return projectedReclaimableBytes;
 }

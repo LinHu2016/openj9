@@ -185,7 +185,8 @@ MM_HeapRegionManagerVLHGC::getHeapMemorySnapshot(MM_GCExtensionsBase *extensions
 			if (region->containsObjects()) {
 				MM_MemoryPool *memoryPool = region->getMemoryPool();
 				Assert_MM_true(NULL != memoryPool);
-				free = memoryPool->getActualFreeMemorySize();
+//				free = memoryPool->getActualFreeMemorySize();
+				free = region->getActualFreeMemorySize();
 			} else {
 				Assert_MM_true(region->isArrayletLeaf());
 				free = 0;

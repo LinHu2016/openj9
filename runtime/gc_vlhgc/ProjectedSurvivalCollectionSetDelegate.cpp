@@ -206,7 +206,8 @@ MM_ProjectedSurvivalCollectionSetDelegate::selectRegion(MM_EnvironmentVLHGC *env
 	UDATA regionSize = _regionManager->getRegionSize();
 	UDATA tableIndex = _regionManager->mapDescriptorToRegionTableIndex(region);
 	UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
-	UDATA freeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//	UDATA freeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+	UDATA freeMemory = region->getFreeMemoryAndDarkMatterBytes();
 	UDATA projectedFreeMemoryAfterGC = regionSize - region->_projectedLiveBytes;
 	UDATA projectedReclaimableBytes = region->getProjectedReclaimableBytes();
 
@@ -534,7 +535,8 @@ MM_ProjectedSurvivalCollectionSetDelegate::rateOfReturnCalculationBeforeSweep(MM
 				if(!region->_sweepData._alreadySwept) {
 					stats->_reclaimStats._reclaimableRegionCountBefore += 1;
 
-					stats->_reclaimStats._regionBytesFreeBefore += memoryPool->getActualFreeMemorySize();
+//					stats->_reclaimStats._regionBytesFreeBefore += memoryPool->getActualFreeMemorySize();
+					stats->_reclaimStats._regionBytesFreeBefore += region->getActualFreeMemorySize();
 					stats->_reclaimStats._regionDarkMatterBefore +=  memoryPool->getDarkMatterBytes();
 				}
 				if(!region->getRememberedSetCardList()->isAccurate()) {

@@ -222,7 +222,8 @@ MM_CollectionSetDelegate::selectRegionsForBudget(MM_EnvironmentVLHGC *env, UDATA
 
 			UDATA tableIndex = _regionManager->mapDescriptorToRegionTableIndex(regionSelectionPtr);
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, regionSelectionPtr);
-			UDATA freeMemory = regionSelectionPtr->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//			UDATA freeMemory = regionSelectionPtr->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+			UDATA freeMemory = regionSelectionPtr->getFreeMemoryAndDarkMatterBytes();
 			_extensions->compactGroupPersistentStats[compactGroup]._regionsInRegionCollectionSetForPGC += 1;
 
 			Trc_MM_CollectionSetDelegate_selectRegionsForBudget(env->getLanguageVMThread(), tableIndex, compactGroup, (100 * freeMemory)/regionSize, (UDATA) 0, (UDATA) 0);
@@ -533,7 +534,8 @@ MM_CollectionSetDelegate::rateOfReturnCalculationBeforeSweep(MM_EnvironmentVLHGC
 				if(!region->_sweepData._alreadySwept) {
 					stats->_reclaimStats._reclaimableRegionCountBefore += 1;
 
-					stats->_reclaimStats._regionBytesFreeBefore += memoryPool->getActualFreeMemorySize();
+//					stats->_reclaimStats._regionBytesFreeBefore += memoryPool->getActualFreeMemorySize();
+					stats->_reclaimStats._regionBytesFreeBefore += region->getActualFreeMemorySize();
 					stats->_reclaimStats._regionDarkMatterBefore +=  memoryPool->getDarkMatterBytes();
 				}
 				if(!region->getRememberedSetCardList()->isAccurate()) {

@@ -482,7 +482,13 @@ MM_CompactGroupPersistentStats::updateStatsBeforeCopyForward(MM_EnvironmentVLHGC
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 
 			if (!persistentStats[compactGroup]._statsHaveBeenUpdatedThisCycle) {
-				UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//				UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+				UDATA completeFreeMemory = region->getFreeMemoryAndDarkMatterBytes();
+//				if (completeFreeMemory > regionSize) {
+//					PORT_ACCESS_FROM_ENVIRONMENT(env);
+//					j9tty_printf(PORTLIB, "updateStatsBeforeCopyForward env=%p, region=%p, logicalAge=%zu, completeFreeMemory=%zu, AdjustedBytesForCardAlignment=%zu, DarkMatterBytes=%zu, freeSize=%zu\n",
+//						env, region, region->getLogicalAge(), completeFreeMemory, ((MM_MemoryPoolAddressOrderedList *)region->getMemoryPool())->getAdjustedBytesForCardAlignment(), region->getMemoryPool()->getDarkMatterBytes(), region->getMemoryPool()->getActualFreeMemorySize());
+//				}
 				Assert_MM_true(completeFreeMemory <= regionSize);
 				UDATA measuredLiveBytes = regionSize - completeFreeMemory;
 				UDATA projectedLiveBytes = region->_projectedLiveBytes;
@@ -536,7 +542,8 @@ MM_CompactGroupPersistentStats::updateStatsBeforeSweep(MM_EnvironmentVLHGC *env,
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 
 			if (!persistentStats[compactGroup]._statsHaveBeenUpdatedThisCycle) {
-				UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//				UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+				UDATA completeFreeMemory = region->getFreeMemoryAndDarkMatterBytes();
 				Assert_MM_true(completeFreeMemory <= regionSize);
 				UDATA measuredLiveBytes = regionSize - completeFreeMemory;
 				UDATA projectedLiveBytes = region->_projectedLiveBytes;
@@ -593,7 +600,8 @@ MM_CompactGroupPersistentStats::updateStatsBeforeCompact(MM_EnvironmentVLHGC *en
 			UDATA compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 
 			if (!persistentStats[compactGroup]._statsHaveBeenUpdatedThisCycle) {
-				UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//				UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+				UDATA completeFreeMemory = region->getFreeMemoryAndDarkMatterBytes();
 				Assert_MM_true(completeFreeMemory <= regionSize);
 				UDATA measuredLiveBytes = regionSize - completeFreeMemory;
 				UDATA projectedLiveBytes = region->_projectedLiveBytes;
@@ -647,7 +655,8 @@ MM_CompactGroupPersistentStats::initProjectedLiveBytes(MM_EnvironmentVLHGC *env)
 	while (NULL != (region = regionIterator.nextRegion())) {
 		/* UDATA_MAX has a special meaning of 'uninitialized' */
 		if(region->containsObjects() && (UDATA_MAX == region->_projectedLiveBytes)) {
-			UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+//			UDATA completeFreeMemory = region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
+			UDATA completeFreeMemory = region->getFreeMemoryAndDarkMatterBytes();
 			Assert_MM_true(completeFreeMemory <= regionSize);
 			UDATA measuredLiveBytes = regionSize - completeFreeMemory;
 			region->_projectedLiveBytes = measuredLiveBytes;
