@@ -79,6 +79,7 @@ class MM_IdleGCManager;
 #define MAXIMUM_SURVIVOR_THRESHOLD 			8192
 #define MINIMUM_SURVIVOR_MINIMUM_FREESIZE 	512
 #define MINIMUM_SURVIVOR_THRESHOLD 			512
+#define DEFAULT_REMAINDER_RECYCLE_THRESHOLD	2048
 
 /**
  * @todo Provide class documentation
@@ -193,6 +194,8 @@ public:
 	double initialRAMPercent; /**< Value of -XX:InitialRAMPercentage specified by the user */
 	UDATA minimumFreeSizeForSurvivor; /**< minimum free size can be reused by collector as survivor, for balanced GC only */
 	UDATA freeSizeThresholdForSurvivor; /**< if average freeSize(freeSize/freeCount) of the region is smaller than the Threshold, the region would not be reused by collector as survivor, for balanced GC only */
+	UDATA tlhRemainderRecycleThreshold;
+	bool  preserveRemainders;
 protected:
 private:
 protected:
@@ -325,6 +328,8 @@ public:
 		, initialRAMPercent(0.0) /* this would get overwritten by user specified value */
 		, minimumFreeSizeForSurvivor(DEFAULT_SURVIVOR_MINIMUM_FREESIZE)
 		, freeSizeThresholdForSurvivor(DEFAULT_SURVIVOR_THRESHOLD)
+		, tlhRemainderRecycleThreshold(DEFAULT_REMAINDER_RECYCLE_THRESHOLD)
+		, preserveRemainders(false)
 	{
 		_typeId = __FUNCTION__;
 	}

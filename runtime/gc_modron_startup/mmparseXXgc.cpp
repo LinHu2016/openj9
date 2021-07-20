@@ -1484,6 +1484,23 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			continue;
 		}
 
+		if (try_scan(&scan_start, "tlhRemainderRecycleThreshold=")) {
+			UDATA size = 0;
+			if(!scan_udata_helper(vm, &scan_start, &size, "tlhRemainderRecycleThreshold=")) {
+				returnValue = JNI_EINVAL;
+				break;
+			}
+
+			extensions->tlhRemainderRecycleThreshold = size;
+			continue;
+		}
+
+		if (try_scan(&scan_start, "preserveRemainders")) {
+
+			extensions->preserveRemainders = true;
+			continue;
+		}
+
 		if (try_scan(&scan_start, "stringDedupPolicy=")) {
 			if (try_scan(&scan_start, "disabled")) {
 				extensions->stringDedupPolicy = MM_GCExtensions::J9_JIT_STRING_DEDUP_POLICY_DISABLED;

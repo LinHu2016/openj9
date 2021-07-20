@@ -659,6 +659,9 @@ public:
 	
 	double getAvgEdenSurvivalRateCopyForward(MM_EnvironmentVLHGC *env) { return _edenSurvivalRateCopyForward; }
 
+	/* when getCompactedToFreeRatio return 0 it is the just case for first PCG or first PGC after Global */
+	double getCompactedToFreeRatio() { return _bytesCompactedToFreeBytesRatio; }
+
 	MM_SchedulingDelegate(MM_EnvironmentVLHGC *env, MM_HeapRegionManager *manager);
 };
 
