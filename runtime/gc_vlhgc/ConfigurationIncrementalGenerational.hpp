@@ -109,15 +109,18 @@ private:
 	static UDATA
 	calculateDefaultRegionSize(MM_EnvironmentBase *env)
 	{
-		UDATA regionSize = 0;
-
-		MM_GCExtensionsBase *extensions = env->getExtensions();
+		MM_GCExtensions *extensions = (MM_GCExtensions *)env->getExtensions();
 		UDATA regionCount = extensions->memoryMax / _tarokMinimumRegionSizeInBytes;
-		/* try to select region size such that the resulting region count is in the range of [1024, 2048] */
-		if (regionCount < 1024 || regionCount > 2048) {
-			regionSize = OMR_MAX(extensions->memoryMax / 1024, _tarokMinimumRegionSizeInBytes);
+		UDATA regionSize = _tarokMinimumRegionSizeInBytes;
+		if (extensions->lowRegionCountMode) {
+			if (regionCount > 64) {
+				regionSize = extensions->memoryMax / 64;
+			}
 		} else {
-			regionSize = _tarokMinimumRegionSizeInBytes;
+			/* try to select region size such that the resulting region count is in the range of [1024, 2048] */
+			if (regionCount < 1024 || regionCount > 2048) {
+				regionSize = OMR_MAX(extensions->memoryMax / 1024, _tarokMinimumRegionSizeInBytes);
+			}
 		}
 
 		return regionSize;

@@ -203,6 +203,7 @@ public:
 		verify_continuation_list = 2,
 	};
 	ContinuationListOption continuationListOption;
+	bool lowRegionCountMode;  /* if true is set, keep region count as low as 64 */
 
 protected:
 private:
@@ -359,6 +360,7 @@ public:
 		, freeSizeThresholdForSurvivor(DEFAULT_SURVIVOR_THRESHOLD)
 		, recycleRemainders(true)
 		, continuationListOption(verify_continuation_list)
+		, lowRegionCountMode(false)
 	{
 		_typeId = __FUNCTION__;
 	}

@@ -307,6 +307,14 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			continue;
 		}
 
+		if (try_scan(&scan_start, "lowRegionCountMode")) {
+			extensions->lowRegionCountMode = true;
+			extensions->tarokNurseryMaxAge._valueSpecified = 1;
+			extensions->tarokNurseryMaxAge._wasSpecified = true;
+			extensions->tarokRegionMaxAge = 2;
+			continue;
+		}
+
 		if (try_scan(&scan_start, "tarokKickoffHeadroomRegionRate=")) {
 			if(!scan_u32_helper(vm, &scan_start, &(extensions->tarokKickoffHeadroomRegionRate), "tarokKickoffHeadroomRegionRate=")) {
 				returnValue = JNI_EINVAL;
