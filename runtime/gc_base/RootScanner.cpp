@@ -85,7 +85,7 @@ MM_RootScanner::scanModularityObjects(J9ClassLoader * classLoader)
 {
 	if (NULL != classLoader->moduleHashTable) {
 		J9HashTableState moduleWalkState;
-		J9JavaVM *javaVM = static_cast<J9JavaVM*>(_omrVM->_language_vm);
+//		J9JavaVM *javaVM = static_cast<J9JavaVM*>(_omrVM->_language_vm);
 		J9Module **modulePtr = (J9Module**)hashTableStartDo(classLoader->moduleHashTable, &moduleWalkState);
 		while (NULL != modulePtr) {
 			J9Module * const module = *modulePtr;
@@ -99,10 +99,10 @@ MM_RootScanner::scanModularityObjects(J9ClassLoader * classLoader)
 			}
 			modulePtr = (J9Module**)hashTableNextDo(&moduleWalkState);
 		}
-
-		if (classLoader == javaVM->systemClassLoader) {
-			doSlot(&javaVM->unamedModuleForSystemLoader->moduleObject);
-		}
+//
+//		if (classLoader == javaVM->systemClassLoader) {
+//			doSlot(&javaVM->unamedModuleForSystemLoader->moduleObject);
+//		}
 	}
 }
 

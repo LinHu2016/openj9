@@ -844,12 +844,12 @@ MM_GlobalMarkingScheme::scanClassLoaderObject(MM_EnvironmentVLHGC *env, J9Object
 				}
 				modulePtr = (J9Module**)hashTableNextDo(&walkState);
 			}
-
-			if (classLoader == _javaVM->systemClassLoader) {
-				Assert_MM_true(NULL != _javaVM->unamedModuleForSystemLoader->moduleObject);
-				markObject(env, _javaVM->unamedModuleForSystemLoader->moduleObject);
-				rememberReferenceIfRequired(env, classLoaderObject, _javaVM->unamedModuleForSystemLoader->moduleObject);
-			}
+//
+//			if (classLoader == _javaVM->systemClassLoader) {
+//				Assert_MM_true(NULL != _javaVM->unamedModuleForSystemLoader->moduleObject);
+//				markObject(env, _javaVM->unamedModuleForSystemLoader->moduleObject);
+//				rememberReferenceIfRequired(env, classLoaderObject, _javaVM->unamedModuleForSystemLoader->moduleObject);
+//			}
 		}
 	}
 }

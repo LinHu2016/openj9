@@ -429,10 +429,10 @@ MM_ConcurrentMarkingDelegate::concurrentClassMark(MM_EnvironmentBase *env, bool 
 						}
 						modulePtr = (J9Module**)hashTableNextDo(&moduleWalkState);
 					}
-
-					if (classLoader == _javaVM->systemClassLoader) {
-						_markingScheme->markObject(env, _javaVM->unamedModuleForSystemLoader->moduleObject);
-					}
+//
+//					if (classLoader == _javaVM->systemClassLoader) {
+//						_markingScheme->markObject(env, _javaVM->unamedModuleForSystemLoader->moduleObject);
+//					}
 				}
 
 				classLoader->gcFlags |= J9_GC_CLASS_LOADER_SCANNED;

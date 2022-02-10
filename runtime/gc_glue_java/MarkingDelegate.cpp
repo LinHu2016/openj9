@@ -344,10 +344,10 @@ MM_MarkingDelegate::completeMarking(MM_EnvironmentBase *env)
 										}
 										modulePtr = (J9Module**)hashTableNextDo(&moduleWalkState);
 									}
-
-									if (classLoader == javaVM->systemClassLoader) {
-										_markingScheme->markObjectNoCheck(env, (omrobjectptr_t )javaVM->unamedModuleForSystemLoader->moduleObject);
-									}
+//
+//									if (classLoader == javaVM->systemClassLoader) {
+//										_markingScheme->markObjectNoCheck(env, (omrobjectptr_t )javaVM->unamedModuleForSystemLoader->moduleObject);
+//									}
 								}
 							}
 						}
