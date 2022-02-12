@@ -279,6 +279,8 @@ createModule(J9VMThread * currentThread, j9object_t moduleObject, J9ClassLoader 
 
 			retval = j9mod;
 		}
+
+		vm->memoryManagerFunctions->J9WriteBarrierPost(currentThread, classLoader->classLoaderObject, moduleName);
 	}
 
 	/* If we failed to create the module */
