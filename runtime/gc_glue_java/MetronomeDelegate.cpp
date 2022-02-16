@@ -1001,10 +1001,10 @@ MM_MetronomeDelegate::doClassTracing(MM_EnvironmentRealtime *env)
 							didWork |= _markingScheme->markObject(env, module->version);
 							modulePtr = (J9Module**)hashTableNextDo(&walkState);
 						}
-//
-//						if (classLoader == _javaVM->systemClassLoader) {
-//							didWork |= _markingScheme->markObject(env, _javaVM->unamedModuleForSystemLoader->moduleObject);
-//						}
+
+						if (classLoader == _javaVM->systemClassLoader) {
+							didWork |= _markingScheme->markObject(env, _javaVM->unamedModuleForSystemLoader->moduleObject);
+						}
 					}
 				}
 			}

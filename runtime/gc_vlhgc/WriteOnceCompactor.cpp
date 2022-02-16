@@ -1301,15 +1301,15 @@ MM_WriteOnceCompactor::fixupClassLoaderObject(MM_EnvironmentVLHGC* env, J9Object
 
 				modulePtr = (J9Module**)hashTableNextDo(&walkState);
 			}
-//
-//			if (classLoader == _javaVM->systemClassLoader) {
-//				slotPtr = &_javaVM->unamedModuleForSystemLoader->moduleObject;
-//
-//				originalObject = *slotPtr;
-//				J9Object* forwardedObject = getForwardWrapper(env, originalObject, cache);
-//				*slotPtr = forwardedObject;
-//				_interRegionRememberedSet->rememberReferenceForCompact(env, classLoaderObject, forwardedObject);
-//			}
+
+			if (classLoader == _javaVM->systemClassLoader) {
+				slotPtr = &_javaVM->unamedModuleForSystemLoader->moduleObject;
+
+				originalObject = *slotPtr;
+				J9Object* forwardedObject = getForwardWrapper(env, originalObject, cache);
+				*slotPtr = forwardedObject;
+				_interRegionRememberedSet->rememberReferenceForCompact(env, classLoaderObject, forwardedObject);
+			}
 		}
 
 		/* We can't fixup remembered set for defined and referenced classes here since we 

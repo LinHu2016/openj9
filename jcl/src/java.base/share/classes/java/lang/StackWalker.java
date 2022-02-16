@@ -384,8 +384,8 @@ public final class StackWalker {
 		public StackTraceElement toStackTraceElement() {
 			String moduleName = null;
 			String moduleVersion = null;
-//			if (null != frameModule && frameModule.isNamed()) {
-			if (null != frameModule) {
+			if (null != frameModule && frameModule.isNamed()) {
+//			if (null != frameModule) {
 				ModuleDescriptor desc = frameModule.getDescriptor();
 				moduleName = desc.name();
 				Optional<Version> versionInfo = desc.version();
