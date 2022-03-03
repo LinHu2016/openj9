@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -832,6 +832,7 @@ public:
 		return getSpineSize(J9GC_J9OBJECT_CLAZZ(arrayPtr, this), layout, getSizeInElements(arrayPtr));
 	}
 
+<<<<<<< v0.26.0-release
 #if defined(J9VM_ENV_DATA64)
 
 	/**
@@ -903,7 +904,7 @@ public:
 	 * field.
 	 *
 	 * @param arrayPtr      Pointer to the indexable object whose size is required
-	 * @param address       Pointer which points to indexable object data
+	 * @param dataAddr      Pointer which points to indexable object data
 	 */
 	MMINLINE void
 	setDataAddrForDiscontiguous(J9IndexableObject *arrayPtr, void *address)
@@ -923,13 +924,6 @@ public:
 
 		*dataAddrPtr = calculatedDataAddr;
 	}
-
-	/**
-	 * Asserts that an indexable object pointer is indeed an indexable object
-	 *
-	 * @param arrayPtr      Pointer to the indexable object
-	 */
-	void AssertArrayPtrIsIndexable(J9IndexableObject *arrayPtr);
 
 	/**
 	 * Returns data pointer associated with a contiguous Indexable object.
@@ -993,6 +987,8 @@ public:
 	}
 #endif /* J9VM_ENV_DATA64 */
 
+=======
+>>>>>>> e86fa4f Add extra U_64 data field to Indexable Object Headers
 	/**
 	 * External fixup dataAddr API to update pointer of indexable objects.
 	 * Used in concurrent GCs in case of mutator and GC thread races.
@@ -1019,6 +1015,7 @@ public:
 #endif /* J9VM_ENV_DATA64 */
 	}
 	/**
+<<<<<<< v0.26.0-release
 	 * External fixup dataAddr API to update pointer of indexable objects.
 	 * Sets the dataAddr of either a contiguous or discomtiguous indexable
 	 * object.
@@ -1166,6 +1163,8 @@ public:
 	}
 
 	/**
+=======
+>>>>>>> 0b96c0d Update dataAddr whenever GC moves indexable object
 	 * Returns the header size of a given indexable object. The arraylet layout is determined base on "small" size.
 	 * @param arrayPtr Ptr to an array for which header size will be returned
 	 * @return Size of header in bytes
@@ -1294,15 +1293,5 @@ public:
 	 * Asserts that an Arraylet has indeed discontiguous layout
 	 */
 	void AssertArrayletIsDiscontiguous(J9IndexableObject *objPtr);
-
-	/**
-	 * Asserts that an Arraylet has true contiguous layout
-	 */
-	void AssertContiguousArrayletLayout(J9IndexableObject *objPtr);
-
-	/**
-	 * Asserts that an Arraylet has true discontiguous layout
-	 */
-	void AssertDiscontiguousArrayletLayout(J9IndexableObject *objPtr);
 };
 #endif /* ARRAYLETOBJECTMODEL_ */

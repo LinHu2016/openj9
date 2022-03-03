@@ -1946,6 +1946,7 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 
 				forwardedHeader->fixupForwardedObject(destinationObjectPtr);
 
+<<<<<<< v0.26.0-release
 				if (objectModel->isIndexable(destinationObjectPtr)) {
 					_extensions->indexableObjectModel.fixupInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)forwardedHeader->getObject());
 
@@ -1955,6 +1956,10 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 					 * arraylet it will point to the first arrayiod. dataAddr is only updated if dataAddr points to data
 					 * within heap. */
 					_extensions->indexableObjectModel.fixupDataAddr(destinationObjectPtr);
+=======
+				if(objectModel->isIndexable(destinationObjectPtr)) {
+					updateInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)forwardedHeader->getObject());
+>>>>>>> 0b96c0d Update dataAddr whenever GC moves indexable object
 				}
 
 				/* IF the object has been hashed and has not been moved then we must store the previous

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -728,13 +728,28 @@ MM_WriteOnceCompactor::evacuatePage(MM_EnvironmentVLHGC *env, void *page, J9MM_F
 			UDATA objectSize = _extensions->objectModel.getConsumedSizeInBytesWithHeader(objectPtr);
 			J9Object *nextLocation = (J9Object *)((UDATA)newLocation + objectSize);
 			if (newLocation != objectPtr) {
-				UDATA objectSizeAfterMove = 0;
-				preObjectMove(env, objectPtr, &objectSizeAfterMove);
-
+				UDATA objectSizeAfterMove = _extensions->objectModel.getConsumedSizeInBytesWithHeaderForMove(objectPtr);
+				bool hasBeenHashed = _extensions->objectModel.hasBeenHashed(objectPtr);
+				bool hasBeenMoved = _extensions->objectModel.hasBeenMoved(objectPtr);
+				I_32 hashCode = 0;
+				if (hasBeenHashed && !hasBeenMoved) {
+					hashCode = computeObjectAddressToHash(_javaVM, objectPtr);
+				}
 				/* copy objectPtr to newLocation */
 				memmove(newLocation, objectPtr, objectSize);
-
-				postObjectMove(env, newLocation, objectPtr);
+				/* the object has just moved so we can't trust the remembered bit.  Clear it and it will be re-added, during fixup, if required */
+				if (_extensions->objectModel.isRemembered(newLocation)) {
+					_extensions->objectModel.clearRemembered(newLocation);
+				}
+				if(_extensions->objectModel.isIndexable(newLocation)) {
+					updateInternalLeafPointersAfterCopy((J9IndexableObject*) newLocation, (J9IndexableObject*) objectPtr);
+				}
+				if (hasBeenHashed && !hasBeenMoved) {
+					/* add the hash */
+					UDATA hashOffset = _extensions->objectModel.getHashcodeOffset(newLocation);
+					*(I_32*)((U_8*)newLocation + hashOffset) = hashCode;
+					_extensions->objectModel.setObjectHasBeenMoved(newLocation);
+				}
 				nextLocation = (J9Object *)((UDATA)newLocation + objectSizeAfterMove);
 			}
 			/* fixup this object's fields, whether it moved or not */
@@ -1167,6 +1182,7 @@ MM_WriteOnceCompactor::fixupObjectsInRange(MM_EnvironmentVLHGC *env, void *lowAd
 	}
 }
 
+<<<<<<< v0.26.0-release
 MMINLINE void
 MM_WriteOnceCompactor::preObjectMove(MM_EnvironmentVLHGC* env, J9Object *objectPtr, UDATA *objectSizeAfterMove)
 {
@@ -1197,6 +1213,8 @@ MM_WriteOnceCompactor::postObjectMove(MM_EnvironmentVLHGC* env, J9Object *newLoc
 	//env->postObjectMoveForCompact(newLocation, objectPtr); // Will substitute lines above
 }
 
+=======
+>>>>>>> 0b96c0d Update dataAddr whenever GC moves indexable object
 void
 MM_WriteOnceCompactor::fixupMixedObject(MM_EnvironmentVLHGC* env, J9Object *objectPtr, J9MM_FixupCache *cache)
 {
