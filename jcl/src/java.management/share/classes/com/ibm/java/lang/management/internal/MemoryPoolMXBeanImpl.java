@@ -187,7 +187,7 @@ public class MemoryPoolMXBeanImpl implements MemoryPoolMXBean {
 	/**
 	 * @return the identifier of the associated memory pool
 	 */
-	int getID() {
+	public int getID() {
 		return this.id;
 	}
 

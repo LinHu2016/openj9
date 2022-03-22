@@ -30,6 +30,7 @@ import com.sun.management.GarbageCollectionNotificationInfo;
 import com.sun.management.GcInfo;
 import com.sun.management.internal.GcInfoUtil;
 
+import java.lang.management.MemoryType;
 import java.lang.management.MemoryUsage;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.ManagementFactory;
@@ -43,6 +44,8 @@ import java.util.List;
 public final class ExtendedGarbageCollectorMXBeanImpl
 		extends GarbageCollectorMXBeanImpl
 		implements GarbageCollectorMXBean {
+	
+	private static String[] poolNames = null;
 
 	ExtendedGarbageCollectorMXBeanImpl(String domainName, String name, int id, ExtendedMemoryMXBeanImpl memBean) {
 		super(domainName, name, id, memBean);
@@ -81,12 +84,30 @@ public final class ExtendedGarbageCollectorMXBeanImpl
 							long[] initialSize, long[] preUsed, long[] preCommitted, long[] preMax,
 							long[] postUsed, long[] postCommitted, long[] postMax) {
 		/* retrieve the names of MemoryPools*/
-		List<MemoryPoolMXBean> memoryPoolList = ManagementFactory.getMemoryPoolMXBeans();
-		String[] poolNames = new String[memoryPoolList.size()];
-		int idx = 0;
-		for (MemoryPoolMXBean bean : memoryPoolList) {
-			poolNames[idx++] = bean.getName();
-		}
+		if (null == poolNames) {
+			List<MemoryPoolMXBean> memoryPoolList = ExtendedMemoryMXBeanImpl.getInstance().getMemoryPoolMXBeans(false);
+			poolNames = new String[memoryPoolList.size()];
+			int idx = 0;
+			int previousID = 0;
+			int id = 0;
+			boolean nonHeap = false;
+			
+			for (MemoryPoolMXBean bean : memoryPoolList) {
+				poolNames[idx++] = bean.getName();
+				id = ((MemoryPoolMXBeanImpl) bean).getID();
+				System.out.println("MemoryPoolMXBean order: ID=" + id +", Name=" + bean.getName());
+				
+				if ((bean.getType() == MemoryType.NON_HEAP) && !nonHeap ) {
+					nonHeap = true;
+				} else {
+					if ((id < previousID) || ((bean.getType() != MemoryType.NON_HEAP) && (nonHeap)) ) {
+						System.out.println("MemoryPoolMXBean order error: currentID=" + id +", previousID=" + previousID);
+					}
+				}
+				previousID = id;
+			}
+		}		
+		
 		int poolNamesLength = poolNames.length;
 		/*[IF JAVA_SPEC_VERSION >= 19]
 		Map<String, MemoryUsage> usageBeforeGc = HashMap.newHashMap(poolNamesLength);
@@ -96,11 +117,58 @@ public final class ExtendedGarbageCollectorMXBeanImpl
 		Map<String, MemoryUsage> usageBeforeGc = new HashMap<>(poolNamesLength * 4 / 3);
 		Map<String, MemoryUsage> usageAfterGc = new HashMap<>(poolNamesLength * 4 / 3);
 		/*[ENDIF] JAVA_SPEC_VERSION >= 19 */
+		boolean bError = false;
 		for (int count = 0; count < poolNames.length; ++count) {
+			
+			/* debugging the potential issues
+		    the value of init or max is negative but not -1; or
+		    the value of used or committed is negative; or
+		    used is greater than the value of committed; or
+		    committed is greater than the value of max max if defined.
+			*/
+			
+			if ((preUsed[count] > preCommitted[count]) || 
+				((preMax[count] != -1) && (preCommitted[count] > preMax[count])) ||
+				(preUsed[count] < 0) ||
+				(preCommitted[count] < 0) ||
+				(initialSize[count] < -1) ||
+				(preMax[count] < -1)) {
+				bError = true;
+				if (preCommitted[count] < 0) {
+					System.out.println("preCommitted size=" + preCommitted[count] + " < 0"); 
+				}
+				System.out.println("MemoryUsage BeforeGc Error! index=" + index + ", count=" + count + ", poolName: " + poolNames[count] +", init=" + initialSize[count] + ", preUsed=" + preUsed[count] + ", preCommitted=" + preCommitted[count] + ", preMax=" + preMax[count]);
+			}
+			
+			if ((postUsed[count] > postCommitted[count]) || 
+					((postMax[count] != -1) && (postCommitted[count] > postMax[count])) ||
+					(postUsed[count] < 0) ||
+					(postCommitted[count] < 0) ||
+					(initialSize[count] < -1) ||
+					(postMax[count] < -1)) {
+				bError = true;
+				if (postCommitted[count] < 0) {
+					System.out.println("postCommitted size=" + postCommitted[count] + " < 0"); 
+				}
+				System.out.println("MemoryUsage AfterGc Error! index=" + index + ", count=" + count + ", poolName: " + poolNames[count] +", init=" + initialSize[count] + ", postUsed=" + postUsed[count] + ", postCommitted=" + postCommitted[count] + ", postMax=" + postMax[count]);
+			}
+			
+			if (bError) {
+				printMemoryUsages(poolNames, initialSize, preUsed, preCommitted, preMax, postUsed, postCommitted, postMax);
+				bError = false;
+			}
+			
 			usageBeforeGc.put(poolNames[count], new MemoryUsage(initialSize[count], preUsed[count], preCommitted[count], preMax[count]));
 			usageAfterGc.put(poolNames[count], new MemoryUsage(initialSize[count], postUsed[count], postCommitted[count], postMax[count]));
 		}
 		return GcInfoUtil.newGcInfoInstance(index, startTime, endTime, usageBeforeGc, usageAfterGc);
+	}
+	
+	static void printMemoryUsages(String[] poolNames, long[] initialSize, long[] preUsed, long[] preCommitted, long[] preMax,
+									long[] postUsed, long[] postCommitted, long[] postMax) {
+		for (int count = 0; count < poolNames.length; ++count) {
+			System.out.println("MemoryUsage" + count + ": poolName=" + poolNames[count] + ", init=" + initialSize[count] + ", preUsed=" + preUsed[count] + ", preCommitted=" + preCommitted[count] + ", preMax=" + preMax[count] + ", postUsed=" + postUsed[count] + ", postCommitted=" + postCommitted[count] + ", postMax=" + postMax[count]);
+		}
 	}
 
 }
