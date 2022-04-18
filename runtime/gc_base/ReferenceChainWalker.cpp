@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -50,7 +50,6 @@ class GC_JVMTIObjectTagTableIterator;
 class GC_VMClassSlotIterator;
 class MM_HeapRegionDescriptor;
 class MM_HeapRegionManager;
-class MM_OwnableSynchronizerObjectList;
 class MM_UnfinalizedObjectList;
 
 #define TEMP_RCW_STACK_SIZE (10 * 1024 * 1024)
@@ -350,7 +349,6 @@ MM_ReferenceChainWalker::scanObject(J9Object *objectPtr)
 	case GC_ObjectModel::SCAN_MIXED_OBJECT_LINKED:
 	case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 	case GC_ObjectModel::SCAN_MIXED_OBJECT:
-	case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
 	case GC_ObjectModel::SCAN_CLASS_OBJECT:
 	case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 		scanMixedObject(objectPtr);
@@ -530,13 +528,6 @@ MM_ReferenceChainWalker::doUnfinalizedObject(J9Object *objectPtr, MM_Unfinalized
 	doSlot(&object, J9GC_ROOT_TYPE_UNFINALIZED_OBJECT, -1, NULL);
 }
 #endif /* J9VM_GC_FINALIZATION */
-
-void
-MM_ReferenceChainWalker::doOwnableSynchronizerObject(J9Object *objectPtr, MM_OwnableSynchronizerObjectList *list)
-{
-	J9Object *object = objectPtr;
-	doSlot(&object, J9GC_ROOT_TYPE_OWNABLE_SYNCHRONIZER_OBJECT, -1, NULL);
-}
 
 /**
  * @todo Provide function documentation

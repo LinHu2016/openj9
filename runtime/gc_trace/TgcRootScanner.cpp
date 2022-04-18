@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -48,7 +48,7 @@ const static char *attributeNames[] = {
 	"threads", /* RootScannerEntity_Threads */
 	"finalizableobjects", /* RootScannerEntity_FinalizableObjects */
 	"unfinalizedobjects", /* RootScannerEntity_UnfinalizedObjects */
-	"ownablesynchronizerobjects", /* RootScannerEntity_OwnableSynchronizerObjects */
+//	"ownablesynchronizerobjects", /* RootScannerEntity_OwnableSynchronizerObjects */
 	"stringtable", /* RootScannerEntity_StringTable */
 	"jniglobalrefs", /* RootScannerEntity_JNIGlobalReferences */
 	"jniweakglobalrefs", /* RootScannerEntity_JNIWeakGlobalReferences */
@@ -68,7 +68,7 @@ const static char *attributeNames[] = {
 	"softrefscomplete", /* RootScannerEntity_SoftReferenceObjectsComplete */
 	"phantomrefscomplete", /* RootScannerEntity_PhantomReferenceObjectsComplete */
 	"unfinalizedobjectscomplete", /* RootScannerEntity_UnfinalizedObjectsComplete */
-	"ownablesynchronizerobjectscomplete", /* RootScannerEntity_OwnableSynchronizerObjectsComplete */
+//	"ownablesynchronizerobjectscomplete", /* RootScannerEntity_OwnableSynchronizerObjectsComplete */
 	"monitorlookupcaches", /* RootScannerEntity_MonitorLookupCaches */
 	"monitorlookupcachescomplete", /* RootScannerEntity_MonitorLookupCachesComplete */
 	"monitorreferenceobjectscomplete", /* RootScannerEntity_MonitorReferenceObjectsComplete */

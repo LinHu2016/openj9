@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -126,14 +126,6 @@ MM_VerboseHandlerOutputStandardJava::outputUnfinalizedInfo(MM_EnvironmentBase *e
 }
 
 void
-MM_VerboseHandlerOutputStandardJava::outputOwnableSynchronizerInfo(MM_EnvironmentBase *env, UDATA indent, UDATA ownableSynchronizerCandidates, UDATA ownableSynchronizerCleared)
-{
-	if (0 != ownableSynchronizerCandidates) {
-		_manager->getWriterChain()->formatAndOutput(env, indent, "<ownableSynchronizers candidates=\"%zu\" cleared=\"%zu\" />", ownableSynchronizerCandidates, ownableSynchronizerCleared);
-	}
-}
-
-void
 MM_VerboseHandlerOutputStandardJava::outputReferenceInfo(MM_EnvironmentBase *env, UDATA indent, const char *referenceType, MM_ReferenceStats *referenceStats, UDATA dynamicThreshold, UDATA maxThreshold)
 {
 	if(0 != referenceStats->_candidates) {
@@ -155,8 +147,6 @@ MM_VerboseHandlerOutputStandardJava::handleMarkEndInternal(MM_EnvironmentBase* e
 	MM_WorkPacketStats *workPacketStats = &_extensions->globalGCStats.workPacketStats;
 
 	outputUnfinalizedInfo(env, 1, markJavaStats->_unfinalizedCandidates, markJavaStats->_unfinalizedEnqueued);
-
-	outputOwnableSynchronizerInfo(env, 1, markJavaStats->_ownableSynchronizerCandidates, markJavaStats->_ownableSynchronizerCleared);
 
 	outputReferenceInfo(env, 1, "soft", &markJavaStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 	outputReferenceInfo(env, 1, "weak", &markJavaStats->_weakReferenceStats, 0, 0);
@@ -238,8 +228,6 @@ MM_VerboseHandlerOutputStandardJava::handleScavengeEndInternal(MM_EnvironmentBas
 		MM_ScavengerJavaStats *scavengerJavaStats = &extensions->scavengerJavaStats;
 
 		outputUnfinalizedInfo(env, 1, scavengerJavaStats->_unfinalizedCandidates, scavengerJavaStats->_unfinalizedEnqueued);
-
-		outputOwnableSynchronizerInfo(env, 1, scavengerJavaStats->_ownableSynchronizerCandidates, (scavengerJavaStats->_ownableSynchronizerCandidates - scavengerJavaStats->_ownableSynchronizerTotalSurvived));
 
 		outputReferenceInfo(env, 1, "soft", &scavengerJavaStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 		outputReferenceInfo(env, 1, "weak", &scavengerJavaStats->_weakReferenceStats, 0, 0);

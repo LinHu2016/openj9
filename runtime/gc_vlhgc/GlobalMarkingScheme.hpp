@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -266,12 +266,6 @@ private:
 	 */
 	void scanUnfinalizedObjects(MM_EnvironmentVLHGC *env);
 #endif /* J9VM_GC_FINALIZATION */
-
-	/**
-	 * Scan all ownable synchronizer objects in the collection set.
-	 * @param env[in] the current thread
-	 */
-	void scanOwnableSynchronizerObjects(MM_EnvironmentVLHGC *env);
 
 	bool isMarked(J9Object *objectPtr);
 

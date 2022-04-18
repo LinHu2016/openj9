@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -41,7 +41,6 @@ class GC_VMClassSlotIterator;
 class GC_VMThreadIterator;
 class MM_EnvironmentBase;
 class MM_Heap;
-class MM_OwnableSynchronizerObjectList;
 class MM_UnfinalizedObjectList;
 
 /**
@@ -96,11 +95,6 @@ private:
 	virtual void doUnfinalizedObject(J9Object *objectPtr, MM_UnfinalizedObjectList *list);
 	virtual void doFinalizableObject(J9Object *objectPtr);
 #endif /* J9VM_GC_FINALIZATION */
-
-	/**
-	 * @todo Provide function documentation
-	 */
-	virtual void doOwnableSynchronizerObject(J9Object *objectPtr, MM_OwnableSynchronizerObjectList *list);
 
 	virtual void doJNIWeakGlobalReference(J9Object **slotPtr);
 	virtual void doJNIGlobalReferenceSlot(J9Object **slotPtr, GC_JNIGlobalReferenceIterator *jniGlobalReferenceIterator);

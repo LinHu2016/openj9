@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -30,7 +30,6 @@
 #include "HeapRegionDataForAllocate.hpp"
 #include "HeapRegionDataForCompactVLHGC.hpp"
 #include "LightweightNonReentrantLock.hpp"
-#include "OwnableSynchronizerObjectList.hpp"
 #include "ReferenceObjectList.hpp"
 #include "RememberedSetCardList.hpp"
 #include "UnfinalizedObjectList.hpp"
@@ -104,7 +103,6 @@ private:
 	MM_HeapRegionDescriptorVLHGC *_dynamicSelectionNext;  /**< Linked list pointer used during dynamic set selection (NOTE: Valid only during dynamic set selection) */
 
 	MM_UnfinalizedObjectList _unfinalizedObjectList; /**< A list of unfinalized objects in this region */
-	MM_OwnableSynchronizerObjectList _ownableSynchronizerObjectList; /**< A list of ownable synchronizer objects in this region */
 	MM_ReferenceObjectList _referenceObjectList; /**< A list of reference objects (i.e. weak/soft/phantom) in this region */
 	
 	/*
@@ -248,12 +246,6 @@ public:
 	 */
 	MM_UnfinalizedObjectList *getUnfinalizedObjectList() { return &_unfinalizedObjectList; }
 
-	/**
-	 * Fetch the list of ownable synchronizer objects within this region.
-	 * @return the list
-	 */
-	MM_OwnableSynchronizerObjectList *getOwnableSynchronizerObjectList() { return &_ownableSynchronizerObjectList; }
-	
 	/**
 	 * Fetch the list of reference objects within this region.
 	 * @return the list

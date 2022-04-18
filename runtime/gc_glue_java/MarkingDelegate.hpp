@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2017, 2021 IBM Corp. and others
+ * Copyright (c) 2017, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -51,7 +51,6 @@ private:
 	MM_MarkingScheme *_markingScheme;
 	bool _collectStringConstantsEnabled;
 	bool _shouldScanUnfinalizedObjects;
-	bool _shouldScanOwnableSynchronizerObjects;
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 	MM_MarkMap *_markMap;							/**< This is set when dynamic class loading is enabled, NULL otherwise */
 	volatile bool _anotherClassMarkPass;			/**< Used in completeClassMark for another scanning request*/
@@ -80,7 +79,6 @@ public:
 		, _markingScheme(NULL)
 		, _collectStringConstantsEnabled(false)
 		, _shouldScanUnfinalizedObjects(false)
-		, _shouldScanOwnableSynchronizerObjects(false)
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 		, _markMap(NULL)
 		, _anotherClassMarkPass(false)
@@ -127,7 +125,6 @@ public:
 		case GC_ObjectModel::SCAN_MIXED_OBJECT_LINKED:
 		case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 		case GC_ObjectModel::SCAN_MIXED_OBJECT:
-		case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
 		case GC_ObjectModel::SCAN_CLASS_OBJECT:
 		case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 			objectScanner = GC_MixedObjectScanner::newInstance(env, objectPtr, scannerSpace, 0);
@@ -193,18 +190,6 @@ public:
 	shouldScanUnfinalizedObjects(bool shouldScanUnfinalizedObjects)
 	{
 		_shouldScanUnfinalizedObjects = shouldScanUnfinalizedObjects;
-	}
-
-	MMINLINE bool
-	shouldScanOwnableSynchronizerObjects()
-	{
-		return _shouldScanOwnableSynchronizerObjects;
-	}
-
-	MMINLINE void
-	shouldScanOwnableSynchronizerObjects(bool shouldScanOwnableSynchronizerObjects)
-	{
-		_shouldScanOwnableSynchronizerObjects = shouldScanOwnableSynchronizerObjects;
 	}
 
 	void scanClass(MM_EnvironmentBase *env, J9Class *clazz);

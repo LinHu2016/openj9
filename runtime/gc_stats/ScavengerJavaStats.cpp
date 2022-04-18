@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -26,9 +26,6 @@
 MM_ScavengerJavaStats::MM_ScavengerJavaStats() :
 	_unfinalizedCandidates(0)
 	,_unfinalizedEnqueued(0)
-	,_ownableSynchronizerCandidates(0)
-	,_ownableSynchronizerTotalSurvived(0)
-	,_ownableSynchronizerNurserySurvived(0)
 	,_weakReferenceStats()
 	,_softReferenceStats()
 	,_phantomReferenceStats()
@@ -43,10 +40,6 @@ MM_ScavengerJavaStats::clear()
 	_unfinalizedCandidates = 0;
 	_unfinalizedEnqueued = 0;
 
-	_ownableSynchronizerCandidates = 0;
-	_ownableSynchronizerTotalSurvived = 0;
-	_ownableSynchronizerNurserySurvived = 0;
-
 	_weakReferenceStats.clear();
 	_softReferenceStats.clear();
 	_phantomReferenceStats.clear();
@@ -54,20 +47,3 @@ MM_ScavengerJavaStats::clear()
 	_monitorReferenceCleared = 0;
 	_monitorReferenceCandidates = 0;
 };
-
-
-void
-MM_ScavengerJavaStats::clearOwnableSynchronizerCounts()
-{
-	_ownableSynchronizerCandidates = 0;
-	_ownableSynchronizerTotalSurvived = 0;
-	_ownableSynchronizerNurserySurvived = 0;
-}
-
-void
-MM_ScavengerJavaStats::mergeOwnableSynchronizerCounts(MM_ScavengerJavaStats *statsToMerge)
-{
-	_ownableSynchronizerCandidates += statsToMerge->_ownableSynchronizerCandidates;
-	_ownableSynchronizerTotalSurvived += statsToMerge->_ownableSynchronizerTotalSurvived;
-	_ownableSynchronizerNurserySurvived += statsToMerge->_ownableSynchronizerNurserySurvived;
-}

@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -41,7 +41,6 @@
 #include "GlobalCollector.hpp"
 #include "ObjectAllocationInterface.hpp"
 #include "ObjectModel.hpp"
-#include "OwnableSynchronizerObjectBuffer.hpp"
 #include "ParallelDispatcher.hpp"
 #include "MemorySpace.hpp"
 #include "MemorySubSpace.hpp"
@@ -994,7 +993,6 @@ ownableSynchronizerObjectCreated(J9VMThread *vmThread, j9object_t object)
 {
 	Assert_MM_true(NULL != object);
 	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
-	env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->add(env, object);
 	MM_ObjectAllocationInterface *objectAllocation = env->_objectAllocationInterface;
 	if (NULL != objectAllocation) {
 		objectAllocation->getAllocationStats()->_ownableSynchronizerObjectCount += 1;

@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -54,9 +54,6 @@ public:
 	uintptr_t _unfinalizedCandidates;  /**< unfinalized objects that are candidates to be finalized visited this cycle */
 	uintptr_t _unfinalizedEnqueued;  /**< unfinalized objects that are enqueued during this cycle (MUST be less than or equal _unfinalizedCandidates) */
 
-	uintptr_t _ownableSynchronizerCandidates;  /**< number of ownable synchronizer objects visited this cycle */
-	uintptr_t _ownableSynchronizerSurvived;	/**< number of ownable synchronizer objects survived this cycle */
-
 	MM_ReferenceStats _weakReferenceStats;  /**< Weak reference stats for the cycle */
 	MM_ReferenceStats _softReferenceStats;  /**< Soft reference stats for the cycle */
 	MM_ReferenceStats _phantomReferenceStats;  /**< Phantom reference stats for the cycle */
@@ -88,9 +85,6 @@ public:
 		_unfinalizedCandidates = 0;
 		_unfinalizedEnqueued = 0;
 
-		_ownableSynchronizerCandidates = 0;
-		_ownableSynchronizerSurvived = 0;
-
 		_weakReferenceStats.clear();
 		_softReferenceStats.clear();
 		_phantomReferenceStats.clear();
@@ -116,8 +110,6 @@ public:
 		_unfinalizedCandidates += stats->_unfinalizedCandidates;
 		_unfinalizedEnqueued += stats->_unfinalizedEnqueued;
 
-		_ownableSynchronizerSurvived += stats->_ownableSynchronizerSurvived;
-
 		_weakReferenceStats.merge(&stats->_weakReferenceStats);
 		_softReferenceStats.merge(&stats->_softReferenceStats);
 		_phantomReferenceStats.merge(&stats->_phantomReferenceStats);
@@ -138,8 +130,6 @@ public:
 		MM_CopyForwardStatsCore()
 		, _unfinalizedCandidates(0)
 		, _unfinalizedEnqueued(0)
-		, _ownableSynchronizerCandidates(0)
-		, _ownableSynchronizerSurvived(0)
 		, _weakReferenceStats()
 		, _softReferenceStats()
 		, _phantomReferenceStats()

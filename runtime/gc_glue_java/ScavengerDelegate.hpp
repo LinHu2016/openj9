@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019, 2021 IBM Corp. and others
+ * Copyright (c) 2019, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -92,9 +92,6 @@ private:
 	/*
 	 * ParallelScavenger, Private
 	 */
-
-	void private_addOwnableSynchronizerObjectInList(MM_EnvironmentStandard *env, omrobjectptr_t object);
-	void private_setupForOwnableSynchronizerProcessing(MM_EnvironmentStandard *env);
 
 	/*
 	 * Scavenger Collector, Private

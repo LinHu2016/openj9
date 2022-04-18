@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -45,15 +45,6 @@ private:
 	 * @param unfinalizedCount number of candidates that transitioned from unfinalized.
 	 */
 	void outputUnfinalizedInfo(MM_EnvironmentBase *env, UDATA indent, UDATA unfinalizedCandidates, UDATA unfinalizedEnqueuedCount);
-
-	/**
-	 * Output ownable synchronizer processing summary.
-	 * @param env GC thread used for output.
-	 * @param indent base level of indentation for the summary.
-	 * @param ownableSynchronizerCandidates number of ownable synchronizers encountered.
-	 * @param ownableSynchronizerCleared number of ownable synchronizers cleared.
-	 */
-	void outputOwnableSynchronizerInfo(MM_EnvironmentBase *env, UDATA indent, UDATA ownableSynchronizerCandidates, UDATA ownableSynchronizerCleared);
 
 	/**
 	 * Output reference processing summary.

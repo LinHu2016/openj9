@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -72,13 +72,6 @@ private:
 	 * @param objectPtr pointer to object for fixup
 	 */
 	void fixupFlattenedArrayObject(omrobjectptr_t objectPtr);
-
-	/**
-	 * Called whenever a ownable synchronizer object is fixed up during compact. Places the object on the thread-specific buffer of gc work thread.
-	 * @param env -- current thread environment
-	 * @param object -- The object of type or subclass of java.util.concurrent.locks.AbstractOwnableSynchronizer.
-	 */
-	MMINLINE void addOwnableSynchronizerObjectInList(MM_EnvironmentBase *env, omrobjectptr_t objectPtr);
 };
 
 #endif /* COMPACTSCHEMEOBJECTFIXUP_HPP_ */

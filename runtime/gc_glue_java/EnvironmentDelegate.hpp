@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 2017, 2021 IBM Corp. and others
+ * Copyright (c) 2017, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -40,7 +40,6 @@ typedef struct GCmovedObjectHashCode {
 } GCmovedObjectHashCode;
 
 class MM_EnvironmentBase;
-class MM_OwnableSynchronizerObjectBuffer;
 class MM_ReferenceObjectBuffer;
 class MM_UnfinalizedObjectBuffer;
 
@@ -58,7 +57,6 @@ public:
 #endif /* OMR_GC_MODRON_SCAVENGER */
 	MM_ReferenceObjectBuffer *_referenceObjectBuffer; /**< The thread-specific buffer of recently discovered reference objects */
 	MM_UnfinalizedObjectBuffer *_unfinalizedObjectBuffer; /**< The thread-specific buffer of recently allocated unfinalized objects */
-	MM_OwnableSynchronizerObjectBuffer *_ownableSynchronizerObjectBuffer; /**< The thread-specific buffer of recently allocated ownable synchronizer objects */
 
 	struct GCmovedObjectHashCode movedObjectHashCodeCache; /**< Structure to aid on object movement and hashing */
 
@@ -69,7 +67,6 @@ public:
 	GC_Environment()
 		:_referenceObjectBuffer(NULL)
 		,_unfinalizedObjectBuffer(NULL)
-		,_ownableSynchronizerObjectBuffer(NULL)
 	{}
 };
 

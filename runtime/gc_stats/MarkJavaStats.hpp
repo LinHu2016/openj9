@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -43,9 +43,6 @@ public:
 	UDATA _unfinalizedCandidates; /**< unfinalized objects that are candidates to be finalized visited this cycle */
 	UDATA _unfinalizedEnqueued; /**< unfinalized objects that are enqueued during this cycle (MUST be less than or equal _unfinalizedCandidates) */
 
-	UDATA _ownableSynchronizerCandidates; /**< number of ownable synchronizer objects visited this cycle */
-	UDATA _ownableSynchronizerCleared; /**< number of ownable synchronizer objects cleared this cycle */
-
 	MM_ReferenceStats _weakReferenceStats; /**< Weak reference stats for the cycle */
 	MM_ReferenceStats _softReferenceStats; /**< Soft reference stats for the cycle */
 	MM_ReferenceStats _phantomReferenceStats; /**< Phantom reference stats for the cycle */
@@ -72,8 +69,6 @@ public:
 		MM_Base()
 		, _unfinalizedCandidates(0)
 		, _unfinalizedEnqueued(0)
-		, _ownableSynchronizerCandidates(0)
-		, _ownableSynchronizerCleared(0)
 		, _weakReferenceStats()
 		, _softReferenceStats()
 		, _phantomReferenceStats()

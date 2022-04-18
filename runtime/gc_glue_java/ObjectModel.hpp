@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -179,7 +179,7 @@ public:
 		switch(J9GC_CLASS_SHAPE(clazz)) {
 		case OBJECT_HEADER_SHAPE_MIXED:
 		{
-			uintptr_t classFlags = J9CLASS_FLAGS(clazz) & (J9AccClassReferenceMask | J9AccClassGCSpecial | J9AccClassOwnableSynchronizer);
+			uintptr_t classFlags = J9CLASS_FLAGS(clazz) & (J9AccClassReferenceMask | J9AccClassGCSpecial);
 			if (0 == classFlags) {
 				if (0 != clazz->selfReferencingField1) {
 					result = SCAN_MIXED_OBJECT_LINKED;
@@ -191,8 +191,6 @@ public:
 					result = SCAN_REFERENCE_MIXED_OBJECT;
 				} else if (0 != (classFlags & J9AccClassGCSpecial)) {
 					result = getSpecialClassScanType(clazz);
-				} else if (0 != (classFlags & J9AccClassOwnableSynchronizer)) {
-					result = SCAN_OWNABLESYNCHRONIZER_OBJECT;
 				} else {
 					/* Assert_MM_unreachable(); */
 					assert(false);

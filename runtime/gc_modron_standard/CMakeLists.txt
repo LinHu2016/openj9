@@ -22,7 +22,6 @@
 
 set(gc_modron_standard_sources
 	ConcurrentSweepGC.cpp
-	OwnableSynchronizerObjectBufferStandard.cpp
 	ReadBarrierVerifier.cpp
 	ReferenceObjectBufferStandard.cpp
 	RootScannerReadBarrierVerifier.cpp
