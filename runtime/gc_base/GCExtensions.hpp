@@ -57,6 +57,7 @@ class MM_HeapMap;
 class MM_MemorySubSpace;
 class MM_ObjectAccessBarrier;
 class MM_OwnableSynchronizerObjectList;
+class MM_OwnableSynchronizerObjectListOnTheFly;
 class MM_StringTable;
 class MM_UnfinalizedObjectList;
 class MM_Wildcard;
@@ -88,6 +89,7 @@ class MM_GCExtensions : public MM_GCExtensionsBase {
 private:
 	MM_OwnableSynchronizerObjectList* ownableSynchronizerObjectLists; /**< The global linked list of ownable synchronizer object lists. */
 public:
+	MM_OwnableSynchronizerObjectListOnTheFly* ownableSynchronizerObjectListOnTheFly;
 	MM_StringTable* stringTable; /**< top level String Table structure (internally organized as a set of hash sub-tables */
 
 	void* gcchkExtensions;
@@ -279,8 +281,12 @@ public:
 	 * @return Linked list of ownable synchronizer objects
 	 */
 	MM_OwnableSynchronizerObjectList* getOwnableSynchronizerObjectListsExternal(J9VMThread *vmThread);
+	MM_OwnableSynchronizerObjectListOnTheFly*  getOwnableSynchronizerObjectListOnTheFlyExternal();
 	MMINLINE MM_OwnableSynchronizerObjectList* getOwnableSynchronizerObjectLists() { return ownableSynchronizerObjectLists; }
 	MMINLINE void setOwnableSynchronizerObjectLists(MM_OwnableSynchronizerObjectList* newOwnableSynchronizerObjectLists) { ownableSynchronizerObjectLists = newOwnableSynchronizerObjectLists; }
+
+	MMINLINE MM_OwnableSynchronizerObjectListOnTheFly* getOwnableSynchronizerObjectListOnTheFly() { return ownableSynchronizerObjectListOnTheFly; }
+	MMINLINE void setOwnableSynchronizerObjectListOnTheFly(MM_OwnableSynchronizerObjectListOnTheFly* ownableSynchronizerObjectList) { ownableSynchronizerObjectListOnTheFly = ownableSynchronizerObjectList; }
 
 	/**
 	 * Create a GCExtensions object
@@ -288,6 +294,7 @@ public:
 	MM_GCExtensions()
 		: MM_GCExtensionsBase()
 		, ownableSynchronizerObjectLists(NULL)
+		, ownableSynchronizerObjectListOnTheFly(NULL)
 		, stringTable(NULL)
 		, gcchkExtensions(NULL)
 		, tgcExtensions(NULL)

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2019 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -42,6 +42,7 @@
 #include "MixedObjectIterator.hpp"
 #include "ObjectAccessBarrier.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#include "OwnableSynchronizerObjectListOnTheFly.hpp"
 #include "PointerArrayIterator.hpp"
 #include "SlotObject.hpp"
 #include "VMInterface.hpp"
@@ -493,6 +494,9 @@ internalIterateRegions(J9JavaVM *vm, J9MM_IterateRegionDescriptor *region, void 
 jvmtiIterationControl
 j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData)
 {
+	uintptr_t ownaleSynchronizerCount = 0;
+	uintptr_t ownaleSynchronizerCount_new = 0;
+
 	J9JavaVM *javaVM = vmThread->javaVM;
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(javaVM->omrVM);
 	MM_ObjectAccessBarrier *barrier = extensions->accessBarrier;
@@ -511,6 +515,7 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 			if (0 != regionFound) {
 				initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
 				returnCode = func(vmThread, &objectDescriptor, userData);
+				++ownaleSynchronizerCount;
 				if (JVMTI_ITERATION_ABORT == returnCode) {
 					return returnCode;
 				}
@@ -521,6 +526,30 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 		}
 		ownableSynchronizerObjectList = ownableSynchronizerObjectList->getNextList();
 	}
+
+	MM_OwnableSynchronizerObjectListOnTheFly* ownableSynchronizerObjectListOnTheFly = extensions->getOwnableSynchronizerObjectListOnTheFlyExternal();
+	J9Object *objectPtr = ownableSynchronizerObjectListOnTheFly->getHeadOfList(MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread));
+	returnCode = JVMTI_ITERATION_CONTINUE;
+	while (NULL != objectPtr) {
+		UDATA regionFound = j9mm_find_region_for_pointer(javaVM, objectPtr, &regionDesc);
+		if (0 != regionFound) {
+//			initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
+//			returnCode = func(vmThread, &objectDescriptor, userData);
+			++ownaleSynchronizerCount_new;
+//			if (JVMTI_ITERATION_ABORT == returnCode) {
+//				return returnCode;
+//			}
+		} else {
+			Assert_MM_unreachable();
+		}
+		objectPtr = barrier->getOwnableSynchronizerLink(objectPtr);
+	}
+
+	Assert_GC_true_with_message2(MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread), (ownaleSynchronizerCount == ownaleSynchronizerCount_new), "ownaleSynchronizerCount:%zu != ownaleSynchronizerCount_new:%zu\n", ownaleSynchronizerCount, ownaleSynchronizerCount_new);
+
+	PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+	j9tty_printf(PORTLIB, "j9mm_iterate_all_ownable_synchronizer_objects ownaleSynchronizerCount=%zu, ownaleSynchronizerCount_new=%zu\n", ownaleSynchronizerCount, ownaleSynchronizerCount_new);
+
 	return returnCode;
 }
 

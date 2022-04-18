@@ -43,6 +43,7 @@
 #include "StringTable.hpp"
 
 #include "OwnableSynchronizerObjectList.hpp"
+#include "OwnableSynchronizerObjectListOnTheFly.hpp"
 #include "ReferenceObjectList.hpp"
 #include "UnfinalizedObjectList.hpp"
 
@@ -146,6 +147,11 @@ public:
 		if (NULL != extensions->stringTable) {
 			extensions->stringTable->kill(env);
 			extensions->stringTable = NULL;
+		}
+
+		if (NULL != extensions->ownableSynchronizerObjectListOnTheFly) {
+			extensions->ownableSynchronizerObjectListOnTheFly->kill(env);
+			extensions->ownableSynchronizerObjectListOnTheFly = NULL;
 		}
 	}
 
