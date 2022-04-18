@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -33,7 +33,6 @@
 #include "EnvironmentStandard.hpp"
 #include "FinalizeListManager.hpp"
 #include "GCExtensions.hpp"
-#include "OwnableSynchronizerObjectBuffer.hpp"
 #include "ParallelTask.hpp"
 #include "ReferenceObjectBuffer.hpp"
 #include "RootScanner.hpp"
@@ -234,8 +233,6 @@ public:
 	void
 	flush(MM_EnvironmentStandard *env)
 	{
-		/* flush ownable synchronizer object buffer after rebuild the ownableSynchronizerObjectList during main scan phase */
-		env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->flush(env);
 	}
 
 

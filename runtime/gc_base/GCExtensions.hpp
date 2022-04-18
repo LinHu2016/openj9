@@ -86,8 +86,9 @@ class MM_IdleGCManager;
  */
 class MM_GCExtensions : public MM_GCExtensionsBase {
 private:
-	MM_OwnableSynchronizerObjectList* ownableSynchronizerObjectLists; /**< The global linked list of ownable synchronizer object lists. */
 public:
+	MM_OwnableSynchronizerObjectList* ownableSynchronizerObjectList;
+	bool needToEnsureHeapWalkableForRebuildingOSOL;
 	MM_StringTable* stringTable; /**< top level String Table structure (internally organized as a set of hash sub-tables */
 
 	void* gcchkExtensions;
@@ -158,7 +159,7 @@ public:
 
 	MM_UnfinalizedObjectList* unfinalizedObjectLists; /**< The global linked list of unfinalized object lists. */
 	
-	UDATA objectListFragmentCount; /**< the size of Local Object Buffer(per gc thread), used by referenceObjectBuffer, UnfinalizedObjectBuffer and OwnableSynchronizerObjectBuffer */
+	UDATA objectListFragmentCount; /**< the size of Local Object Buffer(per gc thread), used by referenceObjectBuffer, UnfinalizedObjectBuffer */
 
 	MM_Wildcard* numaCommonThreadClassNamePatterns; /**< A linked list of thread class names which should be associated with the common context */
 
@@ -274,20 +275,21 @@ public:
 	
 	/**
 	 * Return ownable synchronizer object lists by first ensuring that the lists are in a consistent state (e.g., during concurrent gc).
-	 * This should be used by any external consumer (non-GC consuming the list)     
-	 * @param vmThread The current J9VMThread thread (used to invoke j9gc apis if required)
+	 * This should be used by any external consumer (non-GC consuming the list)
 	 * @return Linked list of ownable synchronizer objects
 	 */
-	MM_OwnableSynchronizerObjectList* getOwnableSynchronizerObjectListsExternal(J9VMThread *vmThread);
-	MMINLINE MM_OwnableSynchronizerObjectList* getOwnableSynchronizerObjectLists() { return ownableSynchronizerObjectLists; }
-	MMINLINE void setOwnableSynchronizerObjectLists(MM_OwnableSynchronizerObjectList* newOwnableSynchronizerObjectLists) { ownableSynchronizerObjectLists = newOwnableSynchronizerObjectLists; }
+	MM_OwnableSynchronizerObjectList*  getOwnableSynchronizerObjectListExternal();
+
+	MMINLINE MM_OwnableSynchronizerObjectList* getOwnableSynchronizerObjectList() { return ownableSynchronizerObjectList; }
+	MMINLINE void setOwnableSynchronizerObjectList(MM_OwnableSynchronizerObjectList* list) { ownableSynchronizerObjectList = list; }
 
 	/**
 	 * Create a GCExtensions object
 	 */
 	MM_GCExtensions()
 		: MM_GCExtensionsBase()
-		, ownableSynchronizerObjectLists(NULL)
+		, ownableSynchronizerObjectList(NULL)
+		, needToEnsureHeapWalkableForRebuildingOSOL(false)
 		, stringTable(NULL)
 		, gcchkExtensions(NULL)
 		, tgcExtensions(NULL)

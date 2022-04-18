@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -50,10 +50,6 @@ public:
 	UDATA _unfinalizedCandidates;  /**< unfinalized objects that are candidates to be finalized visited this cycle */
 	UDATA _unfinalizedEnqueued;  /**< unfinalized objects that are enqueued during this cycle (MUST be less than or equal _unfinalizedCandidates) */
 
-	UDATA _ownableSynchronizerCandidates;  /**< number of ownable synchronizer objects visited this cycle */
-	UDATA _ownableSynchronizerTotalSurvived;	/**< number of ownable synchronizer objects survived this cycle */
-	UDATA _ownableSynchronizerNurserySurvived; /**< number of ownable synchronizer objects survived this cycle in Nursery Space */
-
 	MM_ReferenceStats _weakReferenceStats;  /**< Weak reference stats for the cycle */
 	MM_ReferenceStats _softReferenceStats;  /**< Soft reference stats for the cycle */
 	MM_ReferenceStats _phantomReferenceStats;  /**< Phantom reference stats for the cycle */
@@ -68,17 +64,7 @@ private:
 public:
 
 	void clear();
-	/* clear only OwnableSynchronizerObject related data */
-	void clearOwnableSynchronizerCounts();
-	/* merge only OwnableSynchronizerObject related data */
-	void mergeOwnableSynchronizerCounts(MM_ScavengerJavaStats *statsToMerge);
 	
-	MMINLINE void 
-	updateOwnableSynchronizerNurseryCounts(UDATA survivedCount)
-	{
-		_ownableSynchronizerNurserySurvived += survivedCount;
-	}
-		
 	MM_ScavengerJavaStats();
 
 

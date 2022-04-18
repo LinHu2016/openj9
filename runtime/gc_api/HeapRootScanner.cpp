@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -47,7 +47,6 @@
 #include "ObjectAccessBarrier.hpp"
 #include "ObjectHeapIterator.hpp"
 #include "ObjectModel.hpp"
-#include "OwnableSynchronizerObjectList.hpp"
 #include "PointerArrayIterator.hpp"
 #include "SegmentIterator.hpp"
 #include "StringTable.hpp"
@@ -65,12 +64,6 @@ MM_HeapRootScanner::doClassLoader(J9ClassLoader *classLoader)
 	if (J9_GC_CLASS_LOADER_DEAD != (classLoader->gcFlags & J9_GC_CLASS_LOADER_DEAD) ) {
 		doSlot(J9GC_J9CLASSLOADER_CLASSLOADEROBJECT_EA(classLoader));
 	}
-}
-
-void
-MM_HeapRootScanner::doOwnableSynchronizerObject(J9Object *objectPtr)
-{
-	doObject(objectPtr);
 }
 
 #if defined(J9VM_GC_FINALIZATION)
@@ -458,26 +451,6 @@ MM_HeapRootScanner::scanUnfinalizedObjects()
 	reportScanningEnded(RootScannerEntity_UnfinalizedObjects);
 }
 #endif /* J9VM_GC_FINALIZATION */
-
-void
-MM_HeapRootScanner::scanOwnableSynchronizerObjects()
-{
-	reportScanningStarted(RootScannerEntity_OwnableSynchronizerObjects);
-	setReachability(RootScannerEntityReachability_Weak);
-
-	MM_ObjectAccessBarrier *barrier = _extensions->accessBarrier;
-	MM_OwnableSynchronizerObjectList *ownableSynchronizerObjectList = _extensions->getOwnableSynchronizerObjectLists();
-
-	while(NULL != ownableSynchronizerObjectList) {
-		J9Object *objectPtr = ownableSynchronizerObjectList->getHeadOfList();
-		while (NULL != objectPtr) {
-			doOwnableSynchronizerObject(objectPtr);
-			objectPtr = barrier->getOwnableSynchronizerLink(objectPtr);
-		}
-		ownableSynchronizerObjectList = ownableSynchronizerObjectList->getNextList();
-	}
-	reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
-}
 
 /**
  * @todo Provide function documentation

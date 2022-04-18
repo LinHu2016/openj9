@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2017, 2021 IBM Corp. and others
+ * Copyright (c) 2017, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -49,7 +49,6 @@
 typedef struct MM_HeapRegionDescriptorStandardExtension {
 	uintptr_t _maxListIndex; /**< Max index for _*ObjectLists[index] */
 	MM_UnfinalizedObjectList *_unfinalizedObjectLists; /**< An array of lists of unfinalized objects in this region */
-	MM_OwnableSynchronizerObjectList *_ownableSynchronizerObjectLists; /**< An array of lists of ownable synchronizer objects in this region */
 	MM_ReferenceObjectList *_referenceObjectLists; /**< An array of lists of reference objects (i.e. weak/soft/phantom) in this region */
 } MM_HeapRegionDescriptorStandardExtension;
 
@@ -147,6 +146,11 @@ public:
 			extensions->stringTable->kill(env);
 			extensions->stringTable = NULL;
 		}
+
+		if (NULL != extensions->ownableSynchronizerObjectList) {
+			extensions->ownableSynchronizerObjectList->kill(env);
+			extensions->ownableSynchronizerObjectList = NULL;
+		}
 	}
 
 	OMR_SizeClasses *getSegregatedSizeClasses(MM_EnvironmentBase* env)
@@ -172,7 +176,7 @@ public:
 
 		if (extensions->isStandardGC()) {
 			uintptr_t listCount = extensions->gcThreadCount;
-			uintptr_t allocSize = sizeof(MM_HeapRegionDescriptorStandardExtension) + (listCount * (sizeof(MM_UnfinalizedObjectList) + sizeof(MM_OwnableSynchronizerObjectList) + sizeof(MM_ReferenceObjectList)));
+			uintptr_t allocSize = sizeof(MM_HeapRegionDescriptorStandardExtension) + (listCount * (sizeof(MM_UnfinalizedObjectList) + sizeof(MM_ReferenceObjectList)));
 			MM_HeapRegionDescriptorStandardExtension *regionExtension = (MM_HeapRegionDescriptorStandardExtension *)env->getForge()->allocate(allocSize, MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
 			if (NULL == regionExtension) {
 				return false;
@@ -180,9 +184,7 @@ public:
 
 			regionExtension->_maxListIndex = listCount;
 			regionExtension->_unfinalizedObjectLists = (MM_UnfinalizedObjectList *) ((uintptr_t)regionExtension + sizeof(MM_HeapRegionDescriptorStandardExtension));
-			regionExtension->_ownableSynchronizerObjectLists = (MM_OwnableSynchronizerObjectList *) (regionExtension->_unfinalizedObjectLists + listCount);
-			regionExtension->_referenceObjectLists = (MM_ReferenceObjectList *) (regionExtension->_ownableSynchronizerObjectLists + listCount);
-
+			regionExtension->_referenceObjectLists = (MM_ReferenceObjectList *) (regionExtension->_unfinalizedObjectLists + listCount);
 			for (uintptr_t list = 0; list < listCount; list++) {
 				new(&regionExtension->_unfinalizedObjectLists[list]) MM_UnfinalizedObjectList();
 				regionExtension->_unfinalizedObjectLists[list].setNextList(extensions->unfinalizedObjectLists);
@@ -191,14 +193,6 @@ public:
 					extensions->unfinalizedObjectLists->setPreviousList(&regionExtension->_unfinalizedObjectLists[list]);
 				}
 				extensions->unfinalizedObjectLists = &regionExtension->_unfinalizedObjectLists[list];
-
-				new(&regionExtension->_ownableSynchronizerObjectLists[list]) MM_OwnableSynchronizerObjectList();
-				regionExtension->_ownableSynchronizerObjectLists[list].setNextList(extensions->getOwnableSynchronizerObjectLists());
-				regionExtension->_ownableSynchronizerObjectLists[list].setPreviousList(NULL);
-				if (NULL != extensions->getOwnableSynchronizerObjectLists()) {
-					extensions->getOwnableSynchronizerObjectLists()->setPreviousList(&regionExtension->_ownableSynchronizerObjectLists[list]);
-				}
-				extensions->setOwnableSynchronizerObjectLists(&regionExtension->_ownableSynchronizerObjectLists[list]);
 
 				new(&regionExtension->_referenceObjectLists[list]) MM_ReferenceObjectList();
 			}

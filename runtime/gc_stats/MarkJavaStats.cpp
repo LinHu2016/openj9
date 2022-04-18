@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -32,9 +32,6 @@ MM_MarkJavaStats::clear()
 	_unfinalizedCandidates = 0;
 	_unfinalizedEnqueued = 0;
 
-	_ownableSynchronizerCandidates = 0;
-	_ownableSynchronizerCleared = 0;
-
 	_weakReferenceStats.clear();
 	_softReferenceStats.clear();
 	_phantomReferenceStats.clear();
@@ -56,9 +53,6 @@ MM_MarkJavaStats::merge(MM_MarkJavaStats* statsToMerge)
 {
 	_unfinalizedCandidates += statsToMerge->_unfinalizedCandidates;
 	_unfinalizedEnqueued += statsToMerge->_unfinalizedEnqueued;
-
-	_ownableSynchronizerCandidates += statsToMerge->_ownableSynchronizerCandidates;
-	_ownableSynchronizerCleared += statsToMerge->_ownableSynchronizerCleared;
 
 	_weakReferenceStats.merge(&statsToMerge->_weakReferenceStats);
 	_softReferenceStats.merge(&statsToMerge->_softReferenceStats);

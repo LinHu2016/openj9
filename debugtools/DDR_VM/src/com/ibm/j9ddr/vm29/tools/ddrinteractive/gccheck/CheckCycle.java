@@ -73,9 +73,9 @@ class CheckCycle
 			classes.add(CheckFinalizableList.class);
 		}
 
-		names.add("ownablesynchronizer");
-		classes.add(CheckOwnableSynchronizerList.class);
-		
+//		names.add("ownablesynchronizer");
+//		classes.add(CheckOwnableSynchronizerList.class);
+//		
 		names.add("stringtable");
 		classes.add(CheckStringTable.class);
 
@@ -152,7 +152,7 @@ class CheckCycle
 		reporter.println("  darkmatter");
 		reporter.println("  midscavenge");
 		reporter.println("  scavengerbackout");
-		reporter.println("  ownablesynchronizerconsistency");
+//		reporter.println("  ownablesynchronizerconsistency");
 		reporter.println();
 	}
 
@@ -421,12 +421,12 @@ class CheckCycle
 						}
 					}
 
-					if(miscOption.equals("ownablesynchronizerconsistency")) {
-						/* try to match the count of ownableSynchronizerObjects on Heap and on the lists */
-						miscFlags |= J9MODRON_GCCHK_MISC_OWNABLESYNCHRONIZER_CONSISTENCY;
-						continue;
-					}
-					
+//					if(miscOption.equals("ownablesynchronizerconsistency")) {
+//						/* try to match the count of ownableSynchronizerObjects on Heap and on the lists */
+//						miscFlags |= J9MODRON_GCCHK_MISC_OWNABLESYNCHRONIZER_CONSISTENCY;
+//						continue;
+//					}
+//					
 					_printHelp = true;
 					_engine.getReporter().println("GC Check: unrecognized option '" + miscOption + "'");
 				}
@@ -451,15 +451,15 @@ class CheckCycle
 		_checkFlags = checkFlags;
 		_miscFlags = miscFlags;
 		
-		if (checksToRun.get("objectheap")) {
-			/* initialize OwnableSynchronizerCount On Object Heap for ownableSynchronizer consistency check */
-			_engine.initializeOwnableSynchronizerCountOnHeap();
-		}
-		if (checksToRun.get("ownablesynchronizer")) {
-			/* initialize OwnableSynchronizerCount On Lists for ownableSynchronizer consistency check */
-			_engine.initializeOwnableSynchronizerCountOnList();
-		}
-		
+//		if (checksToRun.get("objectheap")) {
+//			/* initialize OwnableSynchronizerCount On Object Heap for ownableSynchronizer consistency check */
+//			_engine.initializeOwnableSynchronizerCountOnHeap();
+//		}
+//		if (checksToRun.get("ownablesynchronizer")) {
+//			/* initialize OwnableSynchronizerCount On Lists for ownableSynchronizer consistency check */
+//			_engine.initializeOwnableSynchronizerCountOnList();
+//		}
+//		
 	}
 
 	public void run() throws CorruptDataException

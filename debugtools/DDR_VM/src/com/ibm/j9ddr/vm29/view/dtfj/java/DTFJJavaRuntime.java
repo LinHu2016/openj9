@@ -624,24 +624,24 @@ public class DTFJJavaRuntime implements JavaRuntime {
 			/* Do nothing, we don't report stack slots here */
 		}
 
-		@Override
-		protected void doOwnableSynchronizerObject(J9ObjectPointer slot) 
-		{
-			if (slot.notNull()) {
-				try {
-					references.add(new DTFJJavaReference(DTFJJavaRuntime.this,
-							new DTFJJavaObject(slot),
-							"OwnableSynchronizerObject",
-							JavaReference.REFERENCE_UNKNOWN,
-							JavaReference.HEAP_ROOT_OTHER, 
-							getReachabilityCode()));
-				} catch (Throwable t) {
-					CorruptData cd = J9DDRDTFJUtils.handleAsCorruptData(DTFJContext.getProcess(), t);
-					references.add(cd);
-				}
-			}
-		}
-
+//		@Override
+//		protected void doOwnableSynchronizerObject(J9ObjectPointer slot) 
+//		{
+//			if (slot.notNull()) {
+//				try {
+//					references.add(new DTFJJavaReference(DTFJJavaRuntime.this,
+//							new DTFJJavaObject(slot),
+//							"OwnableSynchronizerObject",
+//							JavaReference.REFERENCE_UNKNOWN,
+//							JavaReference.HEAP_ROOT_OTHER, 
+//							getReachabilityCode()));
+//				} catch (Throwable t) {
+//					CorruptData cd = J9DDRDTFJUtils.handleAsCorruptData(DTFJContext.getProcess(), t);
+//					references.add(cd);
+//				}
+//			}
+//		}
+//
 		@Override
 		protected void doMonitorLookupCacheSlot(J9ObjectMonitorPointer slot) 
 		{

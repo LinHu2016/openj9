@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2001, 2021 IBM Corp. and others
+ * Copyright (c) 2001, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -177,18 +177,7 @@ public:
 	void scanFinalizableObjects();
 	virtual void scanUnfinalizedObjects();
 #endif /* J9VM_GC_FINALIZATION */
-	/**
-	 * @todo Provide function documentation
-	 *
-	 * @NOTE this code is not thread safe and assumes it is called in a single threaded
-	 * manner.
-	 *
-	 * @NOTE this can only be used as a READ-ONLY version of the ownableSynchronizerObjectList.
-	 * If you need to modify elements with-in the list you will need to provide your own functionality.
-	 * See MM_MarkingScheme::scanOwnableSynchronizerObjects(MM_EnvironmentStandard *env) as an example
-	 * which modifies elements with-in the list.
-	 */
-	virtual void scanOwnableSynchronizerObjects();
+
 	void scanStringTable();
 	void scanJNIGlobalReferences();
 	void scanJNIWeakGlobalReferences();
@@ -205,11 +194,6 @@ public:
 	virtual void doFinalizableObject(J9Object *objectPtr);
 	virtual void doUnfinalizedObject(J9Object *objectPtr);
 #endif /* J9VM_GC_FINALIZATION */
-	/**
-	 * @todo Provide function documentation
-	 */
-	virtual void doOwnableSynchronizerObject(J9Object *objectPtr);
-
 	virtual void doMonitorReference(J9ObjectMonitor *objectMonitor, GC_HashTableIterator *monitorReferenceIterator);
 
 	virtual void doJNIWeakGlobalReference(J9Object **slotPtr);

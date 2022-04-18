@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019, 2020 IBM Corp. and others
+ * Copyright (c) 2019, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -80,7 +80,6 @@ public:
 
 	bool allocateAndInitializeReferenceObjectLists(MM_EnvironmentBase *env);
 	bool allocateAndInitializeUnfinalizedObjectLists(MM_EnvironmentBase *env);
-	bool allocateAndInitializeOwnableSynchronizerObjectLists(MM_EnvironmentBase *env);
 
 #if defined(J9VM_GC_FINALIZATION)	
 	bool isFinalizationRequired() { return _finalizationRequired; }
@@ -139,7 +138,6 @@ public:
 	void unlockClassUnloadMonitor(MM_EnvironmentRealtime *env);
 
 	UDATA getUnfinalizedObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
-	UDATA getOwnableSynchronizerObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 	UDATA getReferenceObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 
 	void defaultMemorySpaceAllocated(MM_GCExtensionsBase *extensions, void* defaultMemorySpace);
@@ -213,7 +211,6 @@ public:
 		case GC_ObjectModel::SCAN_MIXED_OBJECT_LINKED:
 		case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 		case GC_ObjectModel::SCAN_MIXED_OBJECT:
-		case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
 		case GC_ObjectModel::SCAN_CLASS_OBJECT:
 		case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 			pointersScanned = scanMixedObject(env, objectPtr);
@@ -508,13 +505,6 @@ public:
 #if defined(J9VM_GC_FINALIZATION)
 	void scanUnfinalizedObjects(MM_EnvironmentRealtime *env);
 #endif /* J9VM_GC_FINALIZATION */
-
-	/**
-	 * Wraps the MM_RootScanner::scanOwnableSynchronizerObjects method to disable yielding during the scan
-	 * then yield after scanning.
-	 * @see MM_RootScanner::scanOwnableSynchronizerObjects()
-	 */
-	void scanOwnableSynchronizerObjects(MM_EnvironmentRealtime *env);
 
 private:
 	/**

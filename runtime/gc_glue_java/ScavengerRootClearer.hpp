@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -148,9 +148,6 @@ public:
 		return result;
 	}
 #endif /* J9VM_GC_FINALIZATION */
-
-	/* empty, move ownable synchronizer processing in main scan phase */
-	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env) {}
 
 	virtual void
 	scanPhantomReferenceObjects(MM_EnvironmentBase *env)

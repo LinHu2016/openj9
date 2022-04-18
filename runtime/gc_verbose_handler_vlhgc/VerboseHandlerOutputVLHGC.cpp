@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -266,14 +266,6 @@ MM_VerboseHandlerOutputVLHGC::outputUnfinalizedInfo(MM_EnvironmentBase *env, UDA
 }
 
 void
-MM_VerboseHandlerOutputVLHGC::outputOwnableSynchronizerInfo(MM_EnvironmentBase *env, UDATA indent, UDATA ownableSynchronizerCandidates, UDATA ownableSynchronizerCleared)
-{
-	if (0 != ownableSynchronizerCandidates) {
-		_manager->getWriterChain()->formatAndOutput(env, indent, "<ownableSynchronizers candidates=\"%zu\" cleared=\"%zu\" />", ownableSynchronizerCandidates, ownableSynchronizerCleared);
-	}
-}
-
-void
 MM_VerboseHandlerOutputVLHGC::outputReferenceInfo(MM_EnvironmentBase *env, UDATA indent, const char *referenceType, MM_ReferenceStats *referenceStats, UDATA dynamicThreshold, UDATA maxThreshold)
 {
 	if(0 != referenceStats->_candidates) {
@@ -422,7 +414,6 @@ MM_VerboseHandlerOutputVLHGC::handleCopyForwardEnd(J9HookInterface** hook, UDATA
 	outputRememberedSetClearedInfo(env, irrsStats);
 
 	outputUnfinalizedInfo(env, 1, copyForwardStats->_unfinalizedCandidates, copyForwardStats->_unfinalizedEnqueued);
-	outputOwnableSynchronizerInfo(env, 1, copyForwardStats->_ownableSynchronizerCandidates, (copyForwardStats->_ownableSynchronizerCandidates-copyForwardStats->_ownableSynchronizerSurvived));
 
 	outputReferenceInfo(env, 1, "soft", &copyForwardStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 	outputReferenceInfo(env, 1, "weak", &copyForwardStats->_weakReferenceStats, 0, 0);
@@ -569,7 +560,6 @@ MM_VerboseHandlerOutputVLHGC::outputMarkSummary(MM_EnvironmentBase *env, const c
 	}
 
 	outputUnfinalizedInfo(env, 1, markStats->_unfinalizedCandidates, markStats->_unfinalizedEnqueued);
-	outputOwnableSynchronizerInfo(env, 1, markStats->_ownableSynchronizerCandidates, markStats->_ownableSynchronizerCleared);
 
 	outputReferenceInfo(env, 1, "soft", &markStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 	outputReferenceInfo(env, 1, "weak", &markStats->_weakReferenceStats, 0, 0);

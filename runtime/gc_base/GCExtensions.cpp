@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -41,6 +41,7 @@
 #include "ReferenceChainWalkerMarkMap.hpp"
 #include "SublistPool.hpp"
 #include "Wildcard.hpp"
+#include "OwnableSynchronizerObjectList.hpp"
 
 MM_GCExtensions *
 MM_GCExtensions::newInstance(MM_EnvironmentBase *env)
@@ -271,10 +272,11 @@ MM_GCExtensions::computeDefaultMaxHeapForJava(bool enableOriginalJDK8HeapSizeCom
 	maxSizeDefaultMemorySpace = memoryMax;
 }
 
-MM_OwnableSynchronizerObjectList *
-MM_GCExtensions::getOwnableSynchronizerObjectListsExternal(J9VMThread *vmThread)
+MM_OwnableSynchronizerObjectList*
+MM_GCExtensions::getOwnableSynchronizerObjectListExternal()
 {
 	Assert_MM_true(!isConcurrentScavengerInProgress());
+	ownableSynchronizerObjectList->reset();
+	return ownableSynchronizerObjectList;
 
-	return ownableSynchronizerObjectLists;
 }

@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -419,15 +419,6 @@ public:
 	virtual void scanUnfinalizedObjects(MM_EnvironmentBase *env);
 #endif /* J9VM_GC_FINALIZATION */
 
-	/**
-	 * @todo Provide function documentation
-	 *
-	 * @NOTE this can only be used as a READ-ONLY version of the ownableSynchronizerObjectList.
-	 * If you need to modify elements with-in the list you will need to provide your own functionality.
-	 * See MM_MarkingScheme::scanUnfinalizedObjects(MM_EnvironmentStandard *env) as an example
-	 * which modifies elements within the list.
-	 */
-	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env);
 	virtual void scanStringTable(MM_EnvironmentBase *env);
 	void scanJNIGlobalReferences(MM_EnvironmentBase *env);
 	virtual void scanJNIWeakGlobalReferences(MM_EnvironmentBase *env);
@@ -477,16 +468,6 @@ public:
 	virtual void doUnfinalizedObject(J9Object *objectPtr, MM_UnfinalizedObjectList *list);
 	virtual CompletePhaseCode scanUnfinalizedObjectsComplete(MM_EnvironmentBase *env);
 #endif /* J9VM_GC_FINALIZATION */
-
-	/**
-	 * @todo Provide function documentation
-	 */
-	virtual void doOwnableSynchronizerObject(J9Object *objectPtr, MM_OwnableSynchronizerObjectList *list);
-	
-	/**
-	 * @todo Provide function documentation
-	 */	
-	virtual CompletePhaseCode scanOwnableSynchronizerObjectsComplete(MM_EnvironmentBase *env);
 
 	virtual void doMonitorReference(J9ObjectMonitor *objectMonitor, GC_HashTableIterator *monitorReferenceIterator);
 	virtual void doMonitorLookupCacheSlot(j9objectmonitor_t* slotPtr);

@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 2017, 2020 IBM Corp. and others
+ * Copyright (c) 2017, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -29,8 +29,6 @@
 #include "HeapRegionDescriptorStandard.hpp"
 #include "HeapRegionIteratorStandard.hpp"
 #include "MarkMap.hpp"
-#include "OwnableSynchronizerObjectBuffer.hpp"
-#include "OwnableSynchronizerObjectList.hpp"
 #include "PointerContiguousArrayIterator.hpp"
 
 #if defined(OMR_GC_MODRON_COMPACTION)
@@ -81,7 +79,6 @@ MM_CompactDelegate::verifyHeap(MM_EnvironmentBase *env, MM_MarkMap *markMap)
 			case GC_ObjectModel::SCAN_MIXED_OBJECT_LINKED:
 			case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 			case GC_ObjectModel::SCAN_MIXED_OBJECT:
-			case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
 			case GC_ObjectModel::SCAN_CLASS_OBJECT:
 			case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 			case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
@@ -127,23 +124,11 @@ MM_CompactDelegate::fixupRoots(MM_EnvironmentBase *env, MM_CompactScheme *compac
 void
 MM_CompactDelegate::workerCleanupAfterGC(MM_EnvironmentBase *env)
 {
-	/* flush ownable synchronizer object buffer after rebuild the ownableSynchronizerObjectList during fixupObjects */
-	env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->flush(env);
 }
 
 void
 MM_CompactDelegate::mainSetupForGC(MM_EnvironmentBase *env)
 {
-	MM_GCExtensionsBase *extensions = env->getExtensions();
-	MM_HeapRegionDescriptorStandard *region = NULL;
-	GC_HeapRegionIteratorStandard regionIterator(extensions->getHeap()->getHeapRegionManager());
-	while (NULL != (region = regionIterator.nextRegion())) {
-		MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
-			MM_OwnableSynchronizerObjectList *list = &regionExtension->_ownableSynchronizerObjectLists[i];
-			list->startOwnableSynchronizerProcessing();
-		}
-	}
 }
 
 #endif /* OMR_GC_MODRON_COMPACTION */

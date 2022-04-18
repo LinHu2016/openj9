@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2001, 2019 IBM Corp. and others
+ * Copyright (c) 2001, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -22,6 +22,11 @@
 package com.ibm.tests.garbagecollector;
 import java.io.IOException;
 import java.io.InputStream;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import com.ibm.lang.management.ExtendedThreadInfo;
+import com.ibm.lang.management.ThreadMXBean;
 
 /**
  * This test is to exercise the GC's dynamic class unloading capability.  It tries to load a class and then instantiate thousands
@@ -144,6 +149,31 @@ public class TestClassLoaderMain {
 					timeout = (nowTime - startTime) >= DynamicConfigurationExtractor.getTestDurationMillis();
 				}
 			}
+			
+			System.out.println("test if we still can retrieve all ownableSynchronizers via walking whole heap.");
+			/* test if we still can retrieve all ownableSynchronizers via walking whole heap (if the heap is walkable) */
+			ThreadMXBean tb = (ThreadMXBean)ManagementFactory.getThreadMXBean();
+			try {
+				/* dumpAllExtendedThreads() fetches an array of ExtendedThreadInfo objects that we can examine. */
+				ExtendedThreadInfo[] tinfo = tb.dumpAllExtendedThreads(true, true);
+
+				/* Loop through the array obtained, examining each thread. */
+				for (ExtendedThreadInfo iter : tinfo) {
+					java.lang.management.ThreadInfo thr = iter.getThreadInfo();
+					long thrId = thr.getThreadId();
+					long nativeTid = iter.getNativeThreadId();
+					if (nativeTid <= 0) {
+						System.out.println("Thread corresponding to " + thrId + " is no longer available with the OS.");
+					} else {
+						System.out.println("Thread ID: " + thrId + ", thread name: " + thr.getThreadName() + ", native thread ID: "
+								+ nativeTid);
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+				System.out.println("Unexpected exception occurred while executing dumpAllExtendedThreads().");
+			}
+			
 			System.out.println("Successful test run! (" + (iteration - 1) + " iterations)");
 		}
 		else
