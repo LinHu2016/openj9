@@ -47,6 +47,7 @@
 #include "ClassModel.hpp"
 #include "ForwardedHeader.hpp"
 #include "GCExtensions.hpp"
+#include "GlobalCollector.hpp"
 #include "HeapRegionDescriptor.hpp"
 #include "ModronTypes.hpp"
 #include "ObjectModel.hpp"
@@ -920,6 +921,12 @@ GC_CheckEngine::checkSlotObjectHeap(J9JavaVM *javaVM, J9Object *objectPtr, fj9ob
 	MM_GCExtensions * extensions = MM_GCExtensions::getExtensions(javaVM);
 
 	if (NULL == objectPtr) {
+		return J9MODRON_SLOT_ITERATOR_OK;
+	}
+
+	if (!MM_GCExtensions::getExtensions(javaVM)->getGlobalCollector()->isMarked(objectPtr)) {
+		PORT_ACCESS_FROM_PORT(_portLibrary);
+		j9tty_printf(PORTLIB, "  <gc check: found dead SlotObjectHeap %p>\n", objectPtr);
 		return J9MODRON_SLOT_ITERATOR_OK;
 	}
 

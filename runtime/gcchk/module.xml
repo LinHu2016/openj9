@@ -73,6 +73,20 @@ SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-excepti
 			<library name="j9pool" type="external"/>
 			<library name="j9hookable"/>
 			<library name="j9gcbase"/>
+			<library name="j9modronstartup"/>
+			<library name="omrgcstartup" type="external"/>
+			<library name="j9gcvlhgc">
+				<include-if condition="spec.flags.gc_vlhgc"/>
+			</library>
+			<library name="j9modronstandard">
+				<include-if condition="spec.flags.J9VM_GC_MODRON_STANDARD"/>
+			</library>
+			<library name="omrgcstandard" type="external">
+				<include-if condition="spec.flags.J9VM_GC_MODRON_STANDARD"/>
+			</library>
+			<library name="j9realtime">
+				<include-if condition="spec.flags.J9VM_GC_REALTIME"/>
+			</library>
 			<library name="omrgcbase" type="external"/>
 			<library name="j9gcstructs"/>
 			<library name="omrgcstructs" type="external"/>

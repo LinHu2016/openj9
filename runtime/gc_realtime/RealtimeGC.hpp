@@ -33,6 +33,7 @@
 #include "GlobalCollector.hpp"
 #include "HeapRegionList.hpp"
 #include "IncrementalOverflow.hpp"
+#include "MarkMap.hpp"
 #include "MemorySubSpace.hpp"
 #include "MemoryPoolSegregated.hpp"
 #include "MetronomeDelegate.hpp"
@@ -227,6 +228,8 @@ public:
 	MM_MetronomeDelegate *getRealtimeDelegate() { return &_realtimeDelegate; }
 
 	virtual bool isMarked(void *objectPtr);
+
+	virtual MM_MarkMap *getMarkMap() { return getMarkingScheme()->getMarkMap(); }
 
 	MM_RealtimeGC(MM_EnvironmentBase *env)
 		: MM_GlobalCollector()

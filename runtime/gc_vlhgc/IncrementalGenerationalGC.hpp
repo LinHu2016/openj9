@@ -43,6 +43,8 @@
 #include "GlobalCollector.hpp"
 #include "GlobalMarkDelegate.hpp"
 #include "MainGCThread.hpp"
+#include "MarkMap.hpp"
+#include "MarkMapManager.hpp"
 #include "ModronTypes.hpp"
 #include "ProjectedSurvivalCollectionSetDelegate.hpp"
 #include "ReclaimDelegate.hpp"
@@ -50,8 +52,6 @@
 
 class MM_EnvironmentBase;
 class MM_HeapRegionDescriptorVLHGC;
-class MM_MarkMap;
-class MM_MarkMapManager;
 class MM_MemorySubSpace;
 class MM_MemorySubSpaceTarok;
 class MM_WorkPacketsVLHGC;
@@ -357,6 +357,8 @@ public:
 	void taxationEntryPoint(MM_EnvironmentBase *env, MM_MemorySubSpace *subspace, MM_AllocateDescription *allocDescription);
 
 	virtual bool isMarked(void *objectPtr);
+
+	virtual MM_MarkMap *getMarkMap() { return getMarkMapManager()->getGlobalMarkPhaseMap(); }
 
 	/**
 	 * @return true if the collector has a pending concurrent request

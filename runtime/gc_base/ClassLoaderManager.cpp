@@ -456,6 +456,8 @@ MM_ClassLoaderManager::cleanUpClassLoadersEnd(MM_EnvironmentBase *env, J9ClassLo
 void
 MM_ClassLoaderManager::cleanUpSegmentsAlongClassLoaderLink(J9JavaVM *javaVM, J9MemorySegment *segment, J9MemorySegment **reclaimedSegments)
 {
+//	PORT_ACCESS_FROM_JAVAVM(javaVM);
+//	j9tty_printf(PORTLIB, "cleanUpSegmentsAlongClassLoaderLink segment =%p\n", segment);
 	while (NULL != segment) {
 		J9MemorySegment *nextSegment = segment->nextSegmentInClassLoader;
 		if (segment->type & MEMORY_TYPE_RAM_CLASS) {
@@ -465,8 +467,10 @@ MM_ClassLoaderManager::cleanUpSegmentsAlongClassLoaderLink(J9JavaVM *javaVM, J9M
 			segment->nextSegmentInClassLoader = *reclaimedSegments;
 			*reclaimedSegments = segment;
 			segment->classLoader = NULL;
+//			j9tty_printf(PORTLIB, "cleanUpSegmentsAlongClassLoaderLink reclaimedSegments = %p\n", segment);
 		} else if (!(segment->type & MEMORY_TYPE_UNDEAD_CLASS)) {
 			javaVM->internalVMFunctions->freeMemorySegment(javaVM, segment, 1);
+//			j9tty_printf(PORTLIB, "cleanUpSegmentsAlongClassLoaderLink freeMemorySegment = %p\n", segment);
 		}
 		segment = nextSegment;
 	}

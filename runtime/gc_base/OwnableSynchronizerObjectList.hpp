@@ -26,11 +26,9 @@
 
 #include "j9.h"
 #include "j9cfg.h"
-#include "j9nonbuilder.h"
 #include "modron.h"
 
 #include "BaseNonVirtual.hpp"
-#include "ObjectAccessBarrier.hpp"
 
 class MM_EnvironmentBase;
 
@@ -50,30 +48,8 @@ public:
 	
 /* function members */
 private:
-	MMINLINE bool isOwnableSynchronizerObject(j9object_t object)
-	{
-		bool ret = false;
-		J9Class *objectClass =  J9GC_J9OBJECT_CLAZZ_VM(object, _javaVM);
-		if ((OBJECT_HEADER_SHAPE_MIXED == J9GC_CLASS_SHAPE(objectClass)) && (J9CLASS_FLAGS(objectClass) & J9AccClassOwnableSynchronizer)) {
-			ret = true;
-		}
-		return ret;
-	}
-
-	void add(j9object_t object)
-	{
-		Assert_MM_true(NULL != object);
-
-		j9object_t previousHead = _head;
-		while (previousHead != (j9object_t)MM_AtomicOperations::lockCompareExchange((volatile UDATA*)&_head, (UDATA)previousHead, (UDATA)object)) {
-			previousHead = _head;
-		}
-
-		/* detect trivial cases which can inject cycles into the linked list */
-		Assert_MM_true(_head != previousHead);
-
-		_extensions->accessBarrier->setOwnableSynchronizerLink(object, previousHead);
-	}
+	bool isOwnableSynchronizerObject(j9object_t object);
+	void add(j9object_t object);
 
 protected:
 public:
@@ -96,36 +72,23 @@ public:
 	 * Fetch the head of the linked list, as it appeared at the beginning of OwnableSynchronizer object processing.
 	 * @return the head object, or NULL if the list is empty
 	 */
-	MMINLINE j9object_t getHeadOfList(MM_EnvironmentBase *env) {
-		if (_needRefresh) {
-			rebuildList(env);
-			_needRefresh = false;
-		}
-		return _head;
-	}
+	j9object_t getHeadOfList(MM_EnvironmentBase *env = NULL);
 
-	void reset() {
+	MMINLINE void reset() {
 		_needRefresh = true;
 		_head = NULL; 
 	}
-	
+	bool isRefreshed() {return (!_needRefresh); }
 	void ensureHeapWalkable(MM_EnvironmentBase *env);
 	/*
 	 * rebuildList need to run under ExclusiveVMAccess and no ConcurrentScavengerInProgress
 	 */
 	void rebuildList(MM_EnvironmentBase *env);
+	void rebuildListviaMarkMap(MM_EnvironmentBase *env);
 	/**
 	 * Construct a new list.
 	 */
-	MM_OwnableSynchronizerObjectList(MM_GCExtensions* extensions)
-		: MM_BaseNonVirtual()
-		, _needRefresh(true)
-		, _head(NULL)
-		, _javaVM(NULL)
-		, _extensions(extensions)
-	{
-		_typeId = __FUNCTION__;
-	}
+	MM_OwnableSynchronizerObjectList(MM_GCExtensions* extensions);
 };
 
 #endif /* OWNABLESYNCHRONIZEROBJECTLIST_HPP_ */

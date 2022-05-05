@@ -27,6 +27,11 @@
 #include "ScanFormatter.hpp"
 #include "HeapIteratorAPI.h"
 
+#include "EnvironmentBase.hpp"
+#include "OwnableSynchronizerObjectList.hpp"
+#include "GCExtensions.hpp"
+
+
 /**
  * Private struct used as the user data for the iterator callbacks. The regionDesc will get set
  * by the region iterator callback.
@@ -67,6 +72,17 @@ GC_CheckObjectHeap::kill()
 void
 GC_CheckObjectHeap::check()
 {
+//
+//	J9VMThread* currentThread = _javaVM->internalVMFunctions->currentVMThread(_javaVM);
+//	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(currentThread->omrVMThread);
+//	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(_javaVM);
+//	MM_OwnableSynchronizerObjectList *ownableSynchronizerObjectList = extensions->getOwnableSynchronizerObjectListExternal();
+//	PORT_ACCESS_FROM_PORT(_portLibrary);
+//	j9tty_printf(PORTLIB, "GC_CheckObjectHeap::check env=%p, currentThread=%p, \n", env, currentThread);
+//
+//	ownableSynchronizerObjectList->ensureHeapWalkable(env);
+//
+
 	/* Check by using the HeapIteratorAPI */
 	ObjectIteratorCallbackUserData userData;
 	userData.engine = _engine;

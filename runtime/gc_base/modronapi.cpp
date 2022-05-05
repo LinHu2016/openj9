@@ -993,6 +993,10 @@ ownableSynchronizerObjectCreated(J9VMThread *vmThread, j9object_t object)
 {
 	Assert_MM_true(NULL != object);
 	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+
+	PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+	j9tty_printf(PORTLIB, "ownableSynchronizerObjectCreated object=%p\n", object);
+
 	MM_ObjectAllocationInterface *objectAllocation = env->_objectAllocationInterface;
 	if (NULL != objectAllocation) {
 		objectAllocation->getAllocationStats()->_ownableSynchronizerObjectCount += 1;

@@ -89,6 +89,7 @@ private:
 public:
 	MM_OwnableSynchronizerObjectList* ownableSynchronizerObjectList;
 	bool needToEnsureHeapWalkableForRebuildingOSOL;
+	bool rebuildOwnableSynchronizersListUsingMarkMap;
 	MM_StringTable* stringTable; /**< top level String Table structure (internally organized as a set of hash sub-tables */
 
 	void* gcchkExtensions;
@@ -280,7 +281,8 @@ public:
 	 */
 	MM_OwnableSynchronizerObjectList*  getOwnableSynchronizerObjectListExternal();
 
-	MMINLINE MM_OwnableSynchronizerObjectList* getOwnableSynchronizerObjectList() { return ownableSynchronizerObjectList; }
+	void rebuildOwnableSynchronizerObjectList(MM_EnvironmentBase* env);
+
 	MMINLINE void setOwnableSynchronizerObjectList(MM_OwnableSynchronizerObjectList* list) { ownableSynchronizerObjectList = list; }
 
 	/**
@@ -289,7 +291,8 @@ public:
 	MM_GCExtensions()
 		: MM_GCExtensionsBase()
 		, ownableSynchronizerObjectList(NULL)
-		, needToEnsureHeapWalkableForRebuildingOSOL(false)
+		, needToEnsureHeapWalkableForRebuildingOSOL(true)
+		, rebuildOwnableSynchronizersListUsingMarkMap(false)
 		, stringTable(NULL)
 		, gcchkExtensions(NULL)
 		, tgcExtensions(NULL)

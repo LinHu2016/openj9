@@ -396,7 +396,7 @@ j9mm_iterate_object_slots(
 	jvmtiIterationControl returnCode = JVMTI_ITERATION_CONTINUE;
 	J9Object *objectPtr = (J9Object *)(object->id);
 	MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(javaVM->omrVM);
-	
+
 	switch(extensions->objectModel.getScanType(objectPtr)) {
 	case GC_ObjectModel::SCAN_MIXED_OBJECT_LINKED:
 	case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:

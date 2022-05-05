@@ -23,12 +23,18 @@
 
 #include "j9.h"
 #include "j9cfg.h"
+#include "j9nonbuilder.h"
 #include "ModronAssertions.h"
-
+#include "ObjectAccessBarrier.hpp"
 #include "HeapIteratorAPI.h"
-#include "EnvironmentBase.hpp"
 
 #include "OwnableSynchronizerObjectList.hpp"
+
+#include "GlobalCollector.hpp"
+#include "HeapRegionDescriptor.hpp"
+#include "HeapRegionIterator.hpp"
+#include "HeapMapIterator.hpp"
+#include "EnvironmentBase.hpp"
 
 /**
  * Return codes for iterator functions.
@@ -55,6 +61,17 @@ static jvmtiIterationControl walk_spaceIteratorCallback(J9JavaVM* vm, J9MM_Itera
 static jvmtiIterationControl walk_regionIteratorCallback(J9JavaVM* vm, J9MM_IterateRegionDescriptor* regionDesc, void* userData);
 static jvmtiIterationControl walk_objectIteratorCallback(J9JavaVM* vm, J9MM_IterateObjectDescriptor* objectDesc, void* userData);
 
+MM_OwnableSynchronizerObjectList::MM_OwnableSynchronizerObjectList(MM_GCExtensions* extensions)
+	: MM_BaseNonVirtual()
+	, _needRefresh(true)
+	, _head(NULL)
+	, _javaVM(NULL)
+	, _extensions(extensions)
+{
+	_typeId = __FUNCTION__;
+}
+
+
 MM_OwnableSynchronizerObjectList*
 MM_OwnableSynchronizerObjectList::newInstance(MM_EnvironmentBase *env, MM_GCExtensions* extensions)
 {
@@ -71,13 +88,47 @@ MM_OwnableSynchronizerObjectList::kill(MM_EnvironmentBase* env)
 	env->getForge()->free(this);
 }
 
+bool
+MM_OwnableSynchronizerObjectList::isOwnableSynchronizerObject(j9object_t object)
+{
+	bool ret = false;
+	J9Class *objectClass =  J9GC_J9OBJECT_CLAZZ_VM(object, _javaVM);
+	if ((OBJECT_HEADER_SHAPE_MIXED == J9GC_CLASS_SHAPE(objectClass)) && (J9CLASS_FLAGS(objectClass) & J9AccClassOwnableSynchronizer)) {
+		ret = true;
+	}
+	return ret;
+}
+
+void
+MM_OwnableSynchronizerObjectList::add(j9object_t object)
+{
+	Assert_MM_true(NULL != object);
+
+	j9object_t previousHead = _head;
+	while (previousHead != (j9object_t)MM_AtomicOperations::lockCompareExchange((volatile UDATA*)&_head, (UDATA)previousHead, (UDATA)object)) {
+		previousHead = _head;
+	}
+
+	/* detect trivial cases which can inject cycles into the linked list */
+	Assert_MM_true(_head != previousHead);
+
+	_extensions->accessBarrier->setOwnableSynchronizerLink(object, previousHead);
+}
+
 uintptr_t
 MM_OwnableSynchronizerObjectList::walkObjectHeap(J9JavaVM *javaVM, J9MM_IterateObjectDescriptor *objectDesc, J9MM_IterateRegionDescriptor *regionDesc)
 {
 	uintptr_t result = J9MODRON_SLOT_ITERATOR_OK;
 	if (TRUE == objectDesc->isObject) {
 		if (isOwnableSynchronizerObject(objectDesc->object)) {
-			add(objectDesc->object);
+//			if (_extensions->getGlobalCollector()->isMarked(objectDesc->object)) {
+				add(objectDesc->object);
+//				PORT_ACCESS_FROM_JAVAVM(javaVM);
+//				j9tty_printf(PORTLIB, "walkObjectHeap add ownableSynchronizer =%p to the list\n", objectDesc->object);
+//			} else {
+//				PORT_ACCESS_FROM_JAVAVM(javaVM);
+//				j9tty_printf(PORTLIB, "walkObjectHeap dead ownableSynchronizer =%p\n", objectDesc->object);
+//			}
 		}
 	}
 
@@ -88,12 +139,20 @@ void
 MM_OwnableSynchronizerObjectList::ensureHeapWalkable(MM_EnvironmentBase *env)
 {
 
+	if (NULL == _javaVM) {
+		_javaVM = _extensions->getJavaVM();
+	}
+
+	PORT_ACCESS_FROM_JAVAVM(_javaVM);
+	j9tty_printf(PORTLIB, "ensureHeapWalkable\n");
+
 	J9VMThread *vmThread = (J9VMThread *)env->getLanguageVMThread();
 
 	uintptr_t savedGCFlags = _javaVM->requiredDebugAttributes & J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
 	if (savedGCFlags == 0) { /* if the flags was not set, you set it */
 		_javaVM->requiredDebugAttributes |= J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
 	}
+	_extensions->rebuildMarkMapForCompact = true;
 	/* J9MMCONSTANT_EXPLICIT_GC_RASDUMP_COMPACT allows the GC to run while the current thread is holding
 	 * exclusive VM access.
 	 */
@@ -105,19 +164,33 @@ MM_OwnableSynchronizerObjectList::ensureHeapWalkable(MM_EnvironmentBase *env)
 	}
 
 
+	_extensions->rebuildMarkMapForCompact = false;
 	if (savedGCFlags == 0) { /* if you set it, you have to unset it */
 		_javaVM->requiredDebugAttributes &= ~J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
 	}
 }
 
-void 
+j9object_t
+MM_OwnableSynchronizerObjectList::getHeadOfList(MM_EnvironmentBase *env)
+{
+	if (_needRefresh) {
+		if (_extensions->rebuildOwnableSynchronizersListUsingMarkMap) {
+			rebuildListviaMarkMap(env);
+		} else {
+			rebuildList(env);
+		}
+	}
+	return _head;
+}
+
+void
 MM_OwnableSynchronizerObjectList::rebuildList(MM_EnvironmentBase *env)
 {
 	if (NULL == _javaVM) {
 		_javaVM = _extensions->getJavaVM();
 	}
 
-	if (_extensions->needToEnsureHeapWalkableForRebuildingOSOL) {
+	if ((NULL != env) && _extensions->needToEnsureHeapWalkableForRebuildingOSOL) {
 		ensureHeapWalkable(env);
 	}
 	ObjectIteratorCallbackUserData1 userData;
@@ -125,7 +198,43 @@ MM_OwnableSynchronizerObjectList::rebuildList(MM_EnvironmentBase *env)
 	userData.portLibrary = _javaVM->portLibrary;
 	userData.regionDesc = NULL;
 	_javaVM->memoryManagerFunctions->j9mm_iterate_heaps(_javaVM, _javaVM->portLibrary, 0, walk_heapIteratorCallback, &userData);
+	_needRefresh = false;
 }
+
+void
+MM_OwnableSynchronizerObjectList::rebuildListviaMarkMap(MM_EnvironmentBase *env)
+{
+	if (NULL == _javaVM) {
+		_javaVM = _extensions->getJavaVM();
+	}
+
+	if ((NULL != env) && _extensions->needToEnsureHeapWalkableForRebuildingOSOL) {
+		ensureHeapWalkable(env);
+	}
+
+	PORT_ACCESS_FROM_JAVAVM(_javaVM);
+	MM_HeapMap *markMap = (MM_HeapMap *)_extensions->getGlobalCollector()->getMarkMap();
+
+	MM_HeapRegionManager *regionManager = _extensions->getHeap()->getHeapRegionManager();
+	GC_HeapRegionIterator regionIterator(regionManager);
+	MM_HeapRegionDescriptor *region = NULL;
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		if (region->containsObjects()) {
+			MM_HeapMapIterator mapIterator(_extensions, markMap, (UDATA *)region->getLowAddress(), (UDATA *)region->getHighAddress());
+			J9Object *objectPtr = NULL;
+
+			while(NULL != (objectPtr = mapIterator.nextObject())) {
+				if (isOwnableSynchronizerObject(objectPtr)) {
+					add(objectPtr);
+					j9tty_printf(PORTLIB, "rebuildListviaMarkMap add ownableSynchronizer =%p to the list\n", objectPtr);
+				}
+			}
+		}
+	}
+	_needRefresh = false;
+}
+
 
 static jvmtiIterationControl
 walk_heapIteratorCallback(J9JavaVM* vm, J9MM_IterateHeapDescriptor* heapDesc, void* userData)
