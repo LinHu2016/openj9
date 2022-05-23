@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2001, 2019 IBM Corp. and others
+ * Copyright (c) 2001, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -23,6 +23,12 @@ package com.ibm.tests.garbagecollector;
 import java.io.IOException;
 import java.io.InputStream;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.Math;
+import com.ibm.lang.management.ExtendedThreadInfo;
+import com.ibm.lang.management.ThreadMXBean;
+import java.util.concurrent.locks.*;
 /**
  * This test is to exercise the GC's dynamic class unloading capability.  It tries to load a class and then instantiate thousands
  * of copies of it in an array which it continues to over-write with new copies of the class or other objects to force the creation
@@ -36,6 +42,9 @@ public class TestClassLoaderMain {
 	public static final String TEST_CLASS_FILE = "EmptyTestClass.class";
 	private static byte[] bytes;
 
+    static ReentrantReadWriteLock _rwl = new ReentrantReadWriteLock();
+    static ReentrantReadWriteLock _rwl2 = new ReentrantReadWriteLock();
+     
 	static {
 			bytes = new byte[0];
 			InputStream classFileForTesting = TestClassLoaderMain.class.getResourceAsStream(TEST_CLASS_FILE);
@@ -64,7 +73,7 @@ public class TestClassLoaderMain {
 				}
 			}
 	}
-
+	
 	private static void test(int increment)
 	{
 		int count = 0;
@@ -97,6 +106,33 @@ public class TestClassLoaderMain {
 
 	private static Object[] _objects;
 
+	public static void testRetrieveOwnableSynchronizers()
+	{
+		System.out.println("test if we still can retrieve all ownableSynchronizers via walking whole heap.");
+		/* test if we still can retrieve all ownableSynchronizers via walking whole heap (if the heap is walkable) */
+		ThreadMXBean tb = (ThreadMXBean)ManagementFactory.getThreadMXBean();
+		try {
+			/* dumpAllExtendedThreads() fetches an array of ExtendedThreadInfo objects that we can examine. */
+			ExtendedThreadInfo[] tinfo = tb.dumpAllExtendedThreads(true, true);
+
+			/* Loop through the array obtained, examining each thread. */
+			for (ExtendedThreadInfo iter : tinfo) {
+				java.lang.management.ThreadInfo thr = iter.getThreadInfo();
+				long thrId = thr.getThreadId();
+				long nativeTid = iter.getNativeThreadId();
+				if (nativeTid <= 0) {
+					System.out.println("Thread corresponding to " + thrId + " is no longer available with the OS.");
+				} else {
+					System.out.println("Thread ID: " + thrId + ", thread name: " + thr.getThreadName() + ", native thread ID: "
+							+ nativeTid);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println("Unexpected exception occurred while executing dumpAllExtendedThreads().");
+		}		
+	}
+	
 	public static void main(String[] args) {
 		if (3 == args.length)
 		{
@@ -117,13 +153,68 @@ public class TestClassLoaderMain {
 					System.exit(-1);
 				}
 			}
+			
+			ReentrantReadWriteLock.WriteLock writeLock = _rwl.writeLock();
+			ReentrantReadWriteLock.ReadLock readLock  = _rwl.readLock();
+			ReentrantLock lock = new ReentrantLock();
 
+			lock.lock();
 			int iterations = 0;
-			if (!"-".equals(args[2])) {
-				iterations = Integer.parseInt(args[2]);
-			}
+			try {
+				if (!"-".equals(args[2])) {
+					iterations = Integer.parseInt(args[2]);
+				}
+		    } finally {
+		    	lock.unlock();
+	        }
 
+			readLock.lock();
 			System.out.println("Command line to reproduce this run: com.ibm.tests.garbagecollector.TestClassLoaderMain " + arraySize + " " + percentage + " " + ((iterations == 0) ? "-" : Integer.toString(iterations)));
+			readLock.unlock();
+			writeLock.lock();
+			System.out.println("created lock readLock writeLock");
+			readLock.lock();
+			writeLock.unlock();
+			readLock.unlock();
+
+			Thread t = new Thread(new Runnable() {
+				public void run() {
+					ReentrantReadWriteLock.ReadLock readLock2  = _rwl2.readLock();
+					ReentrantReadWriteLock.WriteLock writeLock2 = _rwl2.writeLock();
+					ReentrantLock lock2 = new ReentrantLock();
+					
+					for (int cnt=0; cnt<100; cnt++) {
+						int sleepTime;
+						readLock2.lock();
+						sleepTime = (int) (Math.random() * 500) + 100;
+						readLock2.unlock();
+						writeLock2.lock();
+						try {
+							testRetrieveOwnableSynchronizers();
+							readLock2.lock();
+						} finally {
+							writeLock2.unlock();
+						}
+						lock2.lock();
+						try {
+							System.out.println("testRetrieveOwnableSynchronizers");
+						} finally {
+					    	lock2.unlock();
+					    }
+					    try {
+							try {	
+								Thread.sleep(sleepTime);
+							} catch (InterruptedException ie) {
+								ie.printStackTrace();
+							}
+					    } finally {
+					    	readLock2.unlock();
+				       }
+					}
+				}
+			});
+
+			t.start();
 
 			_objects = new Object[arraySize];
 			long startTime = System.currentTimeMillis();
@@ -144,7 +235,31 @@ public class TestClassLoaderMain {
 					timeout = (nowTime - startTime) >= DynamicConfigurationExtractor.getTestDurationMillis();
 				}
 			}
+						
+			readLock.lock();
+			while (t.isAlive()) {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException ie) {
+					ie.printStackTrace();
+				}
+			}
+			readLock.unlock();
+			
+			writeLock.lock();
+			System.out.println("writeLock="+ writeLock.toString() +", readLock=" + readLock.toString() + ", _rwl=" + _rwl.toString() + ", _rwl2=" + _rwl2.toString());	
+			readLock.lock();
+			writeLock.unlock();
 			System.out.println("Successful test run! (" + (iteration - 1) + " iterations)");
+			readLock.unlock();
+			
+			lock.lock();
+			try {
+				System.out.println("unlock");				
+		    } finally {
+		    	lock.unlock();
+	        }
+
 		}
 		else
 		{

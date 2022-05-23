@@ -151,7 +151,7 @@ OnLoad(J9JavaVM *javaVM, const char *options)
 	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_INVOKE_GC_CHECK, hookInvokeGCCheck, OMR_GET_CALLSITE(), NULL);
 	
 	/* Set the ALLOW_USER_HEAP_WALK bit in the requiredDebugAttributes flag so GC Check can walk the heap */
-	javaVM->requiredDebugAttributes |= J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
+//	javaVM->requiredDebugAttributes |= J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
 
 	if (((GC_CheckCycle *)extensions->checkCycle)->getMiscFlags() & J9MODRON_GCCHK_VERBOSE) {
 		j9tty_printf(PORTLIB, "<gc check installed>\n");

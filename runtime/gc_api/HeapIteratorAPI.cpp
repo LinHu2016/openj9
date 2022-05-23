@@ -493,6 +493,8 @@ internalIterateRegions(J9JavaVM *vm, J9MM_IterateRegionDescriptor *region, void 
 jvmtiIterationControl
 j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData)
 {
+	uintptr_t ownaleSynchronizerCount = 0;
+
 	J9JavaVM *javaVM = vmThread->javaVM;
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(javaVM->omrVM);
 	MM_ObjectAccessBarrier *barrier = extensions->accessBarrier;
@@ -511,6 +513,7 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 			if (0 != regionFound) {
 				initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
 				returnCode = func(vmThread, &objectDescriptor, userData);
+				++ownaleSynchronizerCount;
 				if (JVMTI_ITERATION_ABORT == returnCode) {
 					return returnCode;
 				}
@@ -521,6 +524,9 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 		}
 		ownableSynchronizerObjectList = ownableSynchronizerObjectList->getNextList();
 	}
+
+	PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+	j9tty_printf(PORTLIB, "j9mm_iterate_all_ownable_synchronizer_objects ownaleSynchronizerCount=%zu\n", ownaleSynchronizerCount);
 	return returnCode;
 }
 
