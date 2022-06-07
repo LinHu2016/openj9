@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -63,6 +63,9 @@ private:
 	 * @param ownableSynchronizerCleared number of ownable synchronizer candidates cleared.
 	 */
 	void outputOwnableSynchronizerInfo(MM_EnvironmentBase *env, UDATA indent, UDATA ownableSynchronizerCandidates, UDATA ownableSynchronizerCleared);
+#if JAVA_SPEC_VERSION >= 19
+	void outputContinuationInfo(MM_EnvironmentBase *env, UDATA indent, UDATA continuationCandidates, UDATA continuationCleared);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	/**
 	 * Output reference processing summary.

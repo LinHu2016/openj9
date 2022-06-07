@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -61,6 +61,11 @@ public:
 	UDATA _ownableSynchronizerSurvived;  /**< number of ownable synchronizer objects survived this cycle, used only by PMS */
 	UDATA _ownableSynchronizerCleared;  /**< number of ownable synchronizer objects cleared this cycle, used only by GMP */
 
+#if JAVA_SPEC_VERSION >= 19
+	UDATA _continuationCandidates;  /**< number of continuation objects visited this cycle, used by both MarkingScheme */
+	UDATA _continuationCleared;  /**< number of continuation objects cleared this cycle, used only by GMP */
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	MM_ReferenceStats _weakReferenceStats;  /**< Weak reference stats for the cycle */
 	MM_ReferenceStats _softReferenceStats;  /**< Soft reference stats for the cycle */
 	MM_ReferenceStats _phantomReferenceStats;  /**< Phantom reference stats for the cycle */
@@ -98,6 +103,11 @@ public:
 		_ownableSynchronizerSurvived = 0;
 		_ownableSynchronizerCleared = 0;
 
+#if JAVA_SPEC_VERSION >= 19
+		_continuationCandidates = 0;
+		_continuationCleared = 0;
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 		_weakReferenceStats.clear();
 		_softReferenceStats.clear();
 		_phantomReferenceStats.clear();
@@ -133,6 +143,11 @@ public:
 		_ownableSynchronizerSurvived += statsToMerge->_ownableSynchronizerSurvived;
 		_ownableSynchronizerCleared += statsToMerge->_ownableSynchronizerCleared;
 
+#if JAVA_SPEC_VERSION >= 19
+		_continuationCandidates += statsToMerge->_continuationCandidates;
+		_continuationCleared += statsToMerge->_continuationCleared;
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 		_weakReferenceStats.merge(&statsToMerge->_weakReferenceStats);
 		_softReferenceStats.merge(&statsToMerge->_softReferenceStats);
 		_phantomReferenceStats.merge(&statsToMerge->_phantomReferenceStats);
@@ -165,6 +180,10 @@ public:
 		,_ownableSynchronizerCandidates(0)
 		,_ownableSynchronizerSurvived(0)
 		,_ownableSynchronizerCleared(0)
+#if JAVA_SPEC_VERSION >= 19
+		,_continuationCandidates(0)
+		,_continuationCleared(0)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		,_weakReferenceStats()
 		,_softReferenceStats()
 		,_phantomReferenceStats()

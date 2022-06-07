@@ -34,7 +34,9 @@
 #include "ObjectAccessBarrier.hpp"
 #include "ReferenceObjectBuffer.hpp"
 #include "UnfinalizedObjectBuffer.hpp"
-
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectList.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "ScavengerBackOutScanner.hpp"
 
 void
@@ -317,4 +319,25 @@ MM_ScavengerBackOutScanner::backoutUnfinalizedObjects(MM_EnvironmentStandard *en
 	env->getGCEnvironment()->_unfinalizedObjectBuffer->flush(env);
 }
 #endif /* J9VM_GC_FINALIZATION */
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_ScavengerBackOutScanner::backoutContinuationObjects(MM_EnvironmentStandard *env)
+{
+	/* TODO: need to solution to handle the backout in case the list has been refreshed. (the related J9VMContinuations has been cleaned up)  */
+	if (!_extensions->isConcurrentScavengerEnabled()) {
+	/* Back out Continuation Processing */
+		MM_HeapRegionDescriptorStandard *region = NULL;
+		GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
+		while (NULL != (region = regionIterator.nextRegion())) {
+			MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+			for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+				MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+				list->backoutList();
+			}
+		}
+	}
+
+ 	/* Done backout */
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #endif /* defined(OMR_GC_MODRON_SCAVENGER) */

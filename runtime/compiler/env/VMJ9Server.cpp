@@ -1397,7 +1397,11 @@ TR_J9ServerVM::hasFinalizer(TR_OpaqueClassBlock *clazz)
    JITServer::ServerStream *stream = _compInfoPT->getMethodBeingCompiled()->_stream;
    JITServerHelpers::getAndCacheRAMClassInfo((J9Class *)clazz, _compInfoPT->getClientData(), stream, JITServerHelpers::CLASSINFO_CLASS_DEPTH_AND_FLAGS, (void *)&classDepthAndFlags);
 
+#if JAVA_SPEC_VERSION >= 19
+   return ((classDepthAndFlags & (J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer | J9AccClassContinuation)) != 0);
+#else
    return ((classDepthAndFlags & (J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer)) != 0);
+#endif /* JAVA_SPEC_VERSION >= 19 */
    }
 
 uintptr_t
@@ -1589,6 +1593,18 @@ TR_J9ServerVM::isOwnableSyncClass(TR_OpaqueClassBlock *clazz)
 
    return ((classDepthAndFlags & J9AccClassOwnableSynchronizer) != 0);
    }
+
+#if JAVA_SPEC_VERSION >= 19
+bool
+TR_J9ServerVM::isContinuationClass(TR_OpaqueClassBlock *clazz)
+   {
+   uintptr_t classDepthAndFlags = 0;
+   JITServer::ServerStream *stream = _compInfoPT->getMethodBeingCompiled()->_stream;
+   JITServerHelpers::getAndCacheRAMClassInfo((J9Class *)clazz, _compInfoPT->getClientData(), stream, JITServerHelpers::CLASSINFO_CLASS_DEPTH_AND_FLAGS, (void *)&classDepthAndFlags);
+
+   return ((classDepthAndFlags & J9AccClassContinuation) != 0);
+   }
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 TR_OpaqueClassBlock *
 TR_J9ServerVM::getClassFromMethodBlock(TR_OpaqueMethodBlock *method)

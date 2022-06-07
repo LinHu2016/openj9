@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2017, 2021 IBM Corp. and others
+ * Copyright (c) 2017, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -52,6 +52,9 @@ private:
 	bool _collectStringConstantsEnabled;
 	bool _shouldScanUnfinalizedObjects;
 	bool _shouldScanOwnableSynchronizerObjects;
+#if JAVA_SPEC_VERSION >= 19
+	bool _shouldScanContinuationObjects;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 	MM_MarkMap *_markMap;							/**< This is set when dynamic class loading is enabled, NULL otherwise */
 	volatile bool _anotherClassMarkPass;			/**< Used in completeClassMark for another scanning request*/
@@ -81,6 +84,9 @@ public:
 		, _collectStringConstantsEnabled(false)
 		, _shouldScanUnfinalizedObjects(false)
 		, _shouldScanOwnableSynchronizerObjects(false)
+#if JAVA_SPEC_VERSION >= 19
+		, _shouldScanContinuationObjects(false)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 		, _markMap(NULL)
 		, _anotherClassMarkPass(false)
@@ -113,6 +119,11 @@ public:
 
 	uintptr_t setupIndexableScanner(MM_EnvironmentBase *env, omrobjectptr_t objectPtr, MM_MarkingSchemeScanReason reason, uintptr_t *sizeToDo, uintptr_t *sizeInElementsToDo, fomrobject_t **basePtr, uintptr_t *flags) { return 0; }
 
+#if JAVA_SPEC_VERSION >= 19
+	void doStackSlot(MM_EnvironmentBase *env, omrobjectptr_t objectPtr, omrobjectptr_t *slotPtr);
+	void scanContinuationObject(MM_EnvironmentBase *env, omrobjectptr_t objectPtr);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	MMINLINE GC_ObjectScanner *
 	getObjectScanner(MM_EnvironmentBase *env, omrobjectptr_t objectPtr, void *scannerSpace, MM_MarkingSchemeScanReason reason, uintptr_t *sizeToDo)
 	{
@@ -133,6 +144,13 @@ public:
 			objectScanner = GC_MixedObjectScanner::newInstance(env, objectPtr, scannerSpace, 0);
 			*sizeToDo = referenceSize + ((GC_MixedObjectScanner *)objectScanner)->getBytesRemaining();
 			break;
+#if JAVA_SPEC_VERSION >= 19
+		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+			scanContinuationObject(env, objectPtr);
+			objectScanner = GC_MixedObjectScanner::newInstance(env, objectPtr, scannerSpace, 0);
+			*sizeToDo = referenceSize + ((GC_MixedObjectScanner *)objectScanner)->getBytesRemaining();
+			break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
 		{
 			uintptr_t slotsToDo = 0;
@@ -201,11 +219,26 @@ public:
 		return _shouldScanOwnableSynchronizerObjects;
 	}
 
+#if JAVA_SPEC_VERSION >= 19
+	MMINLINE bool
+	shouldScanContinuationObjects()
+	{
+		return _shouldScanContinuationObjects;
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	MMINLINE void
 	shouldScanOwnableSynchronizerObjects(bool shouldScanOwnableSynchronizerObjects)
 	{
 		_shouldScanOwnableSynchronizerObjects = shouldScanOwnableSynchronizerObjects;
 	}
+#if JAVA_SPEC_VERSION >= 19
+	MMINLINE void
+	shouldScanContinuationObjects(bool shouldScanContinuationObjects)
+	{
+		_shouldScanContinuationObjects = shouldScanContinuationObjects;
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	void scanClass(MM_EnvironmentBase *env, J9Class *clazz);
 
@@ -230,5 +263,13 @@ public:
 	MMINLINE bool isDynamicClassUnloadingEnabled() { return NULL != _markMap; }
 #endif /* defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING) */
 };
+
+#if JAVA_SPEC_VERSION >= 19
+typedef struct StackIteratorData4MarkingDelegate {
+	MM_MarkingDelegate *markingDelegate;
+	MM_EnvironmentBase *env;
+	omrobjectptr_t fromObject;
+} StackIteratorData4MarkingDelegate;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #endif /* MARKINGDELEGATE_HPP_ */

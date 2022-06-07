@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -108,6 +108,16 @@ MM_HeapRegionDescriptorVLHGC::initialize(MM_EnvironmentBase *env, MM_HeapRegionM
 	}
 	extensions->setOwnableSynchronizerObjectLists(&_ownableSynchronizerObjectList);
 	
+#if JAVA_SPEC_VERSION >= 19
+	/* add our continuation list to the global list (no locking - assumes single threaded initialization) */
+	_continuationObjectList.setNextList(extensions->getContinuationObjectLists());
+	_continuationObjectList.setPreviousList(NULL);
+	if (NULL != extensions->getContinuationObjectLists()) {
+		extensions->getContinuationObjectLists()->setPreviousList(&_continuationObjectList);
+	}
+	extensions->setContinuationObjectLists(&_continuationObjectList);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	return true;
 }
 
@@ -130,6 +140,9 @@ MM_HeapRegionDescriptorVLHGC::tearDown(MM_EnvironmentBase *env)
 	_rememberedSetCardList.tearDown(extensions);
 	extensions->unfinalizedObjectLists = NULL;
 	extensions->setOwnableSynchronizerObjectLists(NULL);
+#if JAVA_SPEC_VERSION >= 19
+	extensions->setContinuationObjectLists(NULL);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	MM_HeapRegionDescriptor::tearDown(env);
 }

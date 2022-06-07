@@ -98,6 +98,12 @@ public:
 		/* empty, move ownable synchronizer processing in fixupObject */
 	}
 
+#if JAVA_SPEC_VERSION >= 19
+	virtual void scanContinuationObjects(MM_EnvironmentBase *env) {
+		/* empty, move continuation processing in fixupObject */
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 private:
 #if defined(J9VM_GC_FINALIZATION)
 	void fixupFinalizableObjects(MM_EnvironmentBase *env);

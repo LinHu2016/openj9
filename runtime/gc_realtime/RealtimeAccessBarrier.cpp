@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -251,6 +251,9 @@ MM_RealtimeAccessBarrier::validateWriteBarrier(J9VMThread *vmThread, J9Object *d
 	case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 	case GC_ObjectModel::SCAN_MIXED_OBJECT:
 	case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+	case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	case GC_ObjectModel::SCAN_CLASS_OBJECT:
 	case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 	case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
@@ -268,7 +271,6 @@ MM_RealtimeAccessBarrier::validateWriteBarrier(J9VMThread *vmThread, J9Object *d
 		/* Also consider validating that slot is a ptr slot */
 		break;
 	}
-
 	case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
 	{
 		MM_HeapRegionManager *regionManager = MM_GCExtensions::getExtensions(javaVM)->getHeap()->getHeapRegionManager();

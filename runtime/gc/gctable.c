@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -252,7 +252,13 @@ J9MemoryManagerFunctions MemoryManagerFunctions = {
 #endif /* J9VM_GC_OBJECT_ACCESS_BARRIER */
 	j9gc_get_bytes_allocated_by_thread,
 	j9mm_iterate_all_ownable_synchronizer_objects,
+#if JAVA_SPEC_VERSION >= 19
+	j9mm_iterate_all_continuation_objects,
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	ownableSynchronizerObjectCreated,
+#if JAVA_SPEC_VERSION >= 19
+	continuationObjectCreated,
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	j9gc_notifyGCOfClassReplacement,
 	j9gc_get_jit_string_dedup_policy,
 	j9gc_stringHashFn,

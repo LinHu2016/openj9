@@ -1588,7 +1588,11 @@ UDATA TR_J9VMBase::constClassFlagsPublic()      {return J9AccPublic;}
 
 int32_t TR_J9VMBase::getFlagValueForPrimitiveTypeCheck()        {return J9AccClassInternalPrimitiveType;}
 int32_t TR_J9VMBase::getFlagValueForArrayCheck()                {return J9AccClassArray;}
+#if JAVA_SPEC_VERSION >= 19
+int32_t TR_J9VMBase::getFlagValueForFinalizerCheck()            {return J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer | J9AccClassContinuation;}
+#else
 int32_t TR_J9VMBase::getFlagValueForFinalizerCheck()            {return J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer;}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 
 UDATA TR_J9VMBase::getGCForwardingPointerOffset()               {
@@ -6477,6 +6481,15 @@ TR_J9VMBase::isOwnableSyncClass(TR_OpaqueClassBlock *clazz)
    return ((J9CLASS_FLAGS(j9class) & J9AccClassOwnableSynchronizer) != 0);
    }
 
+#if JAVA_SPEC_VERSION >= 19
+bool
+TR_J9VMBase::isContinuationClass(TR_OpaqueClassBlock *clazz)
+	{
+	   J9Class* j9class = TR::Compiler->cls.convertClassOffsetToClassPtr(clazz);
+	   return ((J9CLASS_FLAGS(j9class) & J9AccClassContinuation) != 0);
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 const char *
 TR_J9VMBase::getByteCodeName(uint8_t opcode)
    {
@@ -6811,7 +6824,11 @@ TR_J9VM::isPublicClass(TR_OpaqueClassBlock * clazz)
 bool
 TR_J9VMBase::hasFinalizer(TR_OpaqueClassBlock * classPointer)
    {
+#if JAVA_SPEC_VERSION >= 19
+   return (J9CLASS_FLAGS(TR::Compiler->cls.convertClassOffsetToClassPtr(classPointer)) & (J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer | J9AccClassContinuation)) != 0;
+#else
    return (J9CLASS_FLAGS(TR::Compiler->cls.convertClassOffsetToClassPtr(classPointer)) & (J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer)) != 0;
+#endif /* JAVA_SPEC_VERSION >= 19 */
    }
 
 uintptr_t

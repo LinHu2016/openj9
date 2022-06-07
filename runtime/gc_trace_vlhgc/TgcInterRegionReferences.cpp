@@ -104,6 +104,9 @@ tgcHookReportInterRegionReferenceCounting(J9HookInterface** hookInterface, UDATA
 				case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 				case GC_ObjectModel::SCAN_MIXED_OBJECT:
 				case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+				case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 				case GC_ObjectModel::SCAN_CLASS_OBJECT:
 				case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 				{

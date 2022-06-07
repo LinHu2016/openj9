@@ -65,8 +65,11 @@
 #define J9AccClassInternalPrimitiveType 0x20000
 #define J9AccClassIsContended 0x1000000
 #define J9AccClassOwnableSynchronizer 0x200000
-#define J9AccClassUnused200 0x200
+#if JAVA_SPEC_VERSION >= 19
+#define J9AccClassContinuation 0x1000000
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #define J9AccClassUnused400 0x400
+#define J9AccClassUnused200 0x200
 #define J9AccClassRAMArray 0x10000
 #define J9AccClassRAMShapeShift 0x10
 #define J9AccClassReferenceMask 0x30000000
@@ -132,7 +135,11 @@
 #define J9StaticFieldRefPutResolved 0x10
 #define J9StaticFieldRefFinal 0x20
 #define J9StaticFieldRefFlagBits 0x3F
+#if JAVA_SPEC_VERSION >= 19
+#define J9_JAVA_CLASS_FINALIZER_CHECK_MASK (J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer | J9AccClassContinuation)
+#else
 #define J9_JAVA_CLASS_FINALIZER_CHECK_MASK (J9AccClassFinalizeNeeded | J9AccClassOwnableSynchronizer)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #define J9_JAVA_MODIFIERS_SPECIAL_OBJECT (J9AccClassFinalizeNeeded | J9AccClassReferenceMask)
 
 #endif /*J9JAVAACCESSFLAGS_H */

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014, 2019 IBM Corp. and others
+ * Copyright (c) 2014, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -71,6 +71,9 @@ public:
 		case GC_ObjectModel::SCAN_CLASS_OBJECT:
 		case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 		case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
 			return _mixedObjectIterator.initialize(_omrVM, objectPtr);
 		case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
@@ -98,6 +101,9 @@ public:
 		case GC_ObjectModel::SCAN_CLASS_OBJECT:
 		case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 		case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
 			return _mixedObjectIterator.nextSlot();
 		case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
@@ -126,6 +132,9 @@ public:
 		case GC_ObjectModel::SCAN_CLASS_OBJECT:
 		case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 		case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
 			return _mixedObjectIterator.restore(objectIteratorState);
 		case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
@@ -153,6 +162,9 @@ public:
 		case GC_ObjectModel::SCAN_CLASS_OBJECT:
 		case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 		case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
 			return _mixedObjectIterator.save(objectIteratorState);
 		case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:

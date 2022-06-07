@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019, 2020 IBM Corp. and others
+ * Copyright (c) 2019, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -35,6 +35,7 @@
 #include "RealtimeMarkingScheme.hpp"
 #include "ReferenceObjectBuffer.hpp"
 #include "Scheduler.hpp"
+#include "StackSlotValidator.hpp"
 
 class MM_HeapRegionDescriptorRealtime;
 class MM_RealtimeMarkingSchemeRootMarker;
@@ -81,6 +82,7 @@ public:
 	bool allocateAndInitializeReferenceObjectLists(MM_EnvironmentBase *env);
 	bool allocateAndInitializeUnfinalizedObjectLists(MM_EnvironmentBase *env);
 	bool allocateAndInitializeOwnableSynchronizerObjectLists(MM_EnvironmentBase *env);
+	bool allocateAndInitializeContinuationObjectLists(MM_EnvironmentBase *env);
 
 #if defined(J9VM_GC_FINALIZATION)	
 	bool isFinalizationRequired() { return _finalizationRequired; }
@@ -140,6 +142,7 @@ public:
 
 	UDATA getUnfinalizedObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 	UDATA getOwnableSynchronizerObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
+	UDATA getContinuationObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 	UDATA getReferenceObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 
 	void defaultMemorySpaceAllocated(MM_GCExtensionsBase *extensions, void* defaultMemorySpace);
@@ -172,6 +175,11 @@ public:
 	void checkReferenceBuffer(MM_EnvironmentRealtime *env);
 	void setUnmarkedImpliesCleared();
 	void unsetUnmarkedImpliesCleared();
+
+#if JAVA_SPEC_VERSION >= 19
+	UDATA scanContinuationObject(MM_EnvironmentRealtime *env, J9Object *objectPtr);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 	MMINLINE void
 	markClassOfObject(MM_EnvironmentRealtime *env, J9Object *objectPtr)
@@ -218,6 +226,11 @@ public:
 		case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 			pointersScanned = scanMixedObject(env, objectPtr);
 			break;
+#if JAVA_SPEC_VERSION >= 19
+		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+			pointersScanned = scanContinuationObject(env, objectPtr);
+			break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
 			pointersScanned = scanPointerArrayObject(env, (J9IndexableObject *)objectPtr);
 			break;
@@ -516,6 +529,14 @@ public:
 	 */
 	void scanOwnableSynchronizerObjects(MM_EnvironmentRealtime *env);
 
+#if JAVA_SPEC_VERSION >= 19
+	/**
+	 * Wraps the MM_RootScanner::scanContinuationObjects method to disable yielding during the scan
+	 * then yield after scanning.
+	 * @see MM_RootScanner::scanContinuationObjects()
+	 */
+	void scanContinuationObjects(MM_EnvironmentRealtime *env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 private:
 	/**
 	 * Called by the root scanner to scan all WeakReference objects discovered by the mark phase,
@@ -553,6 +574,14 @@ private:
 	friend class MM_RealtimeGC;
 	friend class MM_RealtimeMarkingSchemeRootClearer;
 };
+
+#if JAVA_SPEC_VERSION >= 19
+typedef struct StackIteratorData4RealtimeMarkingScheme {
+	MM_RealtimeMarkingScheme *realtimeMarkingScheme;
+	MM_EnvironmentRealtime *env;
+    J9Object *fromObject;
+} StackIteratorData4RealtimeMarkingScheme;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #endif /* defined(J9VM_GC_REALTIME) */
 

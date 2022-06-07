@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -51,6 +51,9 @@ class GC_VMClassSlotIterator;
 class MM_HeapRegionDescriptor;
 class MM_HeapRegionManager;
 class MM_OwnableSynchronizerObjectList;
+#if JAVA_SPEC_VERSION >= 19
+class MM_ContinuationObjectList;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 class MM_UnfinalizedObjectList;
 
 #define TEMP_RCW_STACK_SIZE (10 * 1024 * 1024)
@@ -355,6 +358,11 @@ MM_ReferenceChainWalker::scanObject(J9Object *objectPtr)
 	case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 		scanMixedObject(objectPtr);
 		break;
+#if JAVA_SPEC_VERSION >= 19
+	case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+		scanMixedObject(objectPtr);
+		break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
 		scanPointerArrayObject((J9IndexableObject *)objectPtr);
 		break;
@@ -537,6 +545,15 @@ MM_ReferenceChainWalker::doOwnableSynchronizerObject(J9Object *objectPtr, MM_Own
 	J9Object *object = objectPtr;
 	doSlot(&object, J9GC_ROOT_TYPE_OWNABLE_SYNCHRONIZER_OBJECT, -1, NULL);
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_ReferenceChainWalker::doContinuationObject(J9Object *objectPtr, MM_ContinuationObjectList *list)
+{
+	J9Object *object = objectPtr;
+	doSlot(&object, J9GC_ROOT_TYPE_CONTINUATION_OBJECT, -1, NULL);
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 /**
  * @todo Provide function documentation

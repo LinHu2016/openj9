@@ -30,6 +30,11 @@
 #include "OwnableSynchronizerObjectBufferRealtime.hpp"
 #include "OwnableSynchronizerObjectBufferStandard.hpp"
 #include "OwnableSynchronizerObjectBufferVLHGC.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectBufferRealtime.hpp"
+#include "ContinuationObjectBufferStandard.hpp"
+#include "ContinuationObjectBufferVLHGC.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "ReferenceObjectBufferRealtime.hpp"
 #include "ReferenceObjectBufferStandard.hpp"
 #include "ReferenceObjectBufferVLHGC.hpp"
@@ -56,18 +61,27 @@ MM_EnvironmentDelegate::initialize(MM_EnvironmentBase *env)
 		_gcEnv._referenceObjectBuffer = MM_ReferenceObjectBufferStandard::newInstance(env);
 		_gcEnv._unfinalizedObjectBuffer = MM_UnfinalizedObjectBufferStandard::newInstance(env);
 		_gcEnv._ownableSynchronizerObjectBuffer = MM_OwnableSynchronizerObjectBufferStandard::newInstance(env);
+#if JAVA_SPEC_VERSION >= 19
+		_gcEnv._continuationObjectBuffer = MM_ContinuationObjectBufferStandard::newInstance(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #endif /* defined(OMR_GC_MODRON_STANDARD) */
 	} else if (extensions->isMetronomeGC()) {
 #if defined(OMR_GC_REALTIME)
 		_gcEnv._referenceObjectBuffer = MM_ReferenceObjectBufferRealtime::newInstance(env);
 		_gcEnv._unfinalizedObjectBuffer = MM_UnfinalizedObjectBufferRealtime::newInstance(env);
 		_gcEnv._ownableSynchronizerObjectBuffer = MM_OwnableSynchronizerObjectBufferRealtime::newInstance(env);
+#if JAVA_SPEC_VERSION >= 19
+		_gcEnv._continuationObjectBuffer = MM_ContinuationObjectBufferRealtime::newInstance(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #endif /* defined(OMR_GC_REALTIME) */
 	} else if (extensions->isVLHGC()) {
 #if defined(OMR_GC_VLHGC)
 		_gcEnv._referenceObjectBuffer = MM_ReferenceObjectBufferVLHGC::newInstance(env);
 		_gcEnv._unfinalizedObjectBuffer = MM_UnfinalizedObjectBufferVLHGC::newInstance(env);
 		_gcEnv._ownableSynchronizerObjectBuffer = MM_OwnableSynchronizerObjectBufferVLHGC::newInstance(env);
+#if JAVA_SPEC_VERSION >= 19
+		_gcEnv._continuationObjectBuffer = MM_ContinuationObjectBufferVLHGC::newInstance(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #endif /* defined(OMR_GC_VLHGC) */
 	} else {
 		Assert_MM_unreachable();
@@ -75,6 +89,9 @@ MM_EnvironmentDelegate::initialize(MM_EnvironmentBase *env)
 
 	if ((NULL == _gcEnv._referenceObjectBuffer) ||
 			(NULL == _gcEnv._unfinalizedObjectBuffer) ||
+#if JAVA_SPEC_VERSION >= 19
+			(NULL == _gcEnv._continuationObjectBuffer) ||
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			(NULL == _gcEnv._ownableSynchronizerObjectBuffer)) {
 		return false;
 	}
@@ -102,6 +119,12 @@ MM_EnvironmentDelegate::tearDown()
 		_gcEnv._ownableSynchronizerObjectBuffer->kill(_env);
 		_gcEnv._ownableSynchronizerObjectBuffer = NULL;
 	}
+#if JAVA_SPEC_VERSION >= 19
+	if (NULL != _gcEnv._continuationObjectBuffer) {
+		_gcEnv._continuationObjectBuffer->kill(_env);
+		_gcEnv._continuationObjectBuffer = NULL;
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 }
 
 OMR_VMThread *
@@ -151,6 +174,9 @@ MM_EnvironmentDelegate::flushNonAllocationCaches()
 #endif /* J9VM_GC_FINALIZATION */
 
 	_gcEnv._ownableSynchronizerObjectBuffer->flush(_env);
+#if JAVA_SPEC_VERSION >= 19
+	_gcEnv._continuationObjectBuffer->flush(_env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 }
 
 void

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019, 2021 IBM Corp. and others
+ * Copyright (c) 2019, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -68,6 +68,9 @@ private:
 	MM_GCExtensions *_extensions;
 	volatile bool _shouldScavengeFinalizableObjects; /**< Set to true at the beginning of a collection if there are any pending finalizable objects */
 	volatile bool _shouldScavengeUnfinalizedObjects; /**< Set to true at the beginning of a collection if there are any unfinalized objects */
+#if JAVA_SPEC_VERSION >= 19
+	volatile bool _shouldScavengeContinuationObjects; /**< Set to true at the beginning of a collection if there are any unfinalized objects */
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	volatile bool _shouldScavengeSoftReferenceObjects; /**< Set to true if there are any SoftReference objects discovered */
 	volatile bool _shouldScavengeWeakReferenceObjects; /**< Set to true if there are any WeakReference objects discovered */
 	volatile bool _shouldScavengePhantomReferenceObjects; /**< Set to true if there are any PhantomReference objects discovered */
@@ -95,6 +98,7 @@ private:
 
 	void private_addOwnableSynchronizerObjectInList(MM_EnvironmentStandard *env, omrobjectptr_t object);
 	void private_setupForOwnableSynchronizerProcessing(MM_EnvironmentStandard *env);
+	void private_setupForContinuationProcessing(MM_EnvironmentStandard *env);
 
 	/*
 	 * Scavenger Collector, Private
@@ -114,6 +118,9 @@ private:
 	 * prevents scavenging. Percolate collect instead.
 	 */
 	bool private_shouldPercolateGarbageCollect_activeJNICriticalRegions(MM_EnvironmentBase *envBase);
+#if JAVA_SPEC_VERSION >= 19
+	bool doContinuationObject(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, MM_ScavengeScanReason reason);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 protected:
 public:
@@ -124,7 +131,7 @@ public:
 	void mainThreadGarbageCollect_scavengeComplete(MM_EnvironmentBase *envBase);
 	void mainThreadGarbageCollect_scavengeSuccess(MM_EnvironmentBase *envBase);
 	bool internalGarbageCollect_shouldPercolateGarbageCollect(MM_EnvironmentBase *envBase, PercolateReason *reason, U_32 *gcCode);
-	GC_ObjectScanner *getObjectScanner(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, void *allocSpace, uintptr_t flags);
+	GC_ObjectScanner *getObjectScanner(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, void *allocSpace, uintptr_t flags, MM_ScavengeScanReason reason, bool *shouldRemember);
 	void flushReferenceObjects(MM_EnvironmentStandard *env);
 	bool hasIndirectReferentsInNewSpace(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr);
 	bool scavengeIndirectObjectSlots(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr);
@@ -153,9 +160,15 @@ public:
 	}
 
 	void setShouldScavengeUnfinalizedObjects(bool shouldScavenge) { _shouldScavengeUnfinalizedObjects = shouldScavenge; }
+#if JAVA_SPEC_VERSION >= 19
+	void setShouldScavengeContinuationObjects(bool shouldScavenge) { _shouldScavengeContinuationObjects = shouldScavenge; }
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	volatile bool getShouldScavengeFinalizableObjects() { return _shouldScavengeFinalizableObjects; }
 	volatile bool getShouldScavengeUnfinalizedObjects() { return _shouldScavengeUnfinalizedObjects; }
+#if JAVA_SPEC_VERSION >= 19
+	volatile bool getShouldScavengeContinuationObjects() { return _shouldScavengeContinuationObjects; }
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	volatile bool getShouldScavengeSoftReferenceObjects() { return _shouldScavengeSoftReferenceObjects; }
 	volatile bool getShouldScavengeWeakReferenceObjects() { return _shouldScavengeWeakReferenceObjects; }
 	volatile bool getShouldScavengePhantomReferenceObjects() { return _shouldScavengePhantomReferenceObjects; }
@@ -169,6 +182,9 @@ public:
 	void poisonSlots(MM_EnvironmentBase *env);
 	void healSlots(MM_EnvironmentBase *env);
 #endif /* defined(OMR_ENV_DATA64) && defined(OMR_GC_FULL_POINTERS) */
+#if JAVA_SPEC_VERSION >= 19
+	void doStackSlot(MM_EnvironmentStandard *env, omrobjectptr_t *slotPtr, MM_ScavengeScanReason reason, bool *shouldRemember);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	bool initialize(MM_EnvironmentBase *env);
 	void tearDown(MM_EnvironmentBase *env);
@@ -177,4 +193,13 @@ public:
 };
 
 #endif /* OMR_GC_MODRON_SCAVENGER */
+#if JAVA_SPEC_VERSION >= 19
+typedef struct StackIteratorData4Scavenge {
+	MM_ScavengerDelegate *scavengerDelegate;
+    MM_EnvironmentStandard *env;
+    MM_ScavengeScanReason reason;
+    bool *shouldRemember;
+} StackIteratorData4Scavenge;
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 #endif /* SCAVENGERDELEGATEJAVA_HPP_ */

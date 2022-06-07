@@ -171,6 +171,9 @@ public:
    virtual void revertToInterpreted(TR_OpaqueMethodBlock *method) override;
    virtual void * getLocationOfClassLoaderObjectPointer(TR_OpaqueClassBlock *clazz) override;
    virtual bool isOwnableSyncClass(TR_OpaqueClassBlock *clazz) override;
+#if JAVA_SPEC_VERSION >= 19
+   virtual bool isContinuationClass(TR_OpaqueClassBlock *clazz) override;
+#endif /* JAVA_SPEC_VERSION >= 19 */
    virtual TR_OpaqueClassBlock * getClassFromMethodBlock(TR_OpaqueMethodBlock *method) override;
    virtual U_8 * fetchMethodExtendedFlagsPointer(J9Method *method) override;
    virtual void * getStaticHookAddress(int32_t event) override;

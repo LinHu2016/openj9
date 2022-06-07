@@ -48,6 +48,11 @@
 #include "FinalizableReferenceBuffer.hpp"
 #include "FinalizeListManager.hpp"
 #endif /* J9VM_GC_FINALIZATION*/
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectBuffer.hpp"
+#include "ContinuationObjectList.hpp"
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "GCExtensions.hpp"
 #include "GlobalCollectionCardCleaner.hpp"
 #include "GlobalCollectionNoScanCardCleaner.hpp"
@@ -763,7 +768,62 @@ MM_GlobalMarkingScheme::scanPointerArrayObject(MM_EnvironmentVLHGC *env, J9Index
 	}
 }
 
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_GlobalMarkingScheme::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr, J9StackWalkState *walkState, const void *stackLocation)
+{
+	J9Object *object = *slotPtr;
+	if (isHeapObject(object)) {
+		/* heap object - validate and mark */
+		Assert_MM_validStackSlot(MM_StackSlotValidator(0, *slotPtr, stackLocation, walkState).validate(env));
+		markObject(env, object);
+		rememberReferenceIfRequired(env, fromObject, object);
+	} else if (NULL != object) {
+		/* stack object - just validate */
+		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, *slotPtr, stackLocation, walkState).validate(env));
+	}
+}
+
+void
+stackSlotIterator4GlobalMarkingScheme(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
+{
+	StackIteratorData4GlobalMarkingScheme *data = (StackIteratorData4GlobalMarkingScheme *)localData;
+	data->globalMarkingScheme->doStackSlot(data->env, data->fromObject, slotPtr, walkState, stackLocation);
+}
+
 void 
+MM_GlobalMarkingScheme::scanContinuationObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr, ScanReason reason)
+{
+	scanMixedObject(env, objectPtr, reason);
+	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, objectPtr);
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
+	if (started && (NULL != j9vmContinuation)) {
+		J9VMThread continuationThread;
+		memset(&continuationThread, 0, sizeof(J9VMThread));
+		continuationThread.javaVM = currentThread->javaVM;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
+
+		StackIteratorData4GlobalMarkingScheme localData;
+		localData.globalMarkingScheme = this;
+		localData.env = env;
+		localData.fromObject = objectPtr;
+		bool bStackFrameClassWalkNeeded = false;
+#if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
+		if (isDynamicClassUnloadingEnabled()) {
+			bStackFrameClassWalkNeeded = true;
+		}
+#endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
+
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, &continuationThread, (void *)&localData, stackSlotIterator4GlobalMarkingScheme, bStackFrameClassWalkNeeded, false);
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_GlobalMarkingScheme::scanContinuationObject GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
+void
 MM_GlobalMarkingScheme::scanClassObject(MM_EnvironmentVLHGC *env, J9Object *classObject, ScanReason reason)
 {
 	scanMixedObject(env, classObject, reason);
@@ -897,6 +957,11 @@ MM_GlobalMarkingScheme::scanObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr
 			case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
 				scanMixedObject(env, objectPtr, reason);
 				break;
+#if JAVA_SPEC_VERSION >= 19
+			case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+				scanContinuationObject(env, objectPtr, reason);
+				break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			case GC_ObjectModel::SCAN_CLASS_OBJECT:
 				scanClassObject(env, objectPtr, reason);
 				break;
@@ -1035,6 +1100,48 @@ MM_GlobalMarkingScheme::scanOwnableSynchronizerObjects(MM_EnvironmentVLHGC *env)
 	/* restore everything to a flushed state before exiting */
 	env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->flush(env);
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_GlobalMarkingScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
+{
+	env->_currentTask->synchronizeGCThreads(env, UNIQUE_ID);
+
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
+	while (NULL != (region = regionIterator.nextRegion())) {
+		if (region->containsObjects()) {
+			if (!region->getContinuationObjectList()->wasEmpty()) {
+				if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+					J9Object *object = region->getContinuationObjectList()->getPriorList();
+					while (NULL != object) {
+						Assert_MM_true(region->isAddressInRegion(object));
+						env->_markVLHGCStats._continuationCandidates += 1;
+
+						/* read the next link before we add it to the buffer */
+						J9Object* next = _extensions->accessBarrier->getContinuationLink(object);
+						if (isMarked(object)) {
+							env->getGCEnvironment()->_continuationObjectBuffer->add(env, object);
+						} else {
+							VM_VMHelpers::cleanupContinuationObject((J9VMThread *)env->getLanguageVMThread(), object);
+							env->_markVLHGCStats._continuationCleared += 1;
+						}
+						object = next;
+					}
+				}
+			}
+		}
+	}
+	/* restore everything to a flushed state before exiting */
+	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
+
+	/*debug*/
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_GlobalMarkingScheme::scanContinuationObjects env=%p, continuationCandidates=%zu, continuationCleared=%zu\n",
+					env, env->_markVLHGCStats._continuationCandidates, env->_markVLHGCStats._continuationCleared);
+
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 /**
  * The root set scanner for MM_GlobalMarkingScheme.
@@ -1211,6 +1318,15 @@ private:
 		_markingScheme->scanOwnableSynchronizerObjects(MM_EnvironmentVLHGC::getEnvironment(env));
 		reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
 	}
+
+#if JAVA_SPEC_VERSION >= 19
+	virtual void scanContinuationObjects(MM_EnvironmentBase *env) {
+		/* allow the marking scheme to handle this, since it knows which regions are interesting */
+		reportScanningStarted(RootScannerEntity_ContinuationObjects);
+		_markingScheme->scanContinuationObjects(MM_EnvironmentVLHGC::getEnvironment(env));
+		reportScanningEnded(RootScannerEntity_ContinuationObjects);
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	virtual void doMonitorReference(J9ObjectMonitor *objectMonitor, GC_HashTableIterator *monitorReferenceIterator) {
 		J9ThreadAbstractMonitor * monitor = (J9ThreadAbstractMonitor*)objectMonitor->monitor;
@@ -1449,6 +1565,9 @@ MM_GlobalMarkingScheme::markLiveObjectsComplete(MM_EnvironmentVLHGC *env)
 				region->getReferenceObjectList()->startWeakReferenceProcessing();
 				region->getUnfinalizedObjectList()->startUnfinalizedProcessing();
 				region->getOwnableSynchronizerObjectList()->startOwnableSynchronizerProcessing();
+#if JAVA_SPEC_VERSION >= 19
+				region->getContinuationObjectList()->startContinuationProcessing();
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			}
 		}
 		env->_currentTask->releaseSynchronizedGCThreads(env);

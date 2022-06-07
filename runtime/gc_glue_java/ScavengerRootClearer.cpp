@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015, 2020 IBM Corp. and others
+ * Copyright (c) 2015, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -39,6 +39,12 @@
 #include "SlotObject.hpp"
 #include "UnfinalizedObjectBuffer.hpp"
 #include "UnfinalizedObjectList.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectBuffer.hpp"
+#include "ContinuationObjectList.hpp"
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 #include "ScavengerRootClearer.hpp"
 
 void
@@ -222,6 +228,56 @@ MM_ScavengerRootClearer::scavengeUnfinalizedObjects(MM_EnvironmentStandard *env)
 	env->enableHotFieldDepthCopy();
 }
 #endif /* J9VM_GC_FINALIZATION */
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_ScavengerRootClearer::scavengeContinuationObjects(MM_EnvironmentStandard *env)
+{
+	MM_HeapRegionDescriptorStandard *region = NULL;
+	GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
+	GC_Environment *gcEnv = env->getGCEnvironment();
+	bool const compressed = _extensions->compressObjectReferences();
+	while(NULL != (region = regionIterator.nextRegion())) {
+		if (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)) {
+			MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+			for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+				MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+				if (!list->wasEmpty()) {
+					if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+						omrobjectptr_t object = list->getPriorList();
+						while (NULL != object) {
+							omrobjectptr_t next = NULL;
+							gcEnv->_scavengerJavaStats._continuationCandidates += 1;
+
+							MM_ForwardedHeader forwardedHeader(object, compressed);
+							if (!forwardedHeader.isForwardedPointer()) {
+								Assert_MM_true(_scavenger->isObjectInEvacuateMemory(object));
+								gcEnv->_scavengerJavaStats._continuationCleared += 1;
+								VM_VMHelpers::cleanupContinuationObject((J9VMThread *)env->getLanguageVMThread(), object);
+							} else {
+								omrobjectptr_t forwardedPtr = forwardedHeader.getForwardedObject();
+								Assert_MM_true(NULL != forwardedPtr);
+								next = _extensions->accessBarrier->getContinuationLink(forwardedPtr, object);
+								gcEnv->_continuationObjectBuffer->add(env, forwardedPtr);
+							}
+							object = next;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/* restore everything to a flushed state before exiting */
+	gcEnv->_continuationObjectBuffer->flush(env);
+	/*debug*/
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_ScavengerRootClearer::scavengeContinuationObjects env=%p, continuationCandidates=%zu, continuationCleared=%zu\n",
+					env, gcEnv->_scavengerJavaStats._continuationCandidates, gcEnv->_scavengerJavaStats._continuationCleared);
+
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 #endif /* defined(OMR_GC_MODRON_SCAVENGER) */
 
 

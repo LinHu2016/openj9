@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -71,6 +71,9 @@ private:
 	void startUnfinalizedProcessing(MM_EnvironmentBase *env);
 	void scavengeFinalizableObjects(MM_EnvironmentStandard *env);
 #endif /* defined(J9VM_GC_FINALIZATION) */
+#if JAVA_SPEC_VERSION >= 19
+	void startContinuationProcessing(MM_EnvironmentBase *env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 protected:
 
@@ -207,6 +210,9 @@ public:
 		 * hence not subject for unfinalized processing.
 		 */ 
 		startUnfinalizedProcessing(env);
+#if JAVA_SPEC_VERSION >= 19
+		startContinuationProcessing(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	}
 
 	void

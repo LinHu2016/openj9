@@ -3022,7 +3022,7 @@ fail:
 			 *            + AccClassHasJDBCNatives (set during native method binding, not inherited)
 			 *           + AccClassGCSpecial (set during internal class load hook and inherited)
 			 *
-			 *         + AccClassIsContended (from romClass->extraModifiers and inherited)
+			 *         + AccClassContinuation for Java19+ (for Java18- AccClassIsContended (from romClass->extraModifiers and inherited))
 			 *        + AccClassHasFinalFields (from romClass->extraModifiers and inherited)
 			 *       + AccClassHotSwappedOut (not set during creation, not inherited)
 			 *      + AccClassDying (not set during creation, inherited but that can't actually occur)
@@ -3108,6 +3108,14 @@ fail:
 					tempClassDepthAndFlags &= ~J9AccClassFinalizeNeeded;
 				}
 #endif
+
+#if JAVA_SPEC_VERSION >= 19
+				/* prepare the bit for J9AccClassContinuation */
+				PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+				j9tty_printf(PORTLIB, "reset bit J9AccClassIsContended in classDepthAndFlags\n");
+
+				tempClassDepthAndFlags &= ~J9AccClassIsContended;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 				/* fill in superclass array */
 				if (superclassCount != 0) {

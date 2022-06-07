@@ -67,7 +67,7 @@
  * for the rationale behind this function).
  */
 static void
-fixObjectIfClassDying(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData)
+fixObjectIfClassDying(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData, MM_HeapWalkerDelegate *delegate)
 {
 	/* Check to see if the object's class is being unloaded. If so, it can't be left as dark matter so abandon it */
 	uintptr_t classFlags = J9CLASS_FLAGS(J9GC_J9OBJECT_CLAZZ_CMP(object, OMRVMTHREAD_COMPRESS_OBJECT_REFERENCES(omrVMThread)));

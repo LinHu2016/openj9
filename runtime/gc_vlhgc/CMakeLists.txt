@@ -1,5 +1,5 @@
 ################################################################################
-# Copyright (c) 2017, 2020 IBM Corp. and others
+# Copyright (c) 2017, 2022 IBM Corp. and others
 #
 # This program and the accompanying materials are made available under
 # the terms of the Eclipse Public License 2.0 which accompanies this
@@ -85,6 +85,10 @@ j9vm_add_library(j9gcvlhgc STATIC
 	${gc_vlhgc_sources}
 )
 
+if(NOT JAVA_SPEC_VERSION LESS 19)
+	target_sources(j9gcvlhgc PRIVATE ContinuationObjectBufferVLHGC.cpp)
+endif()
+
 target_link_libraries(j9gcvlhgc
 	PRIVATE
 		j9vm_interface
@@ -98,6 +102,10 @@ if(OMR_MIXED_REFERENCES_MODE_STATIC)
 	j9vm_add_library(j9gcvlhgc_full STATIC
 		${gc_vlhgc_sources}
 	)
+	
+	if(NOT JAVA_SPEC_VERSION LESS 19)
+		target_sources(j9gcvlhgc_full PRIVATE ContinuationObjectBufferVLHGC.cpp)
+	endif()
 
 	target_link_libraries(j9gcvlhgc_full
 		PRIVATE

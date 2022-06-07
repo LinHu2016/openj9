@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -116,6 +116,9 @@ public:
 		SCAN_OWNABLESYNCHRONIZER_OBJECT = 8,
 		SCAN_MIXED_OBJECT_LINKED = 9,
 		SCAN_FLATTENED_ARRAY_OBJECT = 10
+#if JAVA_SPEC_VERSION >= 19
+		, SCAN_CONTINUATION_OBJECT = 11
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	};
 
 	/**
@@ -179,7 +182,11 @@ public:
 		switch(J9GC_CLASS_SHAPE(clazz)) {
 		case OBJECT_HEADER_SHAPE_MIXED:
 		{
+#if JAVA_SPEC_VERSION >= 19
+			uintptr_t classFlags = J9CLASS_FLAGS(clazz) & (J9AccClassReferenceMask | J9AccClassGCSpecial | J9AccClassOwnableSynchronizer | J9AccClassContinuation);
+#else
 			uintptr_t classFlags = J9CLASS_FLAGS(clazz) & (J9AccClassReferenceMask | J9AccClassGCSpecial | J9AccClassOwnableSynchronizer);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			if (0 == classFlags) {
 				if (0 != clazz->selfReferencingField1) {
 					result = SCAN_MIXED_OBJECT_LINKED;
@@ -193,6 +200,10 @@ public:
 					result = getSpecialClassScanType(clazz);
 				} else if (0 != (classFlags & J9AccClassOwnableSynchronizer)) {
 					result = SCAN_OWNABLESYNCHRONIZER_OBJECT;
+#if JAVA_SPEC_VERSION >= 19
+				} else if (0 != (classFlags & J9AccClassContinuation)) {
+					result = SCAN_CONTINUATION_OBJECT;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 				} else {
 					/* Assert_MM_unreachable(); */
 					assert(false);

@@ -515,6 +515,11 @@ public:
 			if (classFlags & J9AccClassOwnableSynchronizer) {
 				currentThread->javaVM->memoryManagerFunctions->ownableSynchronizerObjectCreated(currentThread, object);
 			}
+#if JAVA_SPEC_VERSION >= 19
+			if (classFlags & J9AccClassContinuation) {
+				currentThread->javaVM->memoryManagerFunctions->continuationObjectCreated(currentThread, object);
+			}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		}
 	}
 
@@ -2011,6 +2016,59 @@ exit:
 		return J9_ARE_NO_BITS_SET(omrthread_get_category(vmThread->osThread), nonJavaThreads);
 	}
 
+#if JAVA_SPEC_VERSION >= 19
+	static VMINLINE void
+	copyJavaStacksFromJ9VMContinuation(J9VMThread *vmThread, J9VMContinuation *continuation)
+	{
+		vmThread->arg0EA = continuation->arg0EA;
+		vmThread->bytecodes = continuation->bytecodes;
+		vmThread->sp = continuation->sp;
+		vmThread->pc = continuation->pc;
+		vmThread->literals = continuation->literals;
+		vmThread->stackOverflowMark = continuation->stackOverflowMark;
+		vmThread->stackOverflowMark2 = continuation->stackOverflowMark2;
+		vmThread->stackObject = continuation->stackObject;
+#ifdef J9VM_INTERP_NATIVE_SUPPORT
+		vmThread->entryLocalStorage = &continuation->entryLocalStorage;
+		vmThread->j2iFrame = NULL;
+#ifdef J9VM_JIT_FULL_SPEED_DEBUG
+		vmThread->decompilationStack = NULL;
+#endif
+#endif
+	}
+
+	static VMINLINE void
+	cleanupContinuationObject(J9VMThread *vmThread, J9Object *objectPtr)
+	{
+		J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, objectPtr);
+		if (NULL != j9vmContinuation) {
+			/* clean up J9VMContinuation, set vmref = NULL */
+			J9VMJDKINTERNALVMCONTINUATION_SET_VMREF(vmThread, objectPtr, NULL);
+		}
+	}
+
+	static VMINLINE void
+	swapFieldsWithContinuation(J9VMThread *vmThread, J9VMContinuation *continuation)
+	{
+	/* Helper macro to swap fields between the two J9Class structs. */
+#define SWAP_MEMBER(fieldName, fieldType, class1, class2) \
+	do { \
+		fieldType temp = (fieldType) (class1)->fieldName; \
+		(class1)->fieldName = (class2)->fieldName; \
+		(class2)->fieldName = (fieldType) temp; \
+	} while (0)
+
+		SWAP_MEMBER(arg0EA, UDATA*, vmThread, continuation);
+		SWAP_MEMBER(bytecodes, UDATA*, vmThread, continuation);
+		SWAP_MEMBER(sp, UDATA*, vmThread, continuation);
+		SWAP_MEMBER(pc, U_8*, vmThread, continuation);
+		SWAP_MEMBER(literals, J9Method*, vmThread, continuation);
+		SWAP_MEMBER(stackOverflowMark, UDATA*, vmThread, continuation);
+		SWAP_MEMBER(stackOverflowMark2, UDATA*, vmThread, continuation);
+		SWAP_MEMBER(stackObject, J9JavaStack*, vmThread, continuation);
+	}
+
+#endif /* JAVA_SPEC_VERSION >= 19 */
 };
 
 #endif /* VMHELPERS_HPP_ */

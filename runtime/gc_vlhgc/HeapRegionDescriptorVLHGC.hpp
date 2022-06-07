@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -31,6 +31,9 @@
 #include "HeapRegionDataForCompactVLHGC.hpp"
 #include "LightweightNonReentrantLock.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectList.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "ReferenceObjectList.hpp"
 #include "RememberedSetCardList.hpp"
 #include "UnfinalizedObjectList.hpp"
@@ -105,6 +108,9 @@ private:
 
 	MM_UnfinalizedObjectList _unfinalizedObjectList; /**< A list of unfinalized objects in this region */
 	MM_OwnableSynchronizerObjectList _ownableSynchronizerObjectList; /**< A list of ownable synchronizer objects in this region */
+#if JAVA_SPEC_VERSION >= 19
+	MM_ContinuationObjectList _continuationObjectList; /**< A list of continuation objects in this region */
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	MM_ReferenceObjectList _referenceObjectList; /**< A list of reference objects (i.e. weak/soft/phantom) in this region */
 	
 	/*
@@ -254,6 +260,13 @@ public:
 	 */
 	MM_OwnableSynchronizerObjectList *getOwnableSynchronizerObjectList() { return &_ownableSynchronizerObjectList; }
 	
+#if JAVA_SPEC_VERSION >= 19
+	/**
+	 * Fetch the list of continuation objects within this region.
+	 * @return the list
+	 */
+	MM_ContinuationObjectList *getContinuationObjectList() { return &_continuationObjectList; }
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	/**
 	 * Fetch the list of reference objects within this region.
 	 * @return the list

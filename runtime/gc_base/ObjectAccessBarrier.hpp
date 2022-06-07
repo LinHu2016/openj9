@@ -60,6 +60,9 @@ protected:
 #endif /* defined(OMR_GC_COMPRESSED_POINTERS) */
 	UDATA _referenceLinkOffset; /** Offset within java/lang/ref/Reference of the reference link field */
 	UDATA _ownableSynchronizerLinkOffset; /** Offset within java/util/concurrent/locks/AbstractOwnableSynchronizer of the ownable synchronizer link field */
+#if JAVA_SPEC_VERSION >= 19
+	UDATA _continuationLinkOffset; /** Offset within java/lang/VirtualThread$VThreadContinuation (jdk/internal/vm/Continuation) of the continuation link field */
+#endif /* JAVA_SPEC_VERSION >= 19 */
 public:
 
 	/* member function */
@@ -490,6 +493,69 @@ public:
 		return slot.readReferenceFromSlot();
 	}
 
+#if JAVA_SPEC_VERSION >= 19
+	/**
+	 * Set the continuationLink link field of the specified reference object to value.
+	 * @param object the object to modify
+	 * @param value the value to store into the object's reference link field
+	 */
+	void setContinuationLink(j9object_t object, j9object_t value);
+
+	/**
+	 * Fetch the continuationLink link field of the specified reference object.(for Compact or forwardedObject case)
+	 * @param object the object(moved object -- new location) to read
+	 * @param originalObject(old location, for checking if it is the last item in the list)
+	 * @return the value stored in the object's reference link field
+	 */
+	j9object_t getContinuationLink(j9object_t object, j9object_t originalObject)
+	{
+		if (NULL == object) {
+			object = originalObject;
+		}
+		UDATA linkOffset = _continuationLinkOffset;
+		fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
+		GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
+		j9object_t next = slot.readReferenceFromSlot();
+		if (originalObject == next) {
+			/* reach end of list(last item points to itself), return NULL */
+			next = NULL;
+		}
+		return next;
+	}
+
+	/**
+	 * Fetch the continuationLink link field of the specified reference object.
+	 * @param object the object to read
+	 * @return the value stored in the object's reference link field
+	 */
+	j9object_t getContinuationLink(j9object_t object)
+	{
+		UDATA linkOffset = _continuationLinkOffset;
+		fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
+		GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
+		j9object_t next = slot.readReferenceFromSlot();
+		if (object == next) {
+			/* reach end of list(last item points to itself), return NULL */
+			next = NULL;
+		}
+		return next;
+	}
+
+	/**
+	 * check if the object in one of ContinuationLists
+	 * @param object the object pointer
+	 * @return the value stored in the object's reference link field
+	 * 		   if reference link field == NULL, it means the object isn't in the list
+	 */
+	j9object_t  isObjectInContinuationList(j9object_t object)
+	{
+		UDATA linkOffset = _continuationLinkOffset;
+		fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
+		GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
+		return slot.readReferenceFromSlot();
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	/**
 	 * Implementation of the JNI GetPrimitiveArrayCritical API.
 	 * See the JNI spec for full details.
@@ -592,6 +658,9 @@ public:
 #endif /* defined(OMR_GC_COMPRESSED_POINTERS) */
 		, _referenceLinkOffset(UDATA_MAX)
 		, _ownableSynchronizerLinkOffset(UDATA_MAX)
+#if JAVA_SPEC_VERSION >= 19
+		, _continuationLinkOffset(UDATA_MAX)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	{
 		_typeId = __FUNCTION__;
 	}

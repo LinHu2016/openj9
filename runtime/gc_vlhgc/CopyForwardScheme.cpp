@@ -62,6 +62,11 @@
 #include "EnvironmentVLHGC.hpp"
 #include "FinalizableObjectBuffer.hpp"
 #include "FinalizableReferenceBuffer.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectBuffer.hpp"
+#include "ContinuationObjectList.hpp"
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "FinalizeListManager.hpp"
 #include "ForwardedHeader.hpp"
 #include "GlobalAllocationManager.hpp"
@@ -474,6 +479,9 @@ MM_CopyForwardScheme::preProcessRegions(MM_EnvironmentVLHGC *env)
 					ownableSynchronizerCountInEden += region->getOwnableSynchronizerObjectList()->getObjectCount();
 				}
 				region->getOwnableSynchronizerObjectList()->startOwnableSynchronizerProcessing();
+#if JAVA_SPEC_VERSION >= 19
+				region->getContinuationObjectList()->startContinuationProcessing();
+#endif /* JAVA_SPEC_VERSION >= 19 */
 				Assert_MM_true(region->getRememberedSetCardList()->isAccurate());
 				if ((region->_criticalRegionsInUse > 0) || !env->_cycleState->_shouldRunCopyForward || (100 == _extensions->fvtest_forceCopyForwardHybridRatio) || (randomDecideForceNonEvacuatedRegion(_extensions->fvtest_forceCopyForwardHybridRatio))) {
 					/* set the region is noEvacuation for copyforward collector */
@@ -501,7 +509,7 @@ MM_CopyForwardScheme::preProcessRegions(MM_EnvironmentVLHGC *env)
 	 * in case partial constructing ownableSynchronizerObject has been moved during previous PGC, notification for new allocation would happen after gc,
 	 * so it is counted for new allocation, but not in Eden region. loose assertion for this special case
 	 */
-		Assert_MM_true(_extensions->allocationStats._ownableSynchronizerObjectCount >= ownableSynchronizerCountInEden);
+	Assert_MM_true(_extensions->allocationStats._ownableSynchronizerObjectCount >= ownableSynchronizerCountInEden);
 	static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._ownableSynchronizerCandidates = ownableSynchronizerCandidates;
 }
 
@@ -792,6 +800,9 @@ MM_CopyForwardScheme::acquireEmptyRegion(MM_EnvironmentVLHGC *env, MM_ReservedRe
 
 			Assert_MM_true(NULL == newRegion->getUnfinalizedObjectList()->getHeadOfList());
 			Assert_MM_true(NULL == newRegion->getOwnableSynchronizerObjectList()->getHeadOfList());
+#if JAVA_SPEC_VERSION >= 19
+			Assert_MM_true(NULL == newRegion->getContinuationObjectList()->getHeadOfList());
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			Assert_MM_false(newRegion->_markData._shouldMark);
 
 			/*
@@ -2271,6 +2282,67 @@ MM_CopyForwardScheme::scanOwnableSynchronizerObjectSlots(MM_EnvironmentVLHGC *en
 	scanMixedObjectSlots(env, reservingContext, objectPtr, reason);
 }
 
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_CopyForwardScheme::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr, J9StackWalkState *walkState, const void *stackLocation)
+{
+	if (isHeapObject(*slotPtr)) {
+		/* heap object - validate and copyforward */
+		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::COULD_BE_FORWARDED, *slotPtr, stackLocation, walkState).validate(env));
+		J9VMThread *thread = ((J9StackWalkState *)walkState)->currentThread;
+		MM_AllocationContextTarok *reservingContext = (MM_AllocationContextTarok *)MM_EnvironmentVLHGC::getEnvironment(thread)->getAllocationContext();
+		copyAndForward(MM_EnvironmentVLHGC::getEnvironment(env), reservingContext, fromObject, slotPtr);
+	} else if (NULL != *slotPtr) {
+		/* stack object - just validate */
+		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, *slotPtr, stackLocation, walkState).validate(env));
+	}
+}
+
+/**
+ * @todo Provide function documentation
+ */
+void
+stackSlotIterator4CopyForwardScheme(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
+{
+	StackIteratorData4CooyForward *data = (StackIteratorData4CooyForward *)localData;
+	MM_CopyForwardScheme *copyForwardScheme = data->copyForwardScheme;
+
+	copyForwardScheme->doStackSlot(data->env, data->fromObject, slotPtr, walkState, stackLocation);
+}
+
+MMINLINE void
+MM_CopyForwardScheme::scanContinuationObjectSlots(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *reservingContext, J9Object *objectPtr, ScanReason reason)
+{
+	scanMixedObjectSlots(env, reservingContext, objectPtr, reason);
+
+	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, objectPtr);
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
+	if (started && (NULL != j9vmContinuation)) {
+		J9VMThread continuationThread;
+		memset(&continuationThread, 0, sizeof(J9VMThread));
+		continuationThread.javaVM = currentThread->javaVM;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
+
+		StackIteratorData4CooyForward localData;
+		localData.copyForwardScheme = this;
+		localData.env = env;
+		localData.fromObject = objectPtr;
+		/* check _includeStackFrameClassReferences, _trackVisibleStackFrameDepth  */
+		bool bStackFrameClassWalkNeeded = false;
+#if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
+		if (isDynamicClassUnloadingEnabled()) {
+			bStackFrameClassWalkNeeded = true;
+		}
+#endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, &continuationThread, (void *)&localData, stackSlotIterator4CopyForwardScheme, bStackFrameClassWalkNeeded, false);
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_CopyForwardScheme::scanContinuationObjectSlots GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 /**
  *  Iterate the slot reference and parse and pass leaf bit of the reference to copy forward
  *  to avoid to push leaf object to work stack in case the reference need to be marked instead of copied.
@@ -2876,6 +2948,11 @@ MM_CopyForwardScheme::scanObject(MM_EnvironmentVLHGC *env, MM_AllocationContextT
 	case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
 		scanOwnableSynchronizerObjectSlots(env, reservingContext, objectPtr, reason);
 		break;
+#if JAVA_SPEC_VERSION >= 19
+	case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+		scanContinuationObjectSlots(env, reservingContext, objectPtr, reason);
+		break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
 		scanReferenceObjectSlots(env, reservingContext, objectPtr, reason);
 		break;
@@ -3156,6 +3233,9 @@ MM_CopyForwardScheme::incrementalScanCacheBySlot(MM_EnvironmentVLHGC *env)
 				case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 				case GC_ObjectModel::SCAN_MIXED_OBJECT:
 				case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+				case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 					hasPartiallyScannedObject = incrementalScanMixedObjectSlots(env, reservingContext, scanCache, objectPtr, hasPartiallyScannedObject, &nextScanCache);
 					break;
 				case GC_ObjectModel::SCAN_CLASS_OBJECT:
@@ -3442,6 +3522,62 @@ MM_CopyForwardScheme::scanUnfinalizedObjects(MM_EnvironmentVLHGC *env)
 	env->getGCEnvironment()->_unfinalizedObjectBuffer->flush(env);
 }
 #endif /* J9VM_GC_FINALIZATION */
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_CopyForwardScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
+{
+	/* ensure that all clearable processing is complete up to this point since this phase resurrects objects */
+	env->_currentTask->synchronizeGCThreads(env, UNIQUE_ID);
+
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
+	while(NULL != (region = regionIterator.nextRegion())) {
+		if (region->_copyForwardData._evacuateSet && !region->getContinuationObjectList()->wasEmpty()) {
+			if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+				J9Object *pointer = region->getContinuationObjectList()->getPriorList();
+
+				while (NULL != pointer) {
+					//bool finalizable = false;
+					env->_copyForwardStats._continuationCandidates += 1;
+					Assert_MM_true(region->isAddressInRegion(pointer));
+
+					/* NOTE: it is safe to read from the forwarded object since either:
+					 * 1. it was copied before continuation processing began, or
+					 * 2. it was copied by this thread.
+					 */
+					MM_ForwardedHeader forwardedHeader(pointer, _extensions->compressObjectReferences());
+					J9Object* forwardedPtr = forwardedHeader.getForwardedObject();
+					if (NULL == forwardedPtr) {
+						if (_markMap->isBitSet(pointer)) {
+							forwardedPtr = pointer;
+						}
+					}
+
+					J9Object* next = _extensions->accessBarrier->getContinuationLink(forwardedPtr, pointer);
+					if (NULL == forwardedPtr) {
+						/* object was not previously marked -- it is now finalizable so push it to the local buffer */
+						env->_copyForwardStats._continuationCleared += 1;
+						VM_VMHelpers::cleanupContinuationObject((J9VMThread *)env->getLanguageVMThread(), pointer);
+					} else {
+						env->getGCEnvironment()->_continuationObjectBuffer->add(env, forwardedPtr);
+					}
+					pointer = next;
+				}
+			}
+		}
+	}
+
+	/* restore everything to a flushed state before exiting */
+	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
+
+	/*debug*/
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_CopyForwardScheme::scanContinuationObjects env=%p, continuationCandidates=%zu, continuationCleared=%zu\n",
+					env, env->_copyForwardStats._continuationCandidates, env->_copyForwardStats._continuationCleared);
+
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 void
 MM_CopyForwardScheme::cleanCardTable(MM_EnvironmentVLHGC *env)
@@ -3852,6 +3988,15 @@ private:
 		/* allow the scheme to handle this, since it knows which regions are interesting */
 		/* empty, move ownable synchronizer processing in copy-continuous phase */
 	}
+
+#if JAVA_SPEC_VERSION >= 19
+	virtual void scanContinuationObjects(MM_EnvironmentBase *env) {
+		/* allow the scheme to handle this, since it knows which regions are interesting */
+		reportScanningStarted(RootScannerEntity_ContinuationObjects);
+		_copyForwardScheme->scanContinuationObjects(MM_EnvironmentVLHGC::getEnvironment(env));
+		reportScanningEnded(RootScannerEntity_ContinuationObjects);
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	virtual void scanPhantomReferenceObjects(MM_EnvironmentBase *env) {
 		reportScanningStarted(RootScannerEntity_PhantomReferenceObjects);
@@ -4451,6 +4596,18 @@ private:
 		}
 	}
 
+#if JAVA_SPEC_VERSION >= 19
+	virtual void doContinuationObject(J9Object *objectPtr, MM_ContinuationObjectList *list) {
+		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
+
+		if(!_copyForwardScheme->_abortInProgress && !_copyForwardScheme->isObjectInNoEvacuationRegions(env, objectPtr) && _copyForwardScheme->verifyIsPointerInEvacute(env, objectPtr)) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "Continuation object list points into evacuate!  list %p object %p\n", list, objectPtr);
+			Assert_MM_unreachable();
+		}
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 public:
 	MM_CopyForwardVerifyScanner(MM_EnvironmentVLHGC *env, MM_CopyForwardScheme *copyForwardScheme) :
 		MM_RootScanner(env, true),
@@ -4529,6 +4686,9 @@ MM_CopyForwardScheme::verifyObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr
 	case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 	case GC_ObjectModel::SCAN_MIXED_OBJECT:
 	case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+	case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		verifyMixedObjectSlots(env, objectPtr);
 		break;
 	case GC_ObjectModel::SCAN_CLASS_OBJECT:

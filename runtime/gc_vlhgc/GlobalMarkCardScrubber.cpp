@@ -43,6 +43,11 @@
 #include "Task.hpp"
 #include "WorkPacketsVLHGC.hpp"
 
+#if JAVA_SPEC_VERSION >= 19
+#include "VMThreadStackSlotIterator.hpp"
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 MM_GlobalMarkCardScrubber::MM_GlobalMarkCardScrubber(MM_EnvironmentVLHGC *env, MM_HeapMap *map, UDATA yieldCheckFrequency)
 	: MM_CardCleaner()
 	, _markMap(map)
@@ -134,6 +139,11 @@ MM_GlobalMarkCardScrubber::scrubObject(MM_EnvironmentVLHGC *env, J9Object *objec
 		case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
 			doScrub = scrubMixedObject(env, objectPtr);
 			break;
+#if JAVA_SPEC_VERSION >= 19
+		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+			doScrub = scrubContinuationObject(env, objectPtr);
+			break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		case GC_ObjectModel::SCAN_CLASS_OBJECT:
 			doScrub = scrubClassObject(env, objectPtr);
 			break;
@@ -170,6 +180,49 @@ MM_GlobalMarkCardScrubber::scrubMixedObject(MM_EnvironmentVLHGC *env, J9Object *
 	
 	return doScrub;
 }
+
+
+#if JAVA_SPEC_VERSION >= 19
+void
+stackSlotIterator4GlobalMarkCardScrubber(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
+{
+	StackIteratorData4GlobalMarkCardScrubber *data = (StackIteratorData4GlobalMarkCardScrubber *)localData;
+	if (*data->doScrub) {
+		*data->doScrub = data->globalMarkCardScrubber->mayScrubReference(data->env, data->fromObject, *slotPtr);
+	}
+}
+
+bool MM_GlobalMarkCardScrubber::scrubContinuationObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr)
+{
+	bool doScrub = scrubMixedObject(env, objectPtr);
+
+	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, objectPtr);
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
+	if (started && (NULL != j9vmContinuation)) {
+		J9VMThread continuationThread;
+		memset(&continuationThread, 0, sizeof(J9VMThread));
+		continuationThread.javaVM = currentThread->javaVM;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
+
+		StackIteratorData4GlobalMarkCardScrubber localData;
+		localData.globalMarkCardScrubber = this;
+		localData.env = env;
+		localData.doScrub = &doScrub;
+		localData.fromObject = objectPtr;
+
+		bool bStackFrameClassWalkNeeded = false;
+#if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
+		bStackFrameClassWalkNeeded = true;
+#endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, &continuationThread, (void *)&localData, stackSlotIterator4GlobalMarkCardScrubber, bStackFrameClassWalkNeeded, false);
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_GlobalMarkCardScrubber::scrubContinuationObject GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+	}
+	return doScrub;
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 bool
 MM_GlobalMarkCardScrubber::scrubPointerArrayObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr)
