@@ -28,6 +28,7 @@
 
 #include "j9cfg.h"
 #include "j9.h"
+
 #include "ModronAssertions.h"
 #include "AllocateDescription.hpp"
 #include "AllocationContextTarok.hpp"
@@ -42,6 +43,9 @@
 #include "ClassLoaderIterator.hpp"
 #include "ClassLoaderRememberedSet.hpp"
 #include "CompactGroupManager.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "WriteOnceCompactor.hpp"
 #include "Debug.hpp"
 #if defined(J9VM_GC_FINALIZATION)
@@ -81,7 +85,6 @@
 #include "VMThreadIterator.hpp"
 #include "WorkPacketsIterator.hpp"
 #include "WorkPacketsVLHGC.hpp"
-
 
 #if defined(J9VM_GC_MODRON_COMPACTION)
 
@@ -468,6 +471,9 @@ MM_WriteOnceCompactor::initRegionCompactDataForCompactSet(MM_EnvironmentVLHGC *e
 			region->_compactData._blockedList = NULL;
 			region->getUnfinalizedObjectList()->startUnfinalizedProcessing();
 			region->getOwnableSynchronizerObjectList()->startOwnableSynchronizerProcessing();
+#if JAVA_SPEC_VERSION >= 19
+			region->getContinuationObjectList()->startContinuationProcessing();
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			
 			/* clear all reference lists in compacted regions, since the GMP will need to rediscover all of these objects */
 			region->getReferenceObjectList()->startWeakReferenceProcessing();
@@ -555,6 +561,9 @@ MM_WriteOnceCompactor::compact(MM_EnvironmentVLHGC *env)
 	env->_compactVLHGCStats._moveStartTime = timeTemp;
 	moveObjects(env);
 	env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->flush(env);
+#if JAVA_SPEC_VERSION >= 19
+	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	/* Note:  moveObjects implicitly synchronizes threads */
 	timeTemp = j9time_hires_clock();
 	env->_compactVLHGCStats._moveEndTime = timeTemp;
@@ -1204,6 +1213,56 @@ MM_WriteOnceCompactor::fixupMixedObject(MM_EnvironmentVLHGC* env, J9Object *obje
 	}
 }
 
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_WriteOnceCompactor::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slot)
+{
+	/* ensure that this isn't a slot pointing into the gap (only matters for split heap VMs) */
+	if (!_extensions->heap->objectIsInGap(*slot)) {
+		J9Object *pointer = *slot;
+		if (NULL != pointer) {
+			J9Object *forwardedPtr = getForwardingPtr(pointer);
+			if (pointer != forwardedPtr) {
+				*slot = forwardedPtr;
+			}
+			_interRegionRememberedSet->rememberReferenceForCompact(env, fromObject, forwardedPtr);
+		}
+	}
+}
+
+/**
+ * @todo Provide function documentation
+ */
+void
+stackSlotIterator4WriteOnceCompactor(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
+{
+	StackIteratorData4WriteOnceCompactor *data = (StackIteratorData4WriteOnceCompactor *)localData;
+	data->writeOnceCompactor->doStackSlot(data->env, data->fromObject, slotPtr);
+}
+
+void
+MM_WriteOnceCompactor::fixupContinuationObject(MM_EnvironmentVLHGC* env, J9Object *objectPtr, J9MM_FixupCache *cache)
+{
+	fixupMixedObject(env, objectPtr, cache);
+
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF((J9VMThread *)env->getLanguageVMThread(), objectPtr);
+	if (NULL != j9vmContinuation) {
+		J9VMThread continuationThread;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
+
+		StackIteratorData4WriteOnceCompactor localData;
+		localData.writeOnceCompactor = this;
+		localData.env = env;
+		localData.fromObject = objectPtr;
+
+		GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getLanguageVMThread(), &continuationThread, (void *)&localData, stackSlotIterator4WriteOnceCompactor, false, false);
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_WriteOnceCompactor::fixupContinuationObject GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 #if defined (J9ZOS39064)
 /* Temporary fix CMVC 173946. Due to a compiler defect (385201) the JVM throws assertions on z/OS 
  * if this function is optimized at -O3. At -O2 the function works, but only because the problem is
@@ -1403,7 +1462,12 @@ MM_WriteOnceCompactor::fixupObject(MM_EnvironmentVLHGC* env, J9Object *objectPtr
 		addOwnableSynchronizerObjectInList(env, objectPtr);
 		fixupMixedObject(env, objectPtr, cache);
 		break;
-
+#if JAVA_SPEC_VERSION >= 19
+	case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+		addContinuationObjectInList(env, objectPtr);
+		fixupContinuationObject(env, objectPtr, cache);
+		break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	case GC_ObjectModel::SCAN_CLASS_OBJECT:
 		fixupClassObject(env, objectPtr, cache);
 		break;
@@ -1833,6 +1897,10 @@ MM_WriteOnceCompactor::verifyHeap(MM_EnvironmentVLHGC *env, bool beforeCompactio
 			case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 			case GC_ObjectModel::SCAN_MIXED_OBJECT:
 			case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+			case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 			case GC_ObjectModel::SCAN_CLASS_OBJECT:
 			case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 			case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:

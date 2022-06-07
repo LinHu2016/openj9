@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -52,6 +52,10 @@ private:
 #if defined(J9VM_GC_FINALIZATION)
 	void scavengeUnfinalizedObjects(MM_EnvironmentStandard *env);
 #endif /* defined(J9VM_GC_FINALIZATION) */
+
+#if JAVA_SPEC_VERSION >= 19
+	void scavengeContinuationObjects(MM_EnvironmentStandard *env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 public:
 	MM_ScavengerRootClearer(MM_EnvironmentBase *env, MM_Scavenger *scavenger) :
@@ -151,6 +155,19 @@ public:
 
 	/* empty, move ownable synchronizer processing in main scan phase */
 	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env) {}
+
+#if JAVA_SPEC_VERSION >= 19
+	virtual void
+	scanContinuationObjects(MM_EnvironmentBase *env)
+	{
+		if (_scavenger->getDelegate()->getShouldScavengeContinuationObjects()) {
+			/* allow the scavenger to handle this */
+			reportScanningStarted(RootScannerEntity_ContinuationObjects);
+			scavengeContinuationObjects(MM_EnvironmentStandard::getEnvironment(env));
+			reportScanningEnded(RootScannerEntity_ContinuationObjects);
+		}
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	virtual void
 	scanPhantomReferenceObjects(MM_EnvironmentBase *env)

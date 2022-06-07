@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -29,6 +29,10 @@ MM_ScavengerJavaStats::MM_ScavengerJavaStats() :
 	,_ownableSynchronizerCandidates(0)
 	,_ownableSynchronizerTotalSurvived(0)
 	,_ownableSynchronizerNurserySurvived(0)
+#if JAVA_SPEC_VERSION >= 19
+	,_continuationCandidates(0)
+	,_continuationCleared(0)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	,_weakReferenceStats()
 	,_softReferenceStats()
 	,_phantomReferenceStats()
@@ -47,6 +51,11 @@ MM_ScavengerJavaStats::clear()
 	_ownableSynchronizerTotalSurvived = 0;
 	_ownableSynchronizerNurserySurvived = 0;
 
+#if JAVA_SPEC_VERSION >= 19
+	_continuationCandidates = 0;
+	_continuationCleared = 0;
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	_weakReferenceStats.clear();
 	_softReferenceStats.clear();
 	_phantomReferenceStats.clear();
@@ -54,7 +63,6 @@ MM_ScavengerJavaStats::clear()
 	_monitorReferenceCleared = 0;
 	_monitorReferenceCandidates = 0;
 };
-
 
 void
 MM_ScavengerJavaStats::clearOwnableSynchronizerCounts()
@@ -71,3 +79,19 @@ MM_ScavengerJavaStats::mergeOwnableSynchronizerCounts(MM_ScavengerJavaStats *sta
 	_ownableSynchronizerTotalSurvived += statsToMerge->_ownableSynchronizerTotalSurvived;
 	_ownableSynchronizerNurserySurvived += statsToMerge->_ownableSynchronizerNurserySurvived;
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_ScavengerJavaStats::clearContinuationCounts()
+{
+	_continuationCandidates = 0;
+	_continuationCleared = 0;
+}
+
+void
+MM_ScavengerJavaStats::mergeContinuationCounts(MM_ScavengerJavaStats *statsToMerge)
+{
+	_continuationCandidates += statsToMerge->_continuationCandidates;
+	_continuationCleared += statsToMerge->_continuationCleared;
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */

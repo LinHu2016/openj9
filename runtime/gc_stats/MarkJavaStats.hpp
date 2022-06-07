@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -46,6 +46,11 @@ public:
 	UDATA _ownableSynchronizerCandidates; /**< number of ownable synchronizer objects visited this cycle */
 	UDATA _ownableSynchronizerCleared; /**< number of ownable synchronizer objects cleared this cycle */
 
+#if JAVA_SPEC_VERSION >= 19
+	UDATA _continuationCandidates; /**< number of continuation objects visited this cycle */
+	UDATA _continuationCleared; /**< number of continuation objects cleared this cycle */
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	MM_ReferenceStats _weakReferenceStats; /**< Weak reference stats for the cycle */
 	MM_ReferenceStats _softReferenceStats; /**< Soft reference stats for the cycle */
 	MM_ReferenceStats _phantomReferenceStats; /**< Phantom reference stats for the cycle */
@@ -74,6 +79,10 @@ public:
 		, _unfinalizedEnqueued(0)
 		, _ownableSynchronizerCandidates(0)
 		, _ownableSynchronizerCleared(0)
+#if JAVA_SPEC_VERSION >= 19
+		, _continuationCandidates(0)
+		, _continuationCleared(0)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		, _weakReferenceStats()
 		, _softReferenceStats()
 		, _phantomReferenceStats()

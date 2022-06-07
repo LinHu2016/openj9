@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -48,6 +48,9 @@
 #include "ObjectHeapIterator.hpp"
 #include "ObjectModel.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectList.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "PointerArrayIterator.hpp"
 #include "SegmentIterator.hpp"
 #include "StringTable.hpp"
@@ -72,6 +75,14 @@ MM_HeapRootScanner::doOwnableSynchronizerObject(J9Object *objectPtr)
 {
 	doObject(objectPtr);
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_HeapRootScanner::doContinuationObject(J9Object *objectPtr)
+{
+	doObject(objectPtr);
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #if defined(J9VM_GC_FINALIZATION)
 /**
@@ -478,6 +489,28 @@ MM_HeapRootScanner::scanOwnableSynchronizerObjects()
 	}
 	reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_HeapRootScanner::scanContinuationObjects()
+{
+	reportScanningStarted(RootScannerEntity_ContinuationObjects);
+	setReachability(RootScannerEntityReachability_Weak);
+
+	MM_ObjectAccessBarrier *barrier = _extensions->accessBarrier;
+	MM_ContinuationObjectList *continuationObjectList = _extensions->getContinuationObjectLists();
+
+	while(NULL != continuationObjectList) {
+		J9Object *objectPtr = continuationObjectList->getHeadOfList();
+		while (NULL != objectPtr) {
+			doContinuationObject(objectPtr);
+			objectPtr = barrier->getContinuationLink(objectPtr);
+		}
+		continuationObjectList = continuationObjectList->getNextList();
+	}
+	reportScanningEnded(RootScannerEntity_ContinuationObjects);
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 /**
  * @todo Provide function documentation

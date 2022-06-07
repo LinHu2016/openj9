@@ -1289,6 +1289,10 @@ public:
    virtual bool isOwnableSyncClass(TR_OpaqueClassBlock *clazz);
    const char *getJ9MonitorName(J9ThreadMonitor* monitor);
 
+#if JAVA_SPEC_VERSION >= 19
+   virtual bool  isContinuationClass(TR_OpaqueClassBlock *clazz);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
    virtual TR_J9SharedCache *sharedCache() { return _sharedCache; }
    virtual void              freeSharedCache();
 

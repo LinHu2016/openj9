@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -133,6 +133,16 @@ MM_VerboseHandlerOutputStandardJava::outputOwnableSynchronizerInfo(MM_Environmen
 	}
 }
 
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_VerboseHandlerOutputStandardJava::outputContinuationInfo(MM_EnvironmentBase *env, UDATA indent, UDATA continuationCandidates, UDATA continuationCleared)
+{
+	if (0 != continuationCandidates) {
+		_manager->getWriterChain()->formatAndOutput(env, indent, "<continuations candidates=\"%zu\" cleared=\"%zu\" />", continuationCandidates, continuationCleared);
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 void
 MM_VerboseHandlerOutputStandardJava::outputReferenceInfo(MM_EnvironmentBase *env, UDATA indent, const char *referenceType, MM_ReferenceStats *referenceStats, UDATA dynamicThreshold, UDATA maxThreshold)
 {
@@ -157,6 +167,10 @@ MM_VerboseHandlerOutputStandardJava::handleMarkEndInternal(MM_EnvironmentBase* e
 	outputUnfinalizedInfo(env, 1, markJavaStats->_unfinalizedCandidates, markJavaStats->_unfinalizedEnqueued);
 
 	outputOwnableSynchronizerInfo(env, 1, markJavaStats->_ownableSynchronizerCandidates, markJavaStats->_ownableSynchronizerCleared);
+
+#if JAVA_SPEC_VERSION >= 19
+	outputContinuationInfo(env, 1, markJavaStats->_continuationCandidates, markJavaStats->_continuationCleared);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	outputReferenceInfo(env, 1, "soft", &markJavaStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 	outputReferenceInfo(env, 1, "weak", &markJavaStats->_weakReferenceStats, 0, 0);
@@ -240,6 +254,10 @@ MM_VerboseHandlerOutputStandardJava::handleScavengeEndInternal(MM_EnvironmentBas
 		outputUnfinalizedInfo(env, 1, scavengerJavaStats->_unfinalizedCandidates, scavengerJavaStats->_unfinalizedEnqueued);
 
 		outputOwnableSynchronizerInfo(env, 1, scavengerJavaStats->_ownableSynchronizerCandidates, (scavengerJavaStats->_ownableSynchronizerCandidates - scavengerJavaStats->_ownableSynchronizerTotalSurvived));
+
+#if JAVA_SPEC_VERSION >= 19
+		outputContinuationInfo(env, 1, scavengerJavaStats->_continuationCandidates, (scavengerJavaStats->_continuationCleared));
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 		outputReferenceInfo(env, 1, "soft", &scavengerJavaStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 		outputReferenceInfo(env, 1, "weak", &scavengerJavaStats->_weakReferenceStats, 0, 0);

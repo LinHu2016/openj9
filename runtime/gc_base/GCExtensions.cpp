@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -278,3 +278,12 @@ MM_GCExtensions::getOwnableSynchronizerObjectListsExternal(J9VMThread *vmThread)
 
 	return ownableSynchronizerObjectLists;
 }
+
+#if JAVA_SPEC_VERSION >= 19
+MM_ContinuationObjectList *
+MM_GCExtensions::getContinuationObjectListsExternal(J9VMThread *vmThread)
+{
+	/* TODO: confirm if it is safe to call */
+	return continuationObjectLists;
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */

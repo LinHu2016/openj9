@@ -1,5 +1,5 @@
 ################################################################################
-# Copyright (c) 2017, 2020 IBM Corp. and others
+# Copyright (c) 2017, 2022 IBM Corp. and others
 #
 # This program and the accompanying materials are made available under
 # the terms of the Eclipse Public License 2.0 which accompanies this
@@ -34,6 +34,10 @@ j9vm_add_library(j9modronstandard STATIC
 	${gc_modron_standard_sources}
 )
 
+if(NOT JAVA_SPEC_VERSION LESS 19)
+	target_sources(j9modronstandard PRIVATE ContinuationObjectBufferStandard.cpp)
+endif()
+
 target_link_libraries(j9modronstandard
 	PRIVATE
 		j9vm_interface
@@ -47,6 +51,10 @@ if(OMR_MIXED_REFERENCES_MODE_STATIC)
 	j9vm_add_library(j9modronstandard_full STATIC
 		${gc_modron_standard_sources}
 	)
+
+	if(NOT JAVA_SPEC_VERSION LESS 19)
+		target_sources(j9modronstandard_full PRIVATE ContinuationObjectBufferStandard.cpp)
+	endif()
 
 	target_link_libraries(j9modronstandard_full
 		PRIVATE

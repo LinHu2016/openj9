@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -273,6 +273,14 @@ private:
 	 */
 	void scanOwnableSynchronizerObjects(MM_EnvironmentVLHGC *env);
 
+#if JAVA_SPEC_VERSION >= 19
+	/**
+	 * Scan all continuation objects in the collection set.
+	 * @param env[in] the current thread
+	 */
+	void scanContinuationObjects(MM_EnvironmentVLHGC *env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	bool isMarked(J9Object *objectPtr);
 
 	/**
@@ -313,6 +321,10 @@ private:
 	 */
 	void scanMixedObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr, ScanReason reason);
 	
+#if JAVA_SPEC_VERSION >= 19
+	void scanContinuationObject(MM_EnvironmentVLHGC *env, J9Object *objectPtr, ScanReason reason);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	/**
 	 * Scan the specified instance of java.lang.Class.
 	 * 1. Scan the object itself, as in scanMixedObject()
@@ -504,6 +516,9 @@ public:
 	 */
 	void flushBuffers(MM_EnvironmentVLHGC *env);
 	
+#if JAVA_SPEC_VERSION >= 19
+	void doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr, J9StackWalkState *walkState, const void *stackLocation);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	/**
 	 * Create a GlobalMarkingScheme object.
 	 */
@@ -530,5 +545,13 @@ public:
 	friend class MM_GlobalMarkingSchemeRootMarker;
 	friend class MM_GlobalMarkingSchemeRootClearer;
 };
+
+#if JAVA_SPEC_VERSION >= 19
+typedef struct StackIteratorData4GlobalMarkingScheme {
+	MM_GlobalMarkingScheme *globalMarkingScheme;
+	MM_EnvironmentVLHGC *env;
+    J9Object *fromObject;
+} StackIteratorData4GlobalMarkingScheme;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #endif /* GLOBALMARKINGSCHEME_HPP_ */

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2001, 2014 IBM Corp. and others
+ * Copyright (c) 2001, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -94,6 +94,11 @@ HeapIteratorAPI_RootIterator::scanAllSlots()
 	if (_flags & SCAN_OWNABLE_SYNCHRONIZER) {
 		scanOwnableSynchronizerObjects();
 	}
+#if JAVA_SPEC_VERSION >= 19
+	if (_flags & SCAN_CONTINUATION) {
+		scanContinuationObjects();
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 }
 
 

@@ -301,6 +301,10 @@ private:
 	 */
 	MMINLINE void scanOwnableSynchronizerObjectSlots(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *reservingContext, J9Object *objectPtr, ScanReason reason);
 
+
+#if JAVA_SPEC_VERSION >= 19
+	MMINLINE void scanContinuationObjectSlots(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *reservingContext, J9Object *objectPtr, ScanReason reason);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	/**
 	 * Called whenever a ownable synchronizer object is scaned during CopyForwardScheme. Places the object on the thread-specific buffer of gc work thread.
 	 * @param env -- current thread environment
@@ -771,6 +775,9 @@ private:
 	void scanFinalizableList(MM_EnvironmentVLHGC *env, j9object_t headObject);
 #endif /* J9VM_GC_FINALIZATION */
 
+#if JAVA_SPEC_VERSION >= 19
+	void scanContinuationObjects(MM_EnvironmentVLHGC *env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	/**
 	 * Clear the cycle's mark map for all regions that are part of the evacuate set.
 	 * @param env GC thread.
@@ -1124,6 +1131,9 @@ public:
 	}
 
 	void abandonTLHRemainders(MM_EnvironmentVLHGC *env);
+#if JAVA_SPEC_VERSION >= 19
+	void doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr, J9StackWalkState *walkState, const void *stackLocation);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	friend class MM_CopyForwardGMPCardCleaner;
 	friend class MM_CopyForwardNoGMPCardCleaner;
@@ -1132,5 +1142,13 @@ public:
 	friend class MM_CopyForwardSchemeRootClearer;
 	friend class MM_CopyForwardSchemeAbortScanner;
 };
+
+#if JAVA_SPEC_VERSION >= 19
+typedef struct StackIteratorData4CooyForward {
+	MM_CopyForwardScheme *copyForwardScheme;
+	MM_EnvironmentVLHGC *env;
+    J9Object *fromObject;
+} StackIteratorData4CooyForward;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #endif /* COPYFORWARDSCHEME_HPP_ */

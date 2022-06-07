@@ -25,6 +25,9 @@
 #include "AsyncCallbackHandler.hpp"
 #include "ClassLoaderIterator.hpp"
 #include "ConfigurationDelegate.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "FinalizeListManager.hpp"
 #include "Heap.hpp"
 #include "HeapRegionDescriptorStandard.hpp"
@@ -153,6 +156,20 @@ MM_ConcurrentMarkingDelegate::scanThreadRoots(MM_EnvironmentBase *env)
 	localData.markingScheme = _markingScheme;
 	localData.env = env;
 	GC_VMThreadStackSlotIterator::scanSlots(vmThread, vmThread, (void *)&localData, concurrentStackSlotIterator, true, false);
+
+
+#if JAVA_SPEC_VERSION >= 19
+	if (NULL != vmThread->currentContinuation)
+	{
+		/* Scan java stacks in currentContinuation */
+		J9VMThread continuationThread;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, vmThread->currentContinuation);
+		GC_VMThreadStackSlotIterator::scanSlots(vmThread, &continuationThread, (void *)&localData, concurrentStackSlotIterator, true, false);
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_ConcurrentMarkingDelegate::scanThreadRoots GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	return true;
 }

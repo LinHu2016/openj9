@@ -31,6 +31,7 @@ set(j9vm_gc_glue_sources
 	${CMAKE_CURRENT_SOURCE_DIR}/ConcurrentSafepointCallbackJava.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/EnvironmentDelegate.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/GlobalCollectorDelegate.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/HeapWalkerDelegate.cpp	
 	${CMAKE_CURRENT_SOURCE_DIR}/JNICriticalRegion.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/MarkingDelegate.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/MarkingSchemeRootClearer.cpp

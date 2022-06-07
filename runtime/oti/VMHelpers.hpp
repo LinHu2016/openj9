@@ -516,6 +516,11 @@ public:
 			if (classFlags & J9AccClassOwnableSynchronizer) {
 				currentThread->javaVM->memoryManagerFunctions->ownableSynchronizerObjectCreated(currentThread, object);
 			}
+#if JAVA_SPEC_VERSION >= 19
+			if (classFlags & J9AccClassContinuation) {
+				currentThread->javaVM->memoryManagerFunctions->continuationObjectCreated(currentThread, object);
+			}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		}
 	}
 
@@ -2038,6 +2043,32 @@ exit:
 		}
 #endif /* JAVA_SPEC_VERSION > 11 */
 	}
+
+#if JAVA_SPEC_VERSION >= 19
+	static VMINLINE void
+	copyJavaStacksFromJ9VMContinuation(J9VMThread *vmThread, J9VMContinuation *continuation)
+	{
+		vmThread->arg0EA = continuation->arg0EA;
+		vmThread->bytecodes = continuation->bytecodes;
+		vmThread->sp = continuation->sp;
+		vmThread->pc = continuation->pc;
+		vmThread->literals = continuation->literals;
+		vmThread->stackOverflowMark = continuation->stackOverflowMark;
+		vmThread->stackOverflowMark2 = continuation->stackOverflowMark2;
+		vmThread->stackObject = continuation->stackObject;
+	}
+
+	static VMINLINE void
+	cleanupContinuationObject(J9VMThread *vmThread, J9Object *objectPtr)
+	{
+		J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, objectPtr);
+		if (NULL != j9vmContinuation) {
+			/* clean up J9VMContinuation, set vmref = NULL */
+			J9VMJDKINTERNALVMCONTINUATION_SET_VMREF(vmThread, objectPtr, NULL);
+		}
+	}
+
+#endif /* JAVA_SPEC_VERSION >= 19 */
 };
 
 #endif /* VMHELPERS_HPP_ */

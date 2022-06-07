@@ -57,6 +57,9 @@ class MM_HeapMap;
 class MM_MemorySubSpace;
 class MM_ObjectAccessBarrier;
 class MM_OwnableSynchronizerObjectList;
+#if JAVA_SPEC_VERSION >= 19
+class MM_ContinuationObjectList;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 class MM_StringTable;
 class MM_UnfinalizedObjectList;
 class MM_Wildcard;
@@ -87,6 +90,9 @@ class MM_IdleGCManager;
 class MM_GCExtensions : public MM_GCExtensionsBase {
 private:
 	MM_OwnableSynchronizerObjectList* ownableSynchronizerObjectLists; /**< The global linked list of ownable synchronizer object lists. */
+#if JAVA_SPEC_VERSION >= 19
+	MM_ContinuationObjectList* continuationObjectLists; /**< The global linked list of continuation object lists. */
+#endif /* JAVA_SPEC_VERSION >= 19 */
 public:
 	MM_StringTable* stringTable; /**< top level String Table structure (internally organized as a set of hash sub-tables */
 
@@ -282,12 +288,21 @@ public:
 	MMINLINE MM_OwnableSynchronizerObjectList* getOwnableSynchronizerObjectLists() { return ownableSynchronizerObjectLists; }
 	MMINLINE void setOwnableSynchronizerObjectLists(MM_OwnableSynchronizerObjectList* newOwnableSynchronizerObjectLists) { ownableSynchronizerObjectLists = newOwnableSynchronizerObjectLists; }
 
+#if JAVA_SPEC_VERSION >= 19
+	MM_ContinuationObjectList* getContinuationObjectListsExternal(J9VMThread *vmThread);
+	MMINLINE MM_ContinuationObjectList* getContinuationObjectLists() { return continuationObjectLists; }
+	MMINLINE void setContinuationObjectLists(MM_ContinuationObjectList* newContinuationObjectLists) { continuationObjectLists = newContinuationObjectLists; }
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	/**
 	 * Create a GCExtensions object
 	 */
 	MM_GCExtensions()
 		: MM_GCExtensionsBase()
 		, ownableSynchronizerObjectLists(NULL)
+#if JAVA_SPEC_VERSION >= 19
+		, continuationObjectLists(NULL)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		, stringTable(NULL)
 		, gcchkExtensions(NULL)
 		, tgcExtensions(NULL)

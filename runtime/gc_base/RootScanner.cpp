@@ -32,7 +32,6 @@
 #endif /* defined(J9VM_OPT_JVMTI) */
 
 #include "RootScanner.hpp"
-
 #include "ClassIterator.hpp"
 #include "ClassHeapIterator.hpp"
 #include "ClassLoaderIterator.hpp"
@@ -57,6 +56,10 @@
 #include "ObjectHeapIteratorAddressOrderedList.hpp"
 #include "ObjectModel.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectList.hpp"
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "ParallelDispatcher.hpp"
 #include "PointerArrayIterator.hpp"
 #include "SlotObject.hpp"
@@ -163,11 +166,28 @@ MM_RootScanner::doOwnableSynchronizerObject(J9Object *objectPtr, MM_OwnableSynch
 	Assert_MM_unreachable();
 }
 
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_RootScanner::doContinuationObject(J9Object *objectPtr, MM_ContinuationObjectList *list)
+{
+	Assert_MM_unreachable();
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
+
 MM_RootScanner::CompletePhaseCode
 MM_RootScanner::scanOwnableSynchronizerObjectsComplete(MM_EnvironmentBase *env)
 {
 	return complete_phase_OK;
 }
+
+#if JAVA_SPEC_VERSION >= 19
+MM_RootScanner::CompletePhaseCode
+MM_RootScanner::scanContinuationObjectsComplete(MM_EnvironmentBase *env)
+{
+	return complete_phase_OK;
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 /**
  * @todo Provide function documentation
@@ -522,6 +542,22 @@ MM_RootScanner::scanOneThread(MM_EnvironmentBase *env, J9VMThread* walkThread, v
 	}
 
 	GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getOmrVMThread()->_language_vmthread, walkThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
+
+#if JAVA_SPEC_VERSION >= 19
+	if (NULL != walkThread->currentContinuation)
+	{
+		/* Scan java stacks in currentContinuation */
+		J9VMThread continuationThread;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, walkThread->currentContinuation);
+		GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getOmrVMThread()->_language_vmthread, &continuationThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
+
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_RootScanner::scanOneThread  GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+
+
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	return false;
 }
 
@@ -735,6 +771,34 @@ MM_RootScanner::scanOwnableSynchronizerObjects(MM_EnvironmentBase *env)
 
 	reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_RootScanner::scanContinuationObjects(MM_EnvironmentBase *env)
+{
+	reportScanningStarted(RootScannerEntity_ContinuationObjects);
+
+	MM_ObjectAccessBarrier *barrier = _extensions->accessBarrier;
+	MM_ContinuationObjectList *continuationObjectList = _extensions->getContinuationObjectLists();
+	while(NULL != continuationObjectList) {
+		if (_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+			J9Object *objectPtr = continuationObjectList->getHeadOfList();
+			while (NULL != objectPtr) {
+				doContinuationObject(objectPtr, continuationObjectList);
+				objectPtr = barrier->getContinuationLink(objectPtr);
+			}
+		}
+		continuationObjectList = continuationObjectList->getNextList();
+	}
+
+	reportScanningEnded(RootScannerEntity_ContinuationObjects);
+
+	/*debug*/
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_RootScanner::scanContinuationObjects env=%p\n", env);
+
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 /**
  * Scan the per-thread object monitor lookup caches.
@@ -994,6 +1058,9 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 	}
 
 	scanOwnableSynchronizerObjects(env);
+#if JAVA_SPEC_VERSION >= 19
+	scanContinuationObjects(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #if defined(J9VM_GC_MODRON_SCAVENGER)
 	/* Remembered set is clearable in a generational system -- if an object in old
@@ -1073,6 +1140,9 @@ MM_RootScanner::scanAllSlots(MM_EnvironmentBase *env)
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
 	scanOwnableSynchronizerObjects(env);
+#if JAVA_SPEC_VERSION >= 19
+	scanContinuationObjects(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 }
 
 bool

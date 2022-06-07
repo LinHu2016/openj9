@@ -42,8 +42,13 @@
 #include "HeapRegionDescriptorRealtime.hpp"
 #include "MetronomeAlarmThread.hpp"
 #include "JNICriticalRegion.hpp"
-#include "OwnableSynchronizerObjectBufferRealtime.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#include "OwnableSynchronizerObjectBufferRealtime.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectList.hpp"
+#include "ContinuationObjectBufferRealtime.hpp"
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "RealtimeAccessBarrier.hpp"
 #include "RealtimeGC.hpp"
 #include "RealtimeMarkingScheme.hpp"
@@ -176,6 +181,13 @@ MM_MetronomeDelegate::initialize(MM_EnvironmentBase *env)
 		return false;
 	}
 
+#if JAVA_SPEC_VERSION >= 19
+	/* allocate and initialize the global continuation object lists */
+	if (!allocateAndInitializeContinuationObjectLists(env)) {
+		return false;
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 	if (!_extensions->dynamicClassUnloadingThresholdForced) {
 		_extensions->dynamicClassUnloadingThreshold = 1;
@@ -262,6 +274,32 @@ MM_MetronomeDelegate::allocateAndInitializeOwnableSynchronizerObjectLists(MM_Env
 	return true;
 }
 
+#if JAVA_SPEC_VERSION >= 19
+bool
+MM_MetronomeDelegate::allocateAndInitializeContinuationObjectLists(MM_EnvironmentBase *env)
+{
+	const UDATA listCount = getContinuationObjectListCount(env);
+	Assert_MM_true(0 < listCount);
+	MM_ContinuationObjectList *continuationObjectLists = (MM_ContinuationObjectList *)env->getForge()->allocate((sizeof(MM_ContinuationObjectList) * listCount), MM_AllocationCategory::FIXED, J9_GET_CALLSITE());
+	if (NULL == continuationObjectLists) {
+		return false;
+	}
+	for (UDATA index = 0; index < listCount; index++) {
+		new(&continuationObjectLists[index]) MM_ContinuationObjectList();
+		/* add each list to the global list. we need to maintain the doubly linked list
+		 * to ensure uniformity with SE/Balanced.
+		 */
+		MM_ContinuationObjectList *previousContinuationObjectList = (0 == index) ? NULL : &continuationObjectLists[index-1];
+		MM_ContinuationObjectList *nextContinuationObjectList = ((listCount - 1) == index) ? NULL : &continuationObjectLists[index+1];
+
+		continuationObjectLists[index].setNextList(nextContinuationObjectList);
+		continuationObjectLists[index].setPreviousList(previousContinuationObjectList);
+	}
+	_extensions->setContinuationObjectLists(continuationObjectLists);
+	return true;
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 void
 MM_MetronomeDelegate::tearDown(MM_EnvironmentBase *env)
 {
@@ -280,6 +318,13 @@ MM_MetronomeDelegate::tearDown(MM_EnvironmentBase *env)
 		_extensions->setOwnableSynchronizerObjectLists(NULL);
 	}
 	
+#if JAVA_SPEC_VERSION >= 19
+	if (NULL != _extensions->getContinuationObjectLists()) {
+		env->getForge()->free(_extensions->getContinuationObjectLists());
+		_extensions->setContinuationObjectLists(NULL);
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	if (NULL != _extensions->accessBarrier) {
 		_extensions->accessBarrier->kill(env);
 		_extensions->accessBarrier = NULL;
@@ -1269,6 +1314,67 @@ MM_MetronomeDelegate::scanOwnableSynchronizerObjects(MM_EnvironmentRealtime *env
 	buffer->flush(env);
 }
 
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_MetronomeDelegate::scanContinuationObjects(MM_EnvironmentRealtime *env)
+{
+	const UDATA maxIndex = getContinuationObjectListCount(env);
+
+	/* first we need to move the current list to the prior list and process the prior list,
+	 * because if object has been marked, we have to re-insert it back to the current list.
+	 */
+	if (env->_currentTask->synchronizeGCThreadsAndReleaseMain(env, UNIQUE_ID)) {
+		GC_OMRVMInterface::flushNonAllocationCaches(env);
+		UDATA listIndex;
+		for (listIndex = 0; listIndex < maxIndex; ++listIndex) {
+			MM_ContinuationObjectList *continuationObjectList = &_extensions->getContinuationObjectLists()[listIndex];
+			continuationObjectList->startContinuationProcessing();
+		}
+		env->_currentTask->releaseSynchronizedGCThreads(env);
+	}
+
+	GC_Environment *gcEnv = env->getGCEnvironment();
+	MM_ContinuationObjectBuffer *buffer = gcEnv->_continuationObjectBuffer;
+	UDATA listIndex;
+	for (listIndex = 0; listIndex < maxIndex; ++listIndex) {
+		MM_ContinuationObjectList *list = &_extensions->getContinuationObjectLists()[listIndex];
+		if (!list->wasEmpty()) {
+			if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+				J9Object *object = list->getPriorList();
+				UDATA objectsVisited = 0;
+				while (NULL != object) {
+					objectsVisited += 1;
+					gcEnv->_markJavaStats._continuationCandidates += 1;
+
+					/* Get next before adding it to the buffer, as buffer modifies ContinuationLink */
+					J9Object* next = _extensions->accessBarrier->getContinuationLink(object);
+					if (_markingScheme->isMarked(object)) {
+						buffer->add(env, object);
+					} else {
+						gcEnv->_markJavaStats._continuationCleared += 1;
+						VM_VMHelpers::cleanupContinuationObject((J9VMThread *)env->getLanguageVMThread(), object);
+					}
+					object = next;
+
+					if (CONTINUATION_OBJECT_YIELD_CHECK_INTERVAL == objectsVisited ) {
+						_scheduler->condYieldFromGC(env);
+						objectsVisited = 0;
+					}
+				}
+				_scheduler->condYieldFromGC(env);
+			}
+		}
+	}
+	/* restore everything to a flushed state before exiting */
+	buffer->flush(env);
+	/*debug*/
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_MetronomeDelegate::scanContinuationObjects env=%p, continuationCandidates=%zu, continuationCleared=%zu\n",
+					env, gcEnv->_markJavaStats._continuationCandidates, gcEnv->_markJavaStats._continuationCleared);
+
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 void
 MM_MetronomeDelegate::scanWeakReferenceObjects(MM_EnvironmentRealtime *env)
 {
@@ -1534,6 +1640,53 @@ MM_MetronomeDelegate::unsetUnmarkedImpliesCleared()
 	_unmarkedImpliesClasses = true;
 #endif /* defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING) */
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+stackSlotIterator4RealtimeGC(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
+{
+	StackIteratorData4RealtimeMarkingScheme *data = (StackIteratorData4RealtimeMarkingScheme *)localData;
+	MM_RealtimeMarkingScheme *realtimeMarkingScheme = data->realtimeMarkingScheme;
+	MM_EnvironmentRealtime *env = data->env;
+
+	J9Object *object = *slotPtr;
+	if (realtimeMarkingScheme->isHeapObject(object)) {
+		/* heap object - validate and mark */
+		Assert_MM_validStackSlot(MM_StackSlotValidator(0, object, stackLocation, walkState).validate(env));
+		realtimeMarkingScheme->markObject(env, object);
+	} else if (NULL != object) {
+		/* stack object - just validate */
+		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, object, stackLocation, walkState).validate(env));
+	}
+}
+
+UDATA
+MM_MetronomeDelegate::scanContinuationObject(MM_EnvironmentRealtime *env, J9Object *objectPtr)
+{
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF((J9VMThread *)env->getLanguageVMThread(), objectPtr);
+	if (NULL != j9vmContinuation) {
+		J9VMThread continuationThread;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
+
+		StackIteratorData4RealtimeMarkingScheme localData;
+		localData.realtimeMarkingScheme = _markingScheme;
+		localData.env = env;
+		localData.fromObject = objectPtr;
+
+		bool bStackFrameClassWalkNeeded = false;
+#if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
+		if (isDynamicClassUnloadingEnabled())
+			bStackFrameClassWalkNeeded = true;
+#endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
+
+		GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getLanguageVMThread(), &continuationThread, (void *)&localData, stackSlotIterator4RealtimeGC, bStackFrameClassWalkNeeded, false);
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MetronomeDelegate::scanContinuationObject GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+	}
+	return scanMixedObject(env, objectPtr);
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #endif /* defined(J9VM_GC_REALTIME) */
 

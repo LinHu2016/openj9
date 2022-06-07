@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019, 2020 IBM Corp. and others
+ * Copyright (c) 2019, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -240,6 +240,18 @@ public:
 		_realtimeGC->getRealtimeDelegate()->scanOwnableSynchronizerObjects(env);
 		reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
 	}
+
+#if JAVA_SPEC_VERSION >= 19
+	virtual void
+	scanContinuationObjects(MM_EnvironmentBase *envBase)	{
+		MM_EnvironmentRealtime *env = MM_EnvironmentRealtime::getEnvironment(envBase);
+
+		reportScanningStarted(RootScannerEntity_ContinuationObjects);
+		/* allow the marking scheme to handle this */
+		_realtimeGC->getRealtimeDelegate()->scanContinuationObjects(env);
+		reportScanningEnded(RootScannerEntity_ContinuationObjects);
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	/**
 	 * Wraps the MM_RootScanner::scanJNIWeakGlobalReferences method to disable yielding during the scan.

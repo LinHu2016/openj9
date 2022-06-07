@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 2017, 2021 IBM Corp. and others
+ * Copyright (c) 2017, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -41,6 +41,9 @@ typedef struct GCmovedObjectHashCode {
 
 class MM_EnvironmentBase;
 class MM_OwnableSynchronizerObjectBuffer;
+#if JAVA_SPEC_VERSION >= 19
+class MM_ContinuationObjectBuffer;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 class MM_ReferenceObjectBuffer;
 class MM_UnfinalizedObjectBuffer;
 
@@ -59,6 +62,9 @@ public:
 	MM_ReferenceObjectBuffer *_referenceObjectBuffer; /**< The thread-specific buffer of recently discovered reference objects */
 	MM_UnfinalizedObjectBuffer *_unfinalizedObjectBuffer; /**< The thread-specific buffer of recently allocated unfinalized objects */
 	MM_OwnableSynchronizerObjectBuffer *_ownableSynchronizerObjectBuffer; /**< The thread-specific buffer of recently allocated ownable synchronizer objects */
+#if JAVA_SPEC_VERSION >= 19
+	MM_ContinuationObjectBuffer *_continuationObjectBuffer; /**< The thread-specific buffer of recently allocated continuation objects */
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	struct GCmovedObjectHashCode movedObjectHashCodeCache; /**< Structure to aid on object movement and hashing */
 
@@ -70,6 +76,9 @@ public:
 		:_referenceObjectBuffer(NULL)
 		,_unfinalizedObjectBuffer(NULL)
 		,_ownableSynchronizerObjectBuffer(NULL)
+#if JAVA_SPEC_VERSION >= 19
+		,_continuationObjectBuffer(NULL)
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	{}
 };
 

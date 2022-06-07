@@ -49,6 +49,10 @@
 #include "MarkingSchemeRootMarker.hpp"
 #include "MarkingSchemeRootClearer.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectList.hpp"
+#include "VMHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "ParallelDispatcher.hpp"
 #include "ReferenceObjectBuffer.hpp"
 #include "RootScanner.hpp"
@@ -132,6 +136,10 @@ MM_MarkingDelegate::workerSetupForGC(MM_EnvironmentBase *env)
 	if (_extensions->scavengerEnabled) {
 		/* clear scavenger stats for correcting the ownableSynchronizerObjects stats, only in generational gc */
 		gcEnv->_scavengerJavaStats.clearOwnableSynchronizerCounts();
+#if JAVA_SPEC_VERSION >= 19
+		/* clear scavenger stats for correcting the continuationObjects stats, only in generational gc */
+		gcEnv->_scavengerJavaStats.clearContinuationCounts();
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	}
 #endif /* defined(J9VM_GC_MODRON_SCAVENGER) */
 #if defined(OMR_GC_MODRON_STANDARD) || defined(OMR_GC_REALTIME)
@@ -168,6 +176,10 @@ MM_MarkingDelegate::workerCleanupAfterGC(MM_EnvironmentBase *env)
 	if (_extensions->scavengerEnabled) {
 		/* merge scavenger ownableSynchronizerObjects stats, only in generational gc */
 		_extensions->scavengerJavaStats.mergeOwnableSynchronizerCounts(&gcEnv->_scavengerJavaStats);
+#if JAVA_SPEC_VERSION >= 19
+		/* merge scavenger continuationObjects stats, only in generational gc */
+		_extensions->scavengerJavaStats.mergeContinuationCounts(&gcEnv->_scavengerJavaStats);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	}
 #endif /* defined(J9VM_GC_MODRON_SCAVENGER) */
 }
@@ -198,6 +210,10 @@ MM_MarkingDelegate::startRootListProcessing(MM_EnvironmentBase *env)
 	if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 		_shouldScanUnfinalizedObjects = false;
 		_shouldScanOwnableSynchronizerObjects = false;
+#if JAVA_SPEC_VERSION >= 19
+		_shouldScanContinuationObjects = false;
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 		MM_HeapRegionDescriptorStandard *region = NULL;
 		GC_HeapRegionIteratorStandard regionIterator(_extensions->heap->getHeapRegionManager());
 		while (NULL != (region = regionIterator.nextRegion())) {
@@ -215,10 +231,84 @@ MM_MarkingDelegate::startRootListProcessing(MM_EnvironmentBase *env)
 				if (!ownableSynchronizerObjectList->wasEmpty()) {
 					_shouldScanOwnableSynchronizerObjects = true;
 				}
+#if JAVA_SPEC_VERSION >= 19
+				/* Start continuation processing for region */
+				MM_ContinuationObjectList *continuationObjectList = &(regionExtension->_continuationObjectLists[i]);
+				continuationObjectList->startContinuationProcessing();
+				if (!continuationObjectList->wasEmpty()) {
+					_shouldScanContinuationObjects = true;
+				}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			}
 		}
 	}
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_MarkingDelegate::doStackSlot(MM_EnvironmentBase *env, omrobjectptr_t objectPtr, omrobjectptr_t *slotPtr)
+{
+	omrobjectptr_t object = *slotPtr;
+	if (_markingScheme->isHeapObject(object) && !_extensions->heap->objectIsInGap(object)) {
+
+#if defined(OMR_GC_CONCURRENT_SCAVENGER)
+		if (_extensions->isConcurrentScavengerEnabled() && _extensions->isScavengerBackOutFlagRaised()) {
+			bool const compressed = _extensions->compressObjectReferences();
+			if (_extensions->getGlobalCollector()->isStwCollectionInProgress()) {
+				MM_ForwardedHeader forwardHeader(*slotPtr, compressed);
+				omrobjectptr_t forwardPtr = forwardHeader.getNonStrictForwardedObject();
+
+				if (NULL != forwardPtr) {
+					if (forwardHeader.isSelfForwardedPointer()) {
+						forwardHeader.restoreSelfForwardedPointer();
+					} else {
+						*slotPtr =forwardPtr;
+					}
+				}
+			}
+		}
+#endif /* OMR_GC_CONCURRENT_SCAVENGER */
+		_markingScheme->inlineMarkObject(env, object);
+	}
+}
+
+/**
+ * @todo Provide function documentation
+ */
+void
+stackSlotIterator4SMarkingDelegate(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
+{
+	StackIteratorData4MarkingDelegate *data = (StackIteratorData4MarkingDelegate *)localData;
+	data->markingDelegate->doStackSlot(data->env, data->fromObject, slotPtr);
+}
+
+
+void
+MM_MarkingDelegate::scanContinuationObject(MM_EnvironmentBase *env, omrobjectptr_t objectPtr)
+{
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF((J9VMThread *)env->getLanguageVMThread(), objectPtr);
+	if (NULL != j9vmContinuation) {
+		J9VMThread continuationThread;
+		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
+
+		StackIteratorData4MarkingDelegate localData;
+		localData.markingDelegate = this;
+		localData.env = env;
+		localData.fromObject = objectPtr;
+
+		bool bStackFrameClassWalkNeeded = false;
+#if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
+		bStackFrameClassWalkNeeded = isDynamicClassUnloadingEnabled();
+#endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
+
+		GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getLanguageVMThread(), &continuationThread, (void *)&localData, stackSlotIterator4SMarkingDelegate, bStackFrameClassWalkNeeded, false);
+		/*debug*/
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MarkingDelegate::scanContinuationObject GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 
 void
 MM_MarkingDelegate::scanRoots(MM_EnvironmentBase *env, bool processLists)

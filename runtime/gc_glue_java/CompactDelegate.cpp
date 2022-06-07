@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 2017, 2020 IBM Corp. and others
+ * Copyright (c) 2017, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -31,6 +31,10 @@
 #include "MarkMap.hpp"
 #include "OwnableSynchronizerObjectBuffer.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectBuffer.hpp"
+#include "ContinuationObjectList.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "PointerContiguousArrayIterator.hpp"
 
 #if defined(OMR_GC_MODRON_COMPACTION)
@@ -82,6 +86,9 @@ MM_CompactDelegate::verifyHeap(MM_EnvironmentBase *env, MM_MarkMap *markMap)
 			case GC_ObjectModel::SCAN_ATOMIC_MARKABLE_REFERENCE_OBJECT:
 			case GC_ObjectModel::SCAN_MIXED_OBJECT:
 			case GC_ObjectModel::SCAN_OWNABLESYNCHRONIZER_OBJECT:
+#if JAVA_SPEC_VERSION >= 19
+			case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+#endif /* JAVA_SPEC_VERSION >= 19 */
 			case GC_ObjectModel::SCAN_CLASS_OBJECT:
 			case GC_ObjectModel::SCAN_CLASSLOADER_OBJECT:
 			case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
@@ -129,6 +136,10 @@ MM_CompactDelegate::workerCleanupAfterGC(MM_EnvironmentBase *env)
 {
 	/* flush ownable synchronizer object buffer after rebuild the ownableSynchronizerObjectList during fixupObjects */
 	env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->flush(env);
+#if JAVA_SPEC_VERSION >= 19
+	/* flush continuation object buffer after rebuild the continuationObjectList during fixupObjects */
+	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 }
 
 void
@@ -142,6 +153,10 @@ MM_CompactDelegate::mainSetupForGC(MM_EnvironmentBase *env)
 		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
 			MM_OwnableSynchronizerObjectList *list = &regionExtension->_ownableSynchronizerObjectLists[i];
 			list->startOwnableSynchronizerProcessing();
+#if JAVA_SPEC_VERSION >= 19
+			MM_ContinuationObjectList *list2 = &regionExtension->_continuationObjectLists[i];
+			list2->startContinuationProcessing();
+#endif /* JAVA_SPEC_VERSION >= 19 */
 		}
 	}
 }

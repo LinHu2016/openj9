@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2019 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -42,6 +42,9 @@
 #include "MixedObjectIterator.hpp"
 #include "ObjectAccessBarrier.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectList.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "PointerArrayIterator.hpp"
 #include "SlotObject.hpp"
 #include "VMInterface.hpp"
@@ -407,7 +410,12 @@ j9mm_iterate_object_slots(
 	case GC_ObjectModel::SCAN_REFERENCE_MIXED_OBJECT:
 		returnCode = iterateMixedObjectSlots(javaVM, objectPtr, object, flags, func, userData);
 		break;
-
+#if JAVA_SPEC_VERSION >= 19
+	/* TODO: ??? */
+	case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+		returnCode = iterateMixedObjectSlots(javaVM, objectPtr, object, flags, func, userData);
+		break;
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	case GC_ObjectModel::SCAN_POINTER_ARRAY_OBJECT:
 		returnCode = iterateArrayObjectSlots(javaVM, objectPtr, object, flags, func, userData);
 		if (JVMTI_ITERATION_CONTINUE == returnCode) {
@@ -523,6 +531,49 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 	}
 	return returnCode;
 }
+
+#if JAVA_SPEC_VERSION >= 19
+/**
+ * Walk all continuation objects, call user provided function.
+ * @param flags The flags describing the walk (unused currently)
+ * @param func The function to call on each object descriptor.
+ * @param userData Pointer to storage for userData.
+ * @return return 0 on successfully iterating entire list, return user provided function call if it did not return JVMTI_ITERATION_CONTINUE
+ */
+jvmtiIterationControl
+j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData)
+{
+	J9JavaVM *javaVM = vmThread->javaVM;
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(javaVM->omrVM);
+	MM_ObjectAccessBarrier *barrier = extensions->accessBarrier;
+	MM_ContinuationObjectList *continuationObjectList = extensions->getContinuationObjectListsExternal(vmThread);
+
+	Assert_MM_true(NULL != continuationObjectList);
+
+	J9MM_IterateObjectDescriptor objectDescriptor;
+	J9MM_IterateRegionDescriptor regionDesc;
+	jvmtiIterationControl returnCode = JVMTI_ITERATION_CONTINUE;
+
+	while (NULL != continuationObjectList) {
+		J9Object *objectPtr = continuationObjectList->getHeadOfList();
+		while (NULL != objectPtr) {
+			UDATA regionFound = j9mm_find_region_for_pointer(javaVM, objectPtr, &regionDesc);
+			if (0 != regionFound) {
+				initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
+				returnCode = func(vmThread, &objectDescriptor, userData);
+				if (JVMTI_ITERATION_ABORT == returnCode) {
+					return returnCode;
+				}
+			} else {
+				Assert_MM_unreachable();
+			}
+			objectPtr = barrier->getContinuationLink(objectPtr);
+		}
+		continuationObjectList = continuationObjectList->getNextList();
+	}
+	return returnCode;
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 } /* extern "C" */
 

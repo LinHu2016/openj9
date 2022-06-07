@@ -41,6 +41,9 @@
 #include "ObjectAllocationInterface.hpp"
 #include "ObjectModel.hpp"
 #include "OwnableSynchronizerObjectBuffer.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationObjectBuffer.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 #include "ParallelDispatcher.hpp"
 #include "MemorySpace.hpp"
 #include "MemorySubSpace.hpp"
@@ -1022,6 +1025,25 @@ ownableSynchronizerObjectCreated(J9VMThread *vmThread, j9object_t object)
 	}
 	return 0;
 }
+
+#if JAVA_SPEC_VERSION >= 19
+UDATA
+continuationObjectCreated(J9VMThread *vmThread, j9object_t object)
+{
+	Assert_MM_true(NULL != object);
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "continuationObjectCreated env=%p, obj=%p\n", env, object);
+
+	env->getGCEnvironment()->_continuationObjectBuffer->add(env, object);
+	MM_ObjectAllocationInterface *objectAllocation = env->_objectAllocationInterface;
+	if (NULL != objectAllocation) {
+		objectAllocation->getAllocationStats()->_continuationObjectCount += 1;
+	}
+	return 0;
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 void
 j9gc_notifyGCOfClassReplacement(J9VMThread *vmThread, J9Class *oldClass, J9Class *newClass, UDATA isFastHCR)

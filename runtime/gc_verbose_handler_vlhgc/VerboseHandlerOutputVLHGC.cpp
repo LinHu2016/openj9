@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2021 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -273,6 +273,16 @@ MM_VerboseHandlerOutputVLHGC::outputOwnableSynchronizerInfo(MM_EnvironmentBase *
 	}
 }
 
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_VerboseHandlerOutputVLHGC::outputContinuationInfo(MM_EnvironmentBase *env, UDATA indent, UDATA continuationCandidates, UDATA continuationCleared)
+{
+	if (0 != continuationCandidates) {
+		_manager->getWriterChain()->formatAndOutput(env, indent, "<continuations candidates=\"%zu\" cleared=\"%zu\" />", continuationCandidates, continuationCleared);
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 void
 MM_VerboseHandlerOutputVLHGC::outputReferenceInfo(MM_EnvironmentBase *env, UDATA indent, const char *referenceType, MM_ReferenceStats *referenceStats, UDATA dynamicThreshold, UDATA maxThreshold)
 {
@@ -423,6 +433,9 @@ MM_VerboseHandlerOutputVLHGC::handleCopyForwardEnd(J9HookInterface** hook, UDATA
 
 	outputUnfinalizedInfo(env, 1, copyForwardStats->_unfinalizedCandidates, copyForwardStats->_unfinalizedEnqueued);
 	outputOwnableSynchronizerInfo(env, 1, copyForwardStats->_ownableSynchronizerCandidates, (copyForwardStats->_ownableSynchronizerCandidates-copyForwardStats->_ownableSynchronizerSurvived));
+#if JAVA_SPEC_VERSION >= 19
+	outputContinuationInfo(env, 1, copyForwardStats->_continuationCandidates, copyForwardStats->_continuationCleared);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	outputReferenceInfo(env, 1, "soft", &copyForwardStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 	outputReferenceInfo(env, 1, "weak", &copyForwardStats->_weakReferenceStats, 0, 0);
@@ -570,6 +583,9 @@ MM_VerboseHandlerOutputVLHGC::outputMarkSummary(MM_EnvironmentBase *env, const c
 
 	outputUnfinalizedInfo(env, 1, markStats->_unfinalizedCandidates, markStats->_unfinalizedEnqueued);
 	outputOwnableSynchronizerInfo(env, 1, markStats->_ownableSynchronizerCandidates, markStats->_ownableSynchronizerCleared);
+#if JAVA_SPEC_VERSION >= 19
+	outputContinuationInfo(env, 1, markStats->_continuationCandidates, markStats->_continuationCleared);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	outputReferenceInfo(env, 1, "soft", &markStats->_softReferenceStats, extensions->getDynamicMaxSoftReferenceAge(), extensions->getMaxSoftReferenceAge());
 	outputReferenceInfo(env, 1, "weak", &markStats->_weakReferenceStats, 0, 0);

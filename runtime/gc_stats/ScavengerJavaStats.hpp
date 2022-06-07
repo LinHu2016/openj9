@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -54,6 +54,11 @@ public:
 	UDATA _ownableSynchronizerTotalSurvived;	/**< number of ownable synchronizer objects survived this cycle */
 	UDATA _ownableSynchronizerNurserySurvived; /**< number of ownable synchronizer objects survived this cycle in Nursery Space */
 
+#if JAVA_SPEC_VERSION >= 19
+	UDATA _continuationCandidates;  /**< number of continuation objects visited this cycle */
+	UDATA _continuationCleared;	/**< number of continuation objects survived this cycle */
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	MM_ReferenceStats _weakReferenceStats;  /**< Weak reference stats for the cycle */
 	MM_ReferenceStats _softReferenceStats;  /**< Soft reference stats for the cycle */
 	MM_ReferenceStats _phantomReferenceStats;  /**< Phantom reference stats for the cycle */
@@ -78,7 +83,13 @@ public:
 	{
 		_ownableSynchronizerNurserySurvived += survivedCount;
 	}
-		
+#if JAVA_SPEC_VERSION >= 19
+	/* clear only ContinuationObject related data */
+	void clearContinuationCounts();
+	/* merge only ContinuationObject related data */
+	void mergeContinuationCounts(MM_ScavengerJavaStats *statsToMerge);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	MM_ScavengerJavaStats();
 
 

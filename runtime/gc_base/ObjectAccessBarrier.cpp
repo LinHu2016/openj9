@@ -92,6 +92,14 @@ MM_ObjectAccessBarrier::initialize(MM_EnvironmentBase *env)
 	if (0 != vm->internalVMFunctions->addHiddenInstanceField(vm, "java/util/concurrent/locks/AbstractOwnableSynchronizer", "ownableSynchronizerLink", refSignature, &_ownableSynchronizerLinkOffset)) {
 		return false;
 	}
+#if JAVA_SPEC_VERSION >= 19
+	/* request an extra slot in jdk/internal/vm/Continuation which we will use to maintain linked lists of continuation objects */
+//	if (0 != vm->internalVMFunctions->addHiddenInstanceField(vm, "jdk/internal/vm/Continuation", "continuationLink", refSignature, &_continuationLinkOffset)) {
+	/* request an extra slot in java/lang/VirtualThread$VThreadContinuation which we will use to maintain linked lists of continuation objects */
+	if (0 != vm->internalVMFunctions->addHiddenInstanceField(vm, "java/lang/VirtualThread$VThreadContinuation", "continuationLink", refSignature, &_continuationLinkOffset)) {
+		return false;
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	
 	return true;
 }
@@ -2261,6 +2269,24 @@ MM_ObjectAccessBarrier::setOwnableSynchronizerLink(j9object_t object, j9object_t
 	GC_SlotObject slot(_extensions->getOmrVM(), ownableSynchronizerLink);
 	slot.writeReferenceToSlot(value);
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_ObjectAccessBarrier::setContinuationLink(j9object_t object, j9object_t value)
+{
+	Assert_MM_true(NULL != object);
+	UDATA linkOffset = _continuationLinkOffset;
+	/* offset will be UDATA_MAX until Continuation is loaded */
+	Assert_MM_true(UDATA_MAX != linkOffset);
+	if (NULL == value) {
+		/* set the last object in the list pointing to itself */
+		value = object;
+	}
+	fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
+	GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
+	slot.writeReferenceToSlot(value);
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 void
 MM_ObjectAccessBarrier::printNativeMethod(J9VMThread* vmThread)

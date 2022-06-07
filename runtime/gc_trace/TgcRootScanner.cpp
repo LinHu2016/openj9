@@ -49,6 +49,9 @@ const static char *attributeNames[] = {
 	"finalizableobjects", /* RootScannerEntity_FinalizableObjects */
 	"unfinalizedobjects", /* RootScannerEntity_UnfinalizedObjects */
 	"ownablesynchronizerobjects", /* RootScannerEntity_OwnableSynchronizerObjects */
+#if JAVA_SPEC_VERSION >= 19
+	"continuationobjects", /* RootScannerEntity_ContinuationObjects */
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	"stringtable", /* RootScannerEntity_StringTable */
 	"jniglobalrefs", /* RootScannerEntity_JNIGlobalReferences */
 	"jniweakglobalrefs", /* RootScannerEntity_JNIWeakGlobalReferences */
@@ -69,6 +72,9 @@ const static char *attributeNames[] = {
 	"phantomrefscomplete", /* RootScannerEntity_PhantomReferenceObjectsComplete */
 	"unfinalizedobjectscomplete", /* RootScannerEntity_UnfinalizedObjectsComplete */
 	"ownablesynchronizerobjectscomplete", /* RootScannerEntity_OwnableSynchronizerObjectsComplete */
+#if JAVA_SPEC_VERSION >= 19
+	"continuationobjectscomplete", /* RootScannerEntity_ContinuationObjectsComplete */
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	"monitorlookupcaches", /* RootScannerEntity_MonitorLookupCaches */
 	"monitorlookupcachescomplete", /* RootScannerEntity_MonitorLookupCachesComplete */
 	"monitorreferenceobjectscomplete", /* RootScannerEntity_MonitorReferenceObjectsComplete */
