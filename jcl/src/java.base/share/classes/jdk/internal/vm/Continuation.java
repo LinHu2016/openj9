@@ -36,8 +36,10 @@ public class Continuation {
 	private final ContinuationScope scope;
 	private final Runnable runnable;
 	private Continuation parent;
-	private boolean started;
-	private volatile boolean finished;
+	private boolean started = false;
+	private boolean finished = false;
+
+	private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
 	private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
@@ -188,22 +190,7 @@ public class Continuation {
 	 * @return {@link true} or {@link false} based on success/failure
 	 */
 	public static boolean yield(ContinuationScope scope) {
-		/* TODO find matching scope to yield */
-		int rcPinned = isPinnedImpl();
-		if (rcPinned != 0) {
-			Pinned reason = null;
-			if (rcPinned == Pinned.CRITICAL_SECTION.errorCode()) {
-				reason = Pinned.CRITICAL_SECTION;
-			} else if (rcPinned == Pinned.MONITOR.errorCode()) {
-				reason = Pinned.MONITOR;
-			} else if (rcPinned == Pinned.NATIVE.errorCode()) {
-				reason = Pinned.NATIVE;
-			} else {
-				throw new AssertionError("Unknown pinned error code: " + rcPinned);
-			}
-			throw new IllegalStateException("Continuation is pinned: " + reason);
-		}
-		return yieldImpl();
+		return yieldImpl(scope);
 	}
 
 	protected void onPinned(Pinned reason) {
@@ -239,6 +226,6 @@ public class Continuation {
 	/* Continuation Native APIs */
 	private native boolean createContinuationImpl();
 	private native boolean enterImpl();
-	private static native boolean yieldImpl();
+	private static native boolean yieldImpl(ContinuationScope scope);
 
 }

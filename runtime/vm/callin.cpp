@@ -319,12 +319,6 @@ buildCallInStackFrame(J9VMThread *currentThread, J9VMEntryLocalStorage *newELS, 
 				goto done;
 			}
 		}
-#if JAVA_SPEC_VERSION >= 19
-		/* Increment avoided for the first call-in where
-		 * currentThread->entryLocalStorage is NULL.
-		 */
-		currentThread->callOutCount += 1;
-#endif /* JAVA_SPEC_VERSION >= 19 */
 	}
 	if (returnsObject) {
 		flags |= J9_SSF_RETURNS_OBJECT;
@@ -372,11 +366,7 @@ done:
 	return success;
 }
 
-#if JAVA_SPEC_VERSION >= 19
 void
-#else /* JAVA_SPEC_VERSION >= 19 */
-static void
-#endif /* JAVA_SPEC_VERSION >= 19 */
 restoreCallInFrame(J9VMThread *currentThread)
 {
 	Assert_VM_mustHaveVMAccess(currentThread);
@@ -406,12 +396,6 @@ restoreCallInFrame(J9VMThread *currentThread)
 	if (NULL != oldELS) {
 		UDATA usedBytes = ((UDATA)oldELS - (UDATA)newELS);
 		currentThread->currentOSStackFree += usedBytes;
-#if JAVA_SPEC_VERSION >= 19
-		/* Decrement avoided for the last return where
-		 * currentThread->entryLocalStorage is set to NULL.
-		 */
-		currentThread->callOutCount -= 1;
-#endif /* JAVA_SPEC_VERSION >= 19 */
 	}
 #if defined(WIN32) && !defined(J9VM_ENV_DATA64)
 	if (J9_ARE_NO_BITS_SET(currentThread->javaVM->sigFlags, J9_SIG_XRS_SYNC)) {
@@ -689,11 +673,7 @@ runJavaThread(J9VMThread *currentThread)
 void JNICALL
 runStaticMethod(J9VMThread *currentThread, U_8 *className, J9NameAndSignature *selector, UDATA argCount, UDATA *arguments)
 {
-	/* Assumes that className is a canonical UTF.
-	 * The returnValue and returnValue2 are copies of the top two stack slots when the called method returns.
-	 * On 64-bit, long values are stored in the lower-memory slot of the 2 stack slots required for longs,
-	 * so returnValue contains the return value.
-	 *
+	/* Assumes that the called method returns void and that className is a canonical UTF.
 	 * Also, the arguments must be in stack shape (ints in the low-memory half of the stack slot on 64-bit)
 	 * and contain no object pointers, as there are GC points in here before the arguments are copied to
 	 * the stack.
@@ -733,7 +713,6 @@ internalRunStaticMethod(J9VMThread *currentThread, J9Method *method, BOOLEAN ret
 	Trc_VM_internalRunStaticMethod_Entry(currentThread);
 	J9VMEntryLocalStorage newELS;
 
-	Assert_VM_false(VM_VMHelpers::classRequiresInitialization(currentThread, J9_CLASS_FROM_METHOD(method)));
 	if (buildCallInStackFrame(currentThread, &newELS, returnsObject != 0, false)) {
 		for (UDATA i = 0; i < argCount; ++i) {
 			*--currentThread->sp = arguments[i];

@@ -5151,9 +5151,10 @@ ffi_OOM:
 #if JAVA_SPEC_VERSION >= 19
 	/* jdk.internal.vm.Continuation: private native boolean enterImpl(); */
 	VMINLINE VM_BytecodeAction
-	enterContinuationImpl(REGISTER_ARGS_LIST)
+	enterContinuation(REGISTER_ARGS_LIST)
 	{
 		VM_BytecodeAction rc = EXECUTE_BYTECODE;
+		J9InternalVMFunctions *vmFuncs = _vm->internalVMFunctions;
 		jboolean res = JNI_FALSE;
 
 		j9object_t continuationObject = *(j9object_t*)_sp;
@@ -5161,7 +5162,7 @@ ffi_OOM:
 		buildInternalNativeStackFrame(REGISTER_ARGS);
 		updateVMStruct(REGISTER_ARGS);
 
-		res = enterContinuation(_currentThread, continuationObject);
+		res = vmFuncs->enterContinuation(_currentThread, continuationObject);
 
 		VMStructHasBeenUpdated(REGISTER_ARGS);
 		if (VM_VMHelpers::exceptionPending(_currentThread)) {
@@ -5175,44 +5176,27 @@ done:
 		return rc;
 	}
 
-	/* jdk.internal.vm.Continuation: private static native boolean yieldImpl(); */
+	/* jdk.internal.vm.Continuation: private static native boolean yieldImpl(ContinuationScope scope); */
 	VMINLINE VM_BytecodeAction
-	yieldContinuationImpl(REGISTER_ARGS_LIST)
+	yieldContinuation(REGISTER_ARGS_LIST)
 	{
 		VM_BytecodeAction rc = EXECUTE_BYTECODE;
+		J9InternalVMFunctions *vmFuncs = _vm->internalVMFunctions;
+		j9object_t continuationScope = *(j9object_t*)_sp;
+
 		buildInternalNativeStackFrame(REGISTER_ARGS);
 		updateVMStruct(REGISTER_ARGS);
 
-		/* store the current Continuation state and swap to carrier thread stack */
-		yieldContinuation(_currentThread);
+		/* this will just swap stack, should probably rename as such */
+		vmFuncs->yieldContinuation(_currentThread, continuationScope);
 
 		VMStructHasBeenUpdated(REGISTER_ARGS);
 		restoreInternalNativeStackFrame(REGISTER_ARGS);
 
-		/* its going to return as if it were returning from continuation.enterImpl()
+		/* its going to return as if it were returning from continuation.enter()
 		 * so we need to push the boolean return val
 		 */
 		returnSingleFromINL(REGISTER_ARGS, JNI_FALSE, 1);
-		return rc;
-
-	}
-
-	/* jdk.internal.vm.Continuation: private static native int isPinnedImpl(); */
-	VMINLINE VM_BytecodeAction
-	isPinnedContinuationImpl(REGISTER_ARGS_LIST)
-	{
-		VM_BytecodeAction rc = EXECUTE_BYTECODE;
-		jint result = 0;
-		buildInternalNativeStackFrame(REGISTER_ARGS);
-		updateVMStruct(REGISTER_ARGS);
-
-		/* Check if the current Continuation is pinned. */
-		result = isPinnedContinuation(_currentThread);
-
-		VMStructHasBeenUpdated(REGISTER_ARGS);
-		restoreInternalNativeStackFrame(REGISTER_ARGS);
-
-		returnSingleFromINL(REGISTER_ARGS, result, 0);
 		return rc;
 
 	}
@@ -10029,7 +10013,6 @@ public:
 #if JAVA_SPEC_VERSION >= 19
 		JUMP_TABLE_ENTRY(J9_BCLOOP_SEND_TARGET_ENTER_CONTINUATION),
 		JUMP_TABLE_ENTRY(J9_BCLOOP_SEND_TARGET_YIELD_CONTINUATION),
-		JUMP_TABLE_ENTRY(J9_BCLOOP_SEND_TARGET_ISPINNED_CONTINUATION),
 #endif /* JAVA_SPEC_VERSION >= 19 */
 	};
 #endif /* !defined(USE_COMPUTED_GOTO) */
@@ -10660,11 +10643,9 @@ runMethod: {
 #endif /* JAVA_SPEC_VERSION >= 16 */
 #if JAVA_SPEC_VERSION >= 19
 	JUMP_TARGET(J9_BCLOOP_SEND_TARGET_ENTER_CONTINUATION):
-		PERFORM_ACTION(enterContinuationImpl(REGISTER_ARGS));
+		PERFORM_ACTION(enterContinuation(REGISTER_ARGS));
 	JUMP_TARGET(J9_BCLOOP_SEND_TARGET_YIELD_CONTINUATION):
-		PERFORM_ACTION(yieldContinuationImpl(REGISTER_ARGS));
-	JUMP_TARGET(J9_BCLOOP_SEND_TARGET_ISPINNED_CONTINUATION):
-		PERFORM_ACTION(isPinnedContinuationImpl(REGISTER_ARGS));
+		PERFORM_ACTION(yieldContinuation(REGISTER_ARGS));
 #endif /* JAVA_SPEC_VERSION >= 19 */
 #if !defined(USE_COMPUTED_GOTO)
 	default:

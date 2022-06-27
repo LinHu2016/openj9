@@ -24,11 +24,6 @@
 
 #include "j9.h"
 
-/* These should match the error code values in enum Pinned within class Continuation. */
-#define J9VM_CONTINUATION_PINNED_REASON_NATIVE 1
-#define J9VM_CONTINUATION_PINNED_REASON_MONITOR 2
-#define J9VM_CONTINUATION_PINNED_REASON_CRITICAL_SECTION 3
-
 class VM_ContinuationHelpers {
 	/*
 	 * Data members
@@ -54,9 +49,9 @@ public:
 	/* Helper macro to swap fields between the two J9Class structs. */
 #define SWAP_MEMBER(fieldName, fieldType, class1, class2) \
 	do { \
-		fieldType temp = (fieldType)((class1)->fieldName); \
+		fieldType temp = (fieldType) (class1)->fieldName; \
 		(class1)->fieldName = (class2)->fieldName; \
-		(class2)->fieldName = (fieldType)temp; \
+		(class2)->fieldName = (fieldType) temp; \
 	} while (0)
 
 		SWAP_MEMBER(arg0EA, UDATA*, vmThread, continuation);

@@ -4887,6 +4887,8 @@ typedef struct J9InternalVMFunctions {
 	j9object_t* (*getDefaultValueSlotAddress)(struct J9Class *clazz);
 #if JAVA_SPEC_VERSION >= 19
 	BOOLEAN (*createContinuation)(struct J9VMThread *currentThread, j9object_t continuationObject);
+	BOOLEAN (*enterContinuation)(struct J9VMThread *currentThread, j9object_t continuationObject);
+	BOOLEAN (*yieldContinuation)(struct J9VMThread *currentThread, j9object_t scope);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 } J9InternalVMFunctions;
 

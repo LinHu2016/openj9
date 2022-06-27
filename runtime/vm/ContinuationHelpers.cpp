@@ -25,11 +25,11 @@
 #include "j9vmnls.h"
 #include "ut_j9vm.h"
 #include "vm_api.h"
-#include "ContinuationHelpers.hpp"
 #include "OutOfLineINL.hpp"
-
+#include "ContinuationHelpers.hpp"
 
 extern "C" {
+#if JAVA_SPEC_VERSION >= 19
 
 J9_DECLARE_CONSTANT_UTF8(continuationClass_name, "jdk/internal/vm/Continuation");
 J9_DECLARE_CONSTANT_UTF8(execute_sig, "(Ljdk/internal/vm/Continuation;)V");
@@ -41,7 +41,7 @@ BOOLEAN
 createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 {
 	J9JavaVM *vm = currentThread->javaVM;
-	PORT_ACCESS_FROM_VMC(currentThread);
+	PORT_ACCESS_FROM_PORT(vm->portLibrary);
 	BOOLEAN result = TRUE;
 	J9JavaStack *stack = NULL;
 	J9SFJNINativeMethodFrame *frame = NULL;
@@ -70,8 +70,7 @@ createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 #undef VMTHR_INITIAL_STACK_SIZE
 
 	continuation->stackObject = stack;
-	continuation->stackOverflowMark2 = J9JAVASTACK_STACKOVERFLOWMARK(stack);
-	continuation->stackOverflowMark = continuation->stackOverflowMark2;
+	continuation->stackOverflowMark = continuation->stackOverflowMark2 = J9JAVASTACK_STACKOVERFLOWMARK(stack);
 
 	frame = ((J9SFJNINativeMethodFrame*)stack->end) - 1;
 	frame->method = NULL;
@@ -80,7 +79,7 @@ createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	frame->savedPC = (U_8*)(UDATA)J9SF_FRAME_TYPE_END_OF_STACK;
 	frame->savedA0 = (UDATA*)(UDATA)J9SF_A0_INVISIBLE_TAG;
 	continuation->sp = (UDATA*)frame;
-	continuation->literals = NULL;
+	continuation->literals = (J9Method*)0;
 	continuation->pc = (U_8*)J9SF_FRAME_TYPE_JNI_NATIVE_METHOD;
 	continuation->arg0EA = (UDATA*)&frame->savedA0;
 	continuation->stackObject->isVirtual = TRUE;
@@ -116,16 +115,9 @@ resumeContinuation(J9VMThread *currentThread, J9VMContinuation *continuation)
 	}
 
 	VM_OutOfLineINL_Helpers::restoreInternalNativeStackFrame(currentThread);
-	VM_OutOfLineINL_Helpers::returnSingle(currentThread, JNI_TRUE, 0);
+	VM_OutOfLineINL_Helpers::returnSingle(currentThread, JNI_TRUE, 1);
 
 	currentThread->returnValue = J9_BCLOOP_EXECUTE_BYTECODE;
-
-	/* Match the increment in enterContinuation -> runStaticMethod so that the
-	 * callOutCount start state is the same in resumeContinuation.
-	 * TODO: This increment should be removed once the call-ins are no
-	 * longer used and the new design for single cInterpreter is implemented.
-	 */
-	currentThread->callOutCount += 1;
 
 	c_cInterpreter(currentThread);
 
@@ -144,10 +136,7 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation);
 	currentThread->currentContinuation = continuation;
 
-	/* Reset counters which determine if the current continuation is pinned. */
-	currentThread->continuationPinCount = 0;
-	currentThread->ownedMonitorCount = 0;
-	currentThread->callOutCount = 0;
+	Assert_VM_notNull(currentThread->currentContinuation);
 
 	if (started) {
 		/* resuming Continuation from yield */
@@ -164,57 +153,47 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 
 	J9VMJDKINTERNALVMCONTINUATION_SET_FINISHED(currentThread, continuationObject, JNI_TRUE);
 
-	Assert_VM_notNull(currentThread->currentContinuation);
+	currentThread->currentContinuation = NULL;
 
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation);
-	currentThread->currentContinuation = NULL;
 
 	/* For some reason the JCL swap thread objects when the VirtualThread dies, but it does
 	 * on enter and yield.
 	 */
 	currentThread->threadObject = currentThread->carrierThreadObject;
 
+	Assert_VM_Null(currentThread->currentContinuation);
+
 	return result;
 }
 
 BOOLEAN
-yieldContinuation(J9VMThread *currentThread)
+yieldContinuation(J9VMThread *currentThread, j9object_t scope)
 {
 	BOOLEAN result = TRUE;
 	J9VMContinuation *continuation = currentThread->currentContinuation;
 
 	/* need to check pin state before yielding */
 
-	Assert_VM_notNull(currentThread->currentContinuation);
-
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation);
-
 	/* pop the current ELS struct from the J9VMThread and store its info in J9VMContinuation struct */
 	VM_ContinuationHelpers::popAndStoreELS(currentThread, continuation);
+
+	/* Swap to parent Continuation for nested Continuation */
+	/*
+	j9object_t parentContinuation = J9VMJDKINTERNALVMCONTINUATION_PARENT(currentThread, continuationObject);
+	if (NULL != parentContinuation) {
+		currentThread->currentContinuation = (J9VMContinuation *)(UDATA)J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, parentContinuation);
+	} else {
+		currentThread->currentContinuation = NULL;
+	}
+	*/
+
 	currentThread->currentContinuation = NULL;
 
 	return result;
 }
 
-jint
-isPinnedContinuation(J9VMThread *currentThread)
-{
-	jint result = 0;
-
-	if (currentThread->continuationPinCount > 0) {
-		result = J9VM_CONTINUATION_PINNED_REASON_CRITICAL_SECTION;
-	} else if (currentThread->ownedMonitorCount > 0) {
-		result = J9VM_CONTINUATION_PINNED_REASON_MONITOR;
-	} else if (currentThread->callOutCount > 1) {
-		/* TODO: This check should be changed from > 1 to > 0 once the call-ins are no
-		 * longer used and the new design for single cInterpreter is implemented.
-		 */
-		result = J9VM_CONTINUATION_PINNED_REASON_NATIVE;
-	} else {
-		/* Do nothing. */
-	}
-
-	return result;
-}
-
+#endif /* JAVA_SPEC_VERSION >= 19 */
 } /* extern "C" */
+ /* extern "C" */
