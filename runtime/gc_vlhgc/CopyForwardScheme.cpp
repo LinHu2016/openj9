@@ -2330,9 +2330,13 @@ MM_CopyForwardScheme::scanContinuationObjectSlots(MM_EnvironmentVLHGC *env, MM_A
 {
 	scanMixedObjectSlots(env, reservingContext, objectPtr, reason);
 
-	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF((J9VMThread *)env->getLanguageVMThread(), objectPtr);
-	if (NULL != j9vmContinuation) {
+	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, objectPtr);
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
+	if (started && (NULL != j9vmContinuation)) {
 		J9VMThread continuationThread;
+		memset(&continuationThread, 0, sizeof(J9VMThread));
+		continuationThread.javaVM = currentThread->javaVM;
 		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
 
 		StackIteratorData4CooyForward localData;
@@ -2346,7 +2350,7 @@ MM_CopyForwardScheme::scanContinuationObjectSlots(MM_EnvironmentVLHGC *env, MM_A
 			bStackFrameClassWalkNeeded = true;
 		}
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
-		GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getLanguageVMThread(), &continuationThread, (void *)&localData, stackSlotIterator4CopyForwardScheme, bStackFrameClassWalkNeeded, false);
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, &continuationThread, (void *)&localData, stackSlotIterator4CopyForwardScheme, bStackFrameClassWalkNeeded, false);
 		/*debug*/
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
 		j9tty_printf(PORTLIB, "MM_CopyForwardScheme::scanContinuationObjectSlots GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);

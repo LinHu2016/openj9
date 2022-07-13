@@ -1663,9 +1663,13 @@ stackSlotIterator4RealtimeGC(J9JavaVM *javaVM, J9Object **slotPtr, void *localDa
 UDATA
 MM_MetronomeDelegate::scanContinuationObject(MM_EnvironmentRealtime *env, J9Object *objectPtr)
 {
-	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF((J9VMThread *)env->getLanguageVMThread(), objectPtr);
-	if (NULL != j9vmContinuation) {
+	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, objectPtr);
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
+	if (started && (NULL != j9vmContinuation)) {
 		J9VMThread continuationThread;
+		memset(&continuationThread, 0, sizeof(J9VMThread));
+		continuationThread.javaVM = currentThread->javaVM;
 		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
 
 		StackIteratorData4RealtimeMarkingScheme localData;
@@ -1679,7 +1683,7 @@ MM_MetronomeDelegate::scanContinuationObject(MM_EnvironmentRealtime *env, J9Obje
 			bStackFrameClassWalkNeeded = true;
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 
-		GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getLanguageVMThread(), &continuationThread, (void *)&localData, stackSlotIterator4RealtimeGC, bStackFrameClassWalkNeeded, false);
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, &continuationThread, (void *)&localData, stackSlotIterator4RealtimeGC, bStackFrameClassWalkNeeded, false);
 		/*debug*/
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
 		j9tty_printf(PORTLIB, "MM_MetronomeDelegate::scanContinuationObject GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);

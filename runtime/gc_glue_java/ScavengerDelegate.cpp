@@ -375,9 +375,13 @@ MM_ScavengerDelegate::doContinuationObject(MM_EnvironmentStandard *env, omrobjec
 {
 	bool shouldRemember = false;
 
-	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF((J9VMThread *)env->getLanguageVMThread(), objectPtr);
-	if (NULL != j9vmContinuation) {
+	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, objectPtr);
+	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
+	if (started && (NULL != j9vmContinuation)) {
 		J9VMThread continuationThread;
+		memset(&continuationThread, 0, sizeof(J9VMThread));
+		continuationThread.javaVM = currentThread->javaVM;
 		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
 
 		StackIteratorData4Scavenge localData;
@@ -387,7 +391,7 @@ MM_ScavengerDelegate::doContinuationObject(MM_EnvironmentStandard *env, omrobjec
 		localData.shouldRemember = &shouldRemember;
 		bool bStackFrameClassWalkNeeded = false;
 
-		GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getLanguageVMThread(), &continuationThread, (void *)&localData, stackSlotIterator4Scavenge, bStackFrameClassWalkNeeded, false);
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, &continuationThread, (void *)&localData, stackSlotIterator4Scavenge, bStackFrameClassWalkNeeded, false);
 		/*debug*/
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
 		j9tty_printf(PORTLIB, "MM_ScavengerDelegate::doContinuationObject GC_VMThreadStackSlotIterator::scanSlots env=%p\n",env);
