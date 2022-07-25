@@ -536,7 +536,15 @@ MM_RootScanner::scanOneThread(MM_EnvironmentBase *env, J9VMThread* walkThread, v
 		doVMThreadSlot(slot, &vmThreadIterator);
 	}
 
-	GC_VMThreadStackSlotIterator::scanSlots((J9VMThread *)env->getOmrVMThread()->_language_vmthread, walkThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
+	J9VMThread *currentThread = (J9VMThread *)env->getOmrVMThread()->_language_vmthread;
+	GC_VMThreadStackSlotIterator::scanSlots(currentThread, walkThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
+
+	if (NULL != walkThread->currentContinuation)
+	{
+		j9object_t vthreadObject = walkThread->threadObject;
+		j9object_t continuationObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
+		doSlot(&continuationObject);
+	}
 	return false;
 }
 
