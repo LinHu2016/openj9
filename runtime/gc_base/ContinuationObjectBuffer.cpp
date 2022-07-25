@@ -72,6 +72,9 @@ MM_ContinuationObjectBuffer::flush(MM_EnvironmentBase* env)
 void
 MM_ContinuationObjectBuffer::add(MM_EnvironmentBase* env, j9object_t object)
 {
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "add ContinuationObject in buffer env=%p, obj=%p, head=%p, tail=%p, _region=%p, _objectCount=%p\n", env, object, _head, _tail, _region, _objectCount);
 	Assert_MM_true(object != _head);
 	Assert_MM_true(object != _tail);
 
@@ -100,6 +103,7 @@ MM_ContinuationObjectBuffer::add(MM_EnvironmentBase* env, j9object_t object)
 			Assert_GC_true_with_message(env, NULL != region, "Attempt to access continuation object located outside of heap (stack allocated?) %p\n", object);
 		}
 		_region = region;
+		j9tty_printf(PORTLIB, "add ContinuationObject in buffer env=%p, _region=%p, _maxObjectCount=%p\n", env, _region, _maxObjectCount);
 
 	}
 	Assert_MM_true(_region->isAddressInRegion(object));

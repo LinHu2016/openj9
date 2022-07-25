@@ -70,8 +70,12 @@ MM_ContinuationObjectBufferVLHGC::tearDown(MM_EnvironmentBase *base)
 void
 MM_ContinuationObjectBufferVLHGC::flushImpl(MM_EnvironmentBase* env)
 {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "flushImpl env=%p, _objectCount=%zu, _region=%p\n", env, _objectCount, _region);
+
 	MM_HeapRegionDescriptorVLHGC *region = (MM_HeapRegionDescriptorVLHGC*)_region;
 	/* both addAll and incrementObjectCount are atomic, but getObjectCount could get inconsistent count, for current use case, it would be fine. */
+	j9tty_printf(PORTLIB, "flushImpl env=%p, region->getContinuationObjectList()=%p, _head=%p, _tail=%p\n", env, region->getContinuationObjectList(), _head, _tail);
 	region->getContinuationObjectList()->addAll(env, _head, _tail);
 	region->getContinuationObjectList()->incrementObjectCount(_objectCount);
 }
