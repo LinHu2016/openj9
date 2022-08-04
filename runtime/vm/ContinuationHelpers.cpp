@@ -25,11 +25,11 @@
 #include "j9vmnls.h"
 #include "ut_j9vm.h"
 #include "vm_api.h"
-#include "OutOfLineINL.hpp"
 #include "ContinuationHelpers.hpp"
+#include "OutOfLineINL.hpp"
+
 
 extern "C" {
-#if JAVA_SPEC_VERSION >= 19
 
 J9_DECLARE_CONSTANT_UTF8(continuationClass_name, "jdk/internal/vm/Continuation");
 J9_DECLARE_CONSTANT_UTF8(execute_sig, "(Ljdk/internal/vm/Continuation;)V");
@@ -41,7 +41,7 @@ BOOLEAN
 createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 {
 	J9JavaVM *vm = currentThread->javaVM;
-	PORT_ACCESS_FROM_PORT(vm->portLibrary);
+	PORT_ACCESS_FROM_VMC(currentThread);
 	BOOLEAN result = TRUE;
 	J9JavaStack *stack = NULL;
 	J9SFJNINativeMethodFrame *frame = NULL;
@@ -70,7 +70,8 @@ createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 #undef VMTHR_INITIAL_STACK_SIZE
 
 	continuation->stackObject = stack;
-	continuation->stackOverflowMark = continuation->stackOverflowMark2 = J9JAVASTACK_STACKOVERFLOWMARK(stack);
+	continuation->stackOverflowMark2 = J9JAVASTACK_STACKOVERFLOWMARK(stack);
+	continuation->stackOverflowMark = continuation->stackOverflowMark2;
 
 	frame = ((J9SFJNINativeMethodFrame*)stack->end) - 1;
 	frame->method = NULL;
@@ -79,7 +80,7 @@ createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	frame->savedPC = (U_8*)(UDATA)J9SF_FRAME_TYPE_END_OF_STACK;
 	frame->savedA0 = (UDATA*)(UDATA)J9SF_A0_INVISIBLE_TAG;
 	continuation->sp = (UDATA*)frame;
-	continuation->literals = (J9Method*)0;
+	continuation->literals = NULL;
 	continuation->pc = (U_8*)J9SF_FRAME_TYPE_JNI_NATIVE_METHOD;
 	continuation->arg0EA = (UDATA*)&frame->savedA0;
 	continuation->stackObject->isVirtual = TRUE;
@@ -89,39 +90,6 @@ createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	/* GC Hook to register Continuation object */
 end:
 	return result;
-}
-
-void JNICALL
-resumeContinuation(J9VMThread *currentThread, J9VMContinuation *continuation)
-{
-	J9VMEntryLocalStorage newELS;
-	newELS = continuation->entryLocalStorage;
-	newELS.oldEntryLocalStorage = currentThread->entryLocalStorage;;
-	currentThread->entryLocalStorage = &newELS;
-
-	if (NULL != newELS.oldEntryLocalStorage) {
-		/* Assuming oldELS > newELS, bytes used is (oldELS - newELS) */
-		UDATA freeBytes = currentThread->currentOSStackFree;
-		UDATA usedBytes = ((UDATA)newELS.oldEntryLocalStorage - (UDATA)&newELS);
-		freeBytes -= usedBytes;
-		currentThread->currentOSStackFree = freeBytes;
-
-		if ((IDATA)freeBytes < J9_OS_STACK_GUARD) {
-			if (J9_ARE_NO_BITS_SET(currentThread->privateFlags, J9_PRIVATE_FLAGS_CONSTRUCTING_EXCEPTION)) {
-				setCurrentExceptionNLS(currentThread, J9VMCONSTANTPOOL_JAVALANGSTACKOVERFLOWERROR, J9NLS_VM_OS_STACK_OVERFLOW);
-				currentThread->currentOSStackFree += usedBytes;
-			}
-		}
-	}
-
-	VM_OutOfLineINL_Helpers::restoreInternalNativeStackFrame(currentThread);
-	VM_OutOfLineINL_Helpers::returnSingle(currentThread, JNI_TRUE, 1);
-
-	currentThread->returnValue = J9_BCLOOP_EXECUTE_BYTECODE;
-
-	c_cInterpreter(currentThread);
-
-	restoreCallInFrame(currentThread);
 }
 
 BOOLEAN
@@ -136,64 +104,90 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation);
 	currentThread->currentContinuation = continuation;
 
-	Assert_VM_notNull(currentThread->currentContinuation);
+	/* Reset counters which determine if the current continuation is pinned. */
+	currentThread->continuationPinCount = 0;
+	currentThread->ownedMonitorCount = 0;
+	currentThread->callOutCount = 0;
 
 	if (started) {
 		/* resuming Continuation from yield */
-		resumeContinuation(currentThread, continuation);
+		VM_OutOfLineINL_Helpers::restoreInternalNativeStackFrame(currentThread);
+		VM_OutOfLineINL_Helpers::returnSingle(currentThread, JNI_TRUE, 1);
+		result = FALSE;
 	} else {
-		/* start new */
-		UDATA args[] = { (UDATA) continuationObject };
-		J9NameAndSignature executeNameAndSig = { (J9UTF8*)&execute_name, (J9UTF8*)&execute_sig };
-
+		/* start new Continuation execution */
 		J9VMJDKINTERNALVMCONTINUATION_SET_STARTED(currentThread, continuationObject, JNI_TRUE);
+		/* prepare callin frame, send method will be set by interpreter */
+		J9SFJNICallInFrame *frame = ((J9SFJNICallInFrame*)currentThread->sp) - 1;
+		UDATA flags = J9_SSF_REL_VM_ACC;
+#if defined(J9VM_OPT_JAVA_OFFLOAD_SUPPORT)
+		J9JavaVM *vm = currentThread->javaVM;
+		if (NULL != vm->javaOffloadSwitchOnWithReasonFunc) {
+			bool isOffloadWithSubtasks = J9_ARE_ANY_BITS_SET(currentThread->javaOffloadState, J9_JNI_OFFLOAD_WITH_SUBTASKS_FLAG);
+			if (isOffloadWithSubtasks) {
+				/* keep offload enabled but turn off allowing created subtasks to offload */
+				vm->javaOffloadSwitchOnDisableSubtasksWithReasonFunc(currentThread, J9_JNI_OFFLOAD_SWITCH_INTERPRETER);
+				currentThread->javaOffloadState &= ~J9_JNI_OFFLOAD_WITH_SUBTASKS_FLAG;
+				flags |= J9_SSF_JNI_OFFLOAD_WAS_WITH_SUBTASKS;
+			} else if (0 == currentThread->javaOffloadState) {
+				vm->javaOffloadSwitchOnWithReasonFunc(currentThread, J9_JNI_OFFLOAD_SWITCH_INTERPRETER);
+			}
+			Assert_VM_unequal(currentThread->javaOffloadState & J9_JNI_OFFLOAD_MAX_VALUE, J9_JNI_OFFLOAD_MAX_VALUE);
+			currentThread->javaOffloadState += 1;
+		}
+#endif /* J9VM_OPT_JAVA_OFFLOAD_SUPPORT */
 
-		runStaticMethod(currentThread, J9UTF8_DATA(&continuationClass_name), &executeNameAndSig, 1, args);
+		frame->exitAddress = NULL;
+		frame->specialFrameFlags = flags;
+		frame->savedCP = currentThread->literals;
+		frame->savedPC = currentThread->pc;
+		frame->savedA0 = (UDATA*)((UDATA)currentThread->arg0EA | J9SF_A0_INVISIBLE_TAG);
+		currentThread->sp = (UDATA*)frame;
+		currentThread->pc = currentThread->javaVM->callInReturnPC;
+		currentThread->literals = 0;
+		currentThread->arg0EA = (UDATA*)&frame->savedA0;
+
+		/* push argument to stack */
+		*--currentThread->sp = (UDATA)continuationObject;
 	}
-
-	J9VMJDKINTERNALVMCONTINUATION_SET_FINISHED(currentThread, continuationObject, JNI_TRUE);
-
-	currentThread->currentContinuation = NULL;
-
-	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation);
-
-	/* For some reason the JCL swap thread objects when the VirtualThread dies, but it does
-	 * on enter and yield.
-	 */
-	currentThread->threadObject = currentThread->carrierThreadObject;
-
-	Assert_VM_Null(currentThread->currentContinuation);
 
 	return result;
 }
 
 BOOLEAN
-yieldContinuation(J9VMThread *currentThread, j9object_t scope)
+yieldContinuation(J9VMThread *currentThread)
 {
 	BOOLEAN result = TRUE;
 	J9VMContinuation *continuation = currentThread->currentContinuation;
 
-	/* need to check pin state before yielding */
+	Assert_VM_notNull(currentThread->currentContinuation);
 
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation);
-	/* pop the current ELS struct from the J9VMThread and store its info in J9VMContinuation struct */
-	VM_ContinuationHelpers::popAndStoreELS(currentThread, continuation);
-
-	/* Swap to parent Continuation for nested Continuation */
-	/*
-	j9object_t parentContinuation = J9VMJDKINTERNALVMCONTINUATION_PARENT(currentThread, continuationObject);
-	if (NULL != parentContinuation) {
-		currentThread->currentContinuation = (J9VMContinuation *)(UDATA)J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, parentContinuation);
-	} else {
-		currentThread->currentContinuation = NULL;
-	}
-	*/
 
 	currentThread->currentContinuation = NULL;
 
 	return result;
 }
 
-#endif /* JAVA_SPEC_VERSION >= 19 */
+jint
+isPinnedContinuation(J9VMThread *currentThread)
+{
+	jint result = 0;
+
+	if (currentThread->continuationPinCount > 0) {
+		result = J9VM_CONTINUATION_PINNED_REASON_CRITICAL_SECTION;
+	} else if (currentThread->ownedMonitorCount > 0) {
+		result = J9VM_CONTINUATION_PINNED_REASON_MONITOR;
+	} else if (currentThread->callOutCount > 0) {
+		/* TODO: This check should be changed from > 1 to > 0 once the call-ins are no
+		 * longer used and the new design for single cInterpreter is implemented.
+		 */
+		result = J9VM_CONTINUATION_PINNED_REASON_NATIVE;
+	} else {
+		/* Do nothing. */
+	}
+
+	return result;
+}
+
 } /* extern "C" */
- /* extern "C" */

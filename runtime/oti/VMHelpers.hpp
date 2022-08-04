@@ -207,6 +207,7 @@ typedef enum {
 #if JAVA_SPEC_VERSION >= 19
 	J9_BCLOOP_SEND_TARGET_ENTER_CONTINUATION,
 	J9_BCLOOP_SEND_TARGET_YIELD_CONTINUATION,
+	J9_BCLOOP_SEND_TARGET_ISPINNED_CONTINUATION,
 #endif /* JAVA_SPEC_VERSION >= 19 */
 } VM_SendTarget;
 
@@ -2055,8 +2056,19 @@ exit:
 		vmThread->stackOverflowMark = continuation->stackOverflowMark;
 		vmThread->stackOverflowMark2 = continuation->stackOverflowMark2;
 		vmThread->stackObject = continuation->stackObject;
+
+		/* copy the JIT GPR registers data referenced by ELS */
+		PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+		j9tty_printf(PORTLIB, "copyJavaStacksFromJ9VMContinuation vmThread->entryLocalStorage=%p\n", vmThread->entryLocalStorage);
+		j9tty_printf(PORTLIB, "copyJavaStacksFromJ9VMContinuation vmThread->entryLocalStorage->jitGlobalStorageBase=%p\n", vmThread->entryLocalStorage->jitGlobalStorageBase);
+		j9tty_printf(PORTLIB, "copyJavaStacksFromJ9VMContinuation continuation=%p\n", continuation);
+		j9tty_printf(PORTLIB, "copyJavaStacksFromJ9VMContinuation continuation->jitGPRs=%p\n", &continuation->jitGPRs);
+
+
+//		vmThread->entryLocalStorage->jitGlobalStorageBase = (UDATA*) &continuation->jitGPRs;
+		vmThread->entryLocalStorage->jitGlobalStorageBase = (UDATA*) ((UDATA)continuation + offsetof(J9VMContinuation, jitGPRs));
+		vmThread->entryLocalStorage->oldEntryLocalStorage = continuation->oldEntryLocalStorage;
 #ifdef J9VM_INTERP_NATIVE_SUPPORT
-		vmThread->entryLocalStorage = &continuation->entryLocalStorage;
 		vmThread->j2iFrame = NULL;
 #ifdef J9VM_JIT_FULL_SPEED_DEBUG
 		vmThread->decompilationStack = NULL;
@@ -2093,6 +2105,12 @@ exit:
 		SWAP_MEMBER(stackOverflowMark, UDATA*, vmThread, continuation);
 		SWAP_MEMBER(stackOverflowMark2, UDATA*, vmThread, continuation);
 		SWAP_MEMBER(stackObject, J9JavaStack*, vmThread, continuation);
+
+		/* Swap the JIT GPR registers data referenced by ELS */
+		J9JITGPRSpillArea tempGPRs = continuation->jitGPRs;
+		continuation->jitGPRs = *(J9JITGPRSpillArea*)vmThread->entryLocalStorage->jitGlobalStorageBase;
+		*(J9JITGPRSpillArea*)vmThread->entryLocalStorage->jitGlobalStorageBase = tempGPRs;
+		SWAP_MEMBER(oldEntryLocalStorage, J9VMEntryLocalStorage*, vmThread->entryLocalStorage, continuation);
 	}
 
 #endif /* JAVA_SPEC_VERSION >= 19 */

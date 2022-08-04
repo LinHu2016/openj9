@@ -2335,7 +2335,9 @@ MM_CopyForwardScheme::scanContinuationObjectSlots(MM_EnvironmentVLHGC *env, MM_A
 	J9VMContinuation *j9vmContinuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
 	if (started && (NULL != j9vmContinuation)) {
 		J9VMThread continuationThread;
+		J9VMEntryLocalStorage newELS;
 		memset(&continuationThread, 0, sizeof(J9VMThread));
+		continuationThread.entryLocalStorage = &newELS;
 		continuationThread.javaVM = currentThread->javaVM;
 		VM_VMHelpers::copyJavaStacksFromJ9VMContinuation(&continuationThread, j9vmContinuation);
 

@@ -4301,7 +4301,7 @@ threadParseArguments(J9JavaVM *vm, char *optArg);
 UDATA
 getJavaThreadPriority(struct J9JavaVM *vm, J9VMThread* thread );
 
-##if JAVA_SPEC_VERSION >= 19
+#if JAVA_SPEC_VERSION >= 19
 /* ---------------- ContinuationHelpers.cpp ---------------- */
 
 /**
@@ -4330,11 +4330,19 @@ enterContinuation(struct J9VMThread *currentThread, j9object_t continuationObjec
  * @brief  suspends the Continuation runnable.
  *
  * @param currentThread
- * @param scope
  * @return BOOLEAN
  */
 BOOLEAN
-yieldContinuation(struct J9VMThread *currentThread, j9object_t scope);
+yieldContinuation(struct J9VMThread *currentThread);
+
+/**
+ * Determine if the current continuation is pinned.
+ *
+ * @param currentThread
+ * @return 0 if not pinned; otherwise, an error code corresponding to the pinned reason.
+ */
+jint
+isPinnedContinuation(J9VMThread *currentThread);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 /* ---------------- hookableAsync.c ---------------- */

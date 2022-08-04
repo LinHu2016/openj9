@@ -4887,8 +4887,8 @@ typedef struct J9InternalVMFunctions {
 	j9object_t* (*getDefaultValueSlotAddress)(struct J9Class *clazz);
 #if JAVA_SPEC_VERSION >= 19
 	BOOLEAN (*createContinuation)(struct J9VMThread *currentThread, j9object_t continuationObject);
-	BOOLEAN (*enterContinuation)(struct J9VMThread *currentThread, j9object_t continuationObject);
-	BOOLEAN (*yieldContinuation)(struct J9VMThread *currentThread, j9object_t scope);
+	BOOLEAN (*enterContinuation) (struct J9VMThread *currentThread, j9object_t continuationObject);
+	BOOLEAN (*yieldContinuation) (struct J9VMThread *currentThread);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 } J9InternalVMFunctions;
 
@@ -4900,6 +4900,68 @@ typedef struct J9InvocationJavaVM {
 	J9NativeLibrary * reserved2_library;
 } J9InvocationJavaVM;
 
+typedef struct J9JITGPRSpillArea {
+#if defined(J9VM_ARCH_S390)
+	U_8 jitGPRs[16 * 8];	/* r0-r15 full 8-byte */
+#elif defined(J9VM_ARCH_POWER) /* J9VM_ARCH_S390 */
+	UDATA jitGPRs[32];	/* r0-r31 */
+	UDATA jitCR;
+	UDATA jitLR;
+#elif defined(J9VM_ARCH_ARM) /* J9VM_ARCH_POWER */
+#if defined(J9VM_ENV_DATA64)
+	/* ARM 64 */
+#error ARM 64 unsupported
+#else /* J9VM_ENV_DATA64 */
+	/* ARM 32 */
+	UDATA jitGPRs[16];	/* r0-r15 */
+#endif /* J9VM_ENV_DATA64 */
+#elif defined(J9VM_ARCH_AARCH64) /* J9VM_ARCH_ARM */
+	UDATA jitGPRs[32]; /* x0-x31 */
+#elif defined(J9VM_ARCH_RISCV) /* J9VM_ARCH_AARCH64 */
+	UDATA jitGPRs[32];	/* x0-x31 */
+#elif defined(J9VM_ARCH_X86) /* J9VM_ARCH_RISCV */
+#if defined(J9VM_ENV_DATA64)
+	union {
+		UDATA numbered[16];
+		struct {
+			UDATA rax;
+			UDATA rbx;
+			UDATA rcx;
+			UDATA rdx;
+			UDATA rdi;
+			UDATA rsi;
+			UDATA rbp;
+			UDATA rsp;
+			UDATA r8;
+			UDATA r9;
+			UDATA r10;
+			UDATA r11;
+			UDATA r12;
+			UDATA r13;
+			UDATA r14;
+			UDATA r15;
+		} named;
+	} jitGPRs;
+#else /* J9VM_ENV_DATA64 */
+	union {
+		UDATA numbered[8];
+		struct {
+			UDATA rax;
+			UDATA rbx;
+			UDATA rcx;
+			UDATA rdx;
+			UDATA rdi;
+			UDATA rsi;
+			UDATA rbp;
+			UDATA rsp;
+		} named;
+	} jitGPRs;
+#endif /* J9VM_ENV_DATA64 */
+#else /* J9VM_ARCH_X86 */
+#error Unknown architecture
+#endif /* J9VM_ARCH_X86 */
+} J9JITGPRSpillArea;
+
 #if JAVA_SPEC_VERSION >= 19
 typedef struct J9VMContinuation {
 	UDATA* arg0EA;
@@ -4910,7 +4972,8 @@ typedef struct J9VMContinuation {
 	UDATA* stackOverflowMark;
 	UDATA* stackOverflowMark2;
 	J9JavaStack* stackObject;
-	struct J9VMEntryLocalStorage entryLocalStorage;
+	struct J9JITGPRSpillArea jitGPRs;
+	struct J9VMEntryLocalStorage* oldEntryLocalStorage;
 } J9VMContinuation;
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
@@ -5757,68 +5820,6 @@ typedef struct J9JITWatchedStaticFieldData {
 #if J9_INLINE_JNI_MAX_ARG_COUNT != 32
 #error Math is depending on J9_INLINE_JNI_MAX_ARG_COUNT being 32
 #endif
-
-typedef struct J9JITGPRSpillArea {
-#if defined(J9VM_ARCH_S390)
-	U_8 jitGPRs[16 * 8];	/* r0-r15 full 8-byte */
-#elif defined(J9VM_ARCH_POWER) /* J9VM_ARCH_S390 */
-	UDATA jitGPRs[32];	/* r0-r31 */
-	UDATA jitCR;
-	UDATA jitLR;
-#elif defined(J9VM_ARCH_ARM) /* J9VM_ARCH_POWER */
-#if defined(J9VM_ENV_DATA64)
-	/* ARM 64 */
-#error ARM 64 unsupported
-#else /* J9VM_ENV_DATA64 */
-	/* ARM 32 */
-	UDATA jitGPRs[16];	/* r0-r15 */
-#endif /* J9VM_ENV_DATA64 */
-#elif defined(J9VM_ARCH_AARCH64) /* J9VM_ARCH_ARM */
-	UDATA jitGPRs[32]; /* x0-x31 */
-#elif defined(J9VM_ARCH_RISCV) /* J9VM_ARCH_AARCH64 */
-	UDATA jitGPRs[32];	/* x0-x31 */
-#elif defined(J9VM_ARCH_X86) /* J9VM_ARCH_RISCV */
-#if defined(J9VM_ENV_DATA64)
-	union {
-		UDATA numbered[16];
-		struct {
-			UDATA rax;
-			UDATA rbx;
-			UDATA rcx;
-			UDATA rdx;
-			UDATA rdi;
-			UDATA rsi;
-			UDATA rbp;
-			UDATA rsp;
-			UDATA r8;
-			UDATA r9;
-			UDATA r10;
-			UDATA r11;
-			UDATA r12;
-			UDATA r13;
-			UDATA r14;
-			UDATA r15;
-		} named;
-	} jitGPRs;
-#else /* J9VM_ENV_DATA64 */
-	union {
-		UDATA numbered[8];
-		struct {
-			UDATA rax;
-			UDATA rbx;
-			UDATA rcx;
-			UDATA rdx;
-			UDATA rdi;
-			UDATA rsi;
-			UDATA rbp;
-			UDATA rsp;
-		} named;
-	} jitGPRs;
-#endif /* J9VM_ENV_DATA64 */
-#else /* J9VM_ARCH_X86 */
-#error Unknown architecture
-#endif /* J9VM_ARCH_X86 */
-} J9JITGPRSpillArea;
 
 typedef struct J9CInterpreterStackFrame {
 #if defined(J9VM_ARCH_S390)
