@@ -531,8 +531,8 @@ Java_java_lang_VirtualThread_notifyJvmtiMountBegin(JNIEnv *env, jobject thread, 
 		J9VMThread *currentThread = (J9VMThread *)env;
 		J9JavaVM *vm = currentThread->javaVM;
 		J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
-		VirtualThread vthreadObject = vmThread->threadObject;
-		Continuation contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
+		j9object_t vthreadObject = currentThread->threadObject;
+		j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
 		mmFuncs->preMountContinuation(currentThread, (j9object_t) contObject);
 	}
 	if (firstMount) {
@@ -598,8 +598,8 @@ Java_java_lang_VirtualThread_notifyJvmtiUnmountBegin(JNIEnv *env, jobject thread
 	J9VMThread *currentThread = (J9VMThread *)env;
 	J9JavaVM *vm = currentThread->javaVM;
 	J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
-	VirtualThread vthreadObject = vmThread->threadObject;
-	Continuation contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
+	j9object_t vthreadObject = currentThread->threadObject;
+	j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
 	mmFuncs->preDismountContinuation(currentThread, (j9object_t) contObject);
 }
 
