@@ -32,6 +32,8 @@
 #include "j9cfg.h"
 
 #include "MemorySubSpace.hpp"
+#include "HeapRegionDescriptorVLHGC.hpp"
+#include "MemorySubSpaceRegionIterator.hpp"
 
 class MM_AllocateDescription;
 class MM_EnvironmentBase;
@@ -299,6 +301,18 @@ public:
 	 */
 	bool consumeFromTaxationThreshold(MM_EnvironmentBase *env, uintptr_t bytesToConsume);
 
+	virtual void *getLowAddressAllocate()
+	{
+		GC_MemorySubSpaceRegionIterator regionIterator(this);
+		MM_HeapRegionDescriptorVLHGC *region = NULL;
+		while (NULL != (region = (MM_HeapRegionDescriptorVLHGC*)regionIterator.nextRegion())) {
+			if (MM_HeapRegionDescriptor::ADDRESS_ORDERED == region->getRegionType())
+			{
+				return region->getLowAddress();
+			}
+		}
+		return NULL;
+	}
 	/**
 	 * Create a MemorySubSpaceGeneric object
 	 */

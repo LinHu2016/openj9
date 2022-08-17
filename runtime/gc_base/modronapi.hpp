@@ -103,6 +103,9 @@ UDATA ownableSynchronizerObjectCreated(J9VMThread *vmThread, j9object_t object);
 
 #if JAVA_SPEC_VERSION >= 19
 UDATA continuationObjectCreated(J9VMThread *vmThread, j9object_t object);
+void preMountContinuation(J9VMThread *vmThread, j9object_t object);
+void preDismountContinuation(J9VMThread *vmThread, j9object_t object);
+void j9gc_complete_concurrent(J9VMThread *vmThread);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 /**

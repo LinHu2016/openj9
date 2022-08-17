@@ -527,6 +527,14 @@ Java_java_lang_Thread_registerNatives(JNIEnv *env, jclass clazz)
 void JNICALL
 Java_java_lang_VirtualThread_notifyJvmtiMountBegin(JNIEnv *env, jobject thread, jboolean firstMount)
 {
+	{
+		J9VMThread *currentThread = (J9VMThread *)env;
+		J9JavaVM *vm = currentThread->javaVM;
+		J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
+		VirtualThread vthreadObject = vmThread->threadObject;
+		Continuation contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
+		mmFuncs->preMountContinuation(currentThread, (j9object_t) contObject);
+	}
 	if (firstMount) {
 		J9VMThread *currentThread = (J9VMThread *)env;
 		J9JavaVM *vm = currentThread->javaVM;
@@ -587,6 +595,12 @@ Java_java_lang_VirtualThread_notifyJvmtiMountEnd(JNIEnv *env, jobject thread, jb
 void JNICALL
 Java_java_lang_VirtualThread_notifyJvmtiUnmountBegin(JNIEnv *env, jobject thread, jboolean lastUnmount)
 {
+	J9VMThread *currentThread = (J9VMThread *)env;
+	J9JavaVM *vm = currentThread->javaVM;
+	J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
+	VirtualThread vthreadObject = vmThread->threadObject;
+	Continuation contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
+	mmFuncs->preDismountContinuation(currentThread, (j9object_t) contObject);
 }
 
 /* private native void notifyJvmtiUnmountEnd(boolean lastUnmount); */

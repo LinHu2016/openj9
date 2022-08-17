@@ -258,6 +258,8 @@ J9MemoryManagerFunctions MemoryManagerFunctions = {
 	ownableSynchronizerObjectCreated,
 #if JAVA_SPEC_VERSION >= 19
 	continuationObjectCreated,
+	preMountContinuation,
+	preDismountContinuation,
 #endif /* JAVA_SPEC_VERSION >= 19 */
 	j9gc_notifyGCOfClassReplacement,
 	j9gc_get_jit_string_dedup_policy,

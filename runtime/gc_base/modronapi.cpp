@@ -54,6 +54,53 @@
 
 extern "C" {
 
+/**
+ * wait the concurrent GC complete
+ */
+void
+j9gc_complete_concurrent(J9VMThread *vmThread)
+{
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+	MM_GCExtensionsBase *extensions = env->getExtensions();
+	bool concurrentScavenger = extensions->isConcurrentScavengerInProgress();
+	bool concurrentMarking = false;
+#if defined(OMR_GC_MODRON_CONCURRENT_MARK)
+	if ((extensions->concurrentMark) && (vmThread->privateFlags & J9_PRIVATE_FLAGS_CONCURRENT_MARK_ACTIVE)) {
+		concurrentMarking = true;
+	}
+#endif /* OMR_GC_MODRON_CONCURRENT_MARK */
+	if (concurrentMarking || concurrentScavenger) {
+		((MM_MemorySpace *)vmThread->omrVMThread->memorySpace)->localGarbageCollect(env, J9MMCONSTANT_IMPLICIT_GC_COMPLETE_CONCURRENT);
+	}
+}
+
+
+
+void
+preMountContinuation(J9VMThread *vmThread, j9object_t object)
+{
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+	MM_GCExtensionsBase *extensions = env->getExtensions();
+	j9gc_complete_concurrent(vmThread);
+	/* blindly remember the continuation Object via J9WriteBarrierPost,  */
+	MM_MemorySubSpace *defaultMemorySubSpace = extensions->heap->getDefaultMemorySpace()->getDefaultMemorySubSpace();
+
+	vmThread->javaVM->memoryManagerFunctions->J9WriteBarrierPost(vmThread, object, (j9object_t) defaultMemorySubSpace->getLowAddressAllocate());
+
+}
+
+void
+preDismountContinuation(J9VMThread *vmThread, j9object_t object)
+{
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+	MM_GCExtensionsBase *extensions = env->getExtensions();
+	j9gc_complete_concurrent(vmThread);
+	/* blindly remember the continuation Object via J9WriteBarrierPost,  */
+	MM_MemorySubSpace *defaultMemorySubSpace = extensions->heap->getDefaultMemorySpace()->getDefaultMemorySubSpace();
+
+	vmThread->javaVM->memoryManagerFunctions->J9WriteBarrierPost(vmThread, object, (j9object_t) defaultMemorySubSpace->getLowAddressAllocate());
+}
+
 UDATA
 j9gc_modron_global_collect(J9VMThread *vmThread)
 {

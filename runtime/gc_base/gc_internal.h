@@ -270,6 +270,8 @@ extern J9_CFUNC void j9gc_finalizer_completeFinalizersOnExit(J9VMThread* vmThrea
 extern J9_CFUNC UDATA ownableSynchronizerObjectCreated(J9VMThread *vmThread, j9object_t object);
 #if JAVA_SPEC_VERSION >= 19
 extern J9_CFUNC UDATA continuationObjectCreated(J9VMThread *vmThread, j9object_t object);
+extern J9_CFUNC void preMountContinuation(J9VMThread *vmThread, j9object_t object);
+extern J9_CFUNC void preDismountContinuation(J9VMThread *vmThread, j9object_t object);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 extern J9_CFUNC void j9gc_notifyGCOfClassReplacement(J9VMThread *vmThread, J9Class *originalClass, J9Class *replacementClass, UDATA isFastHCR);

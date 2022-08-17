@@ -4492,6 +4492,8 @@ typedef struct J9MemoryManagerFunctions {
 	UDATA  ( *ownableSynchronizerObjectCreated)(struct J9VMThread *vmThread, j9object_t object) ;
 #if JAVA_SPEC_VERSION >= 19
 	UDATA  ( *continuationObjectCreated)(struct J9VMThread *vmThread, j9object_t object);
+	void ( *preMountContinuation)(struct J9VMThread *vmThread, j9object_t object);
+	void ( *preDismountContinuation)(struct J9VMThread *vmThread, j9object_t object);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 	void  ( *j9gc_notifyGCOfClassReplacement)(struct J9VMThread *vmThread, J9Class *originalClass, J9Class *replacementClass, UDATA isFastHCR) ;
