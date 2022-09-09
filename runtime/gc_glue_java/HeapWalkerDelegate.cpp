@@ -34,13 +34,9 @@
 void
 MM_HeapWalkerDelegate::objectSlotsDo(OMR_VMThread *omrVMThread, omrobjectptr_t objectPtr, MM_HeapWalkerSlotFunc function, void *userData)
 {
-	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(omrVMThread);
-	switch(_objectModel->getScanType(objectPtr)) {
-	case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+	if (_objectModel->isContinuationSubClass(objectPtr)) {
+		MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(omrVMThread);
 		doContinuationObject(env, objectPtr, function, userData);
-		break;
-	default:
-		break;
 	}
 }
 

@@ -168,6 +168,13 @@ private:
 	}
 
 public:
+	MMINLINE bool
+	isContinuationSubClass(J9Object *objectPtr)
+	{
+		J9Class *clazz = J9GC_J9OBJECT_CLAZZ(objectPtr, this);
+		return (J9CLASS_FLAGS(clazz) & J9AccClassContinuation);
+	}
+
 	/**
 	 * Determine the ScanType code for objects of the specified class. This code determines how instances should be scanned.
 	 * @param clazz[in] the class of the object to be scanned
