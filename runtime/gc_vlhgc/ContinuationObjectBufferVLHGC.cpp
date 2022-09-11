@@ -99,6 +99,9 @@ MM_ContinuationObjectBufferVLHGC::addForOnlyCompactedRegion(MM_EnvironmentBase* 
 		MM_HeapRegionDescriptor *region = regionManager->regionDescriptorForAddress(object);
 		Assert_GC_true_with_message(env, NULL != region, "Attempt to access continuation object located outside of heap (stack allocated?) %p\n", object);
 
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_ContinuationObjectBufferVLHGC::addForOnlyCompactedRegion object=%p, region=%p, _shouldCompact=%zu\n", object, region, ((MM_HeapRegionDescriptorVLHGC *)region)->_compactData._shouldCompact);
+
 		if (((MM_HeapRegionDescriptorVLHGC *)region)->_compactData._shouldCompact) {
 			/* flush the buffer and start fresh */
 			flush(env);

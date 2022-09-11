@@ -2297,8 +2297,10 @@ MM_CopyForwardScheme::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject
 	if (isHeapObject(*slotPtr)) {
 		/* heap object - validate and copyforward */
 		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::COULD_BE_FORWARDED, *slotPtr, stackLocation, walkState).validate(env));
-		J9VMThread *thread = ((J9StackWalkState *)walkState)->currentThread;
-		MM_AllocationContextTarok *reservingContext = (MM_AllocationContextTarok *)MM_EnvironmentVLHGC::getEnvironment(thread)->getAllocationContext();
+//		J9VMThread *thread = ((J9StackWalkState *)walkState)->currentThread;
+//		MM_AllocationContextTarok *reservingContext = (MM_AllocationContextTarok *)MM_EnvironmentVLHGC::getEnvironment(thread)->getAllocationContext();
+		MM_AllocationContextTarok *reservingContext = getContextForHeapAddress(*slotPtr);
+
 		copyAndForward(MM_EnvironmentVLHGC::getEnvironment(env), reservingContext, fromObject, slotPtr);
 	} else if (NULL != *slotPtr) {
 		/* stack object - just validate */
@@ -2314,6 +2316,9 @@ stackSlotIteratorForCopyForwardScheme(J9JavaVM *javaVM, J9Object **slotPtr, void
 {
 	StackIteratorData4CopyForward *data = (StackIteratorData4CopyForward *)localData;
 	MM_CopyForwardScheme *copyForwardScheme = data->copyForwardScheme;
+
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "stackSlotIteratorForCopyForwardScheme *slot=%p, fromObject=%p\n", *slotPtr, data->fromObject);
 
 	copyForwardScheme->doStackSlot(data->env, data->fromObject, slotPtr, walkState, stackLocation);
 }
@@ -3789,6 +3794,10 @@ private:
 		if (NULL != *slotPtr) {
 			/* we don't have the context of this slot so just relocate the object into the same node where we found it */
 			MM_AllocationContextTarok *reservingContext = _copyForwardScheme->getContextForHeapAddress(*slotPtr);
+
+			PORT_ACCESS_FROM_ENVIRONMENT(MM_EnvironmentVLHGC::getEnvironment(_env));
+			j9tty_printf(PORTLIB, "MM_CopyForwardSchemeRootScanner.doSlot() slotPtr=%p, slot=%p\n", slotPtr, *slotPtr);
+
 			_copyForwardScheme->copyAndForward(MM_EnvironmentVLHGC::getEnvironment(_env), reservingContext, slotPtr);
 		}
 	}

@@ -785,6 +785,10 @@ void
 stackSlotIteratorForGlobalMarkingScheme(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4GlobalMarkingScheme *data = (StackIteratorData4GlobalMarkingScheme *)localData;
+
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "stackSlotIteratorForGlobalMarkingScheme *slot=%p, fromObject=%p\n", *slotPtr, data->fromObject);
+
 	data->globalMarkingScheme->doStackSlot(data->env, data->fromObject, slotPtr, walkState, stackLocation);
 }
 

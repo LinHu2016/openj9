@@ -26,6 +26,7 @@
 #include "ClassLoaderIterator.hpp"
 #include "ConfigurationDelegate.hpp"
 #include "FinalizeListManager.hpp"
+#include "ForwardedHeader.hpp"
 #include "Heap.hpp"
 #include "HeapRegionDescriptorStandard.hpp"
 #include "HeapRegionIteratorStandard.hpp"
@@ -154,14 +155,11 @@ MM_ConcurrentMarkingDelegate::scanThreadRoots(MM_EnvironmentBase *env)
 	localData.env = env;
 	GC_VMThreadStackSlotIterator::scanSlots(vmThread, vmThread, (void *)&localData, concurrentStackSlotIterator, true, false);
 
-	if (NULL != vmThread->currentContinuation)
-	{
-		/* Scan java stacks in currentContinuation and related Continuation Object */
-		j9object_t vthreadObject = vmThread->threadObject;
-		j9object_t continuationObject = J9VMJAVALANGVIRTUALTHREAD_CONT(vmThread, vthreadObject);
-		doSlot(&continuationObject);
+#if JAVA_SPEC_VERSION >= 19
+	if (NULL != vmThread->currentContinuation) {
+		GC_VMThreadStackSlotIterator::scanSlots(vmThread, vmThread->currentContinuation, (void *)&localData, concurrentStackSlotIterator, true, false);
 	}
-
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	return true;
 }
 

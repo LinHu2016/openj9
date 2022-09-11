@@ -258,13 +258,19 @@ JVM_VirtualThreadMountBegin(JNIEnv *env, jobject thread, jboolean firstMount)
 	f_monitorEnter(vm->liveVirtualThreadListMutex);
 	j9object_t threadObj = J9_JNI_UNWRAP_REFERENCE(thread);
 
-	assert(IS_VIRTUAL_THREAD(currentThread, threadObj));
+	PORT_ACCESS_FROM_JAVAVM(vm);
 	j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, threadObj);
-	J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
-	mmFuncs->preMountContinuation(currentThread, (j9object_t) contObject);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, contObject);
+	j9tty_printf(PORTLIB, "JVM_VirtualThreadMountBegin currentThread=%p, firstMount=%zu, threadObj=%p, contObject=%p, J9VMContinuation=%p\n",
+														currentThread, firstMount, threadObj, contObject, continuation);
+
+	assert(IS_VIRTUAL_THREAD(currentThread, threadObj));
+//	j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, threadObj);
+//	J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
+//	mmFuncs->preMountContinuation(currentThread, (j9object_t) contObject);
 
 
-	while (J9OBJECT_I64_LOAD(currentThread, threadObj, vm->virtualThreadInspectorCountOffset) > 0) {
+	while (J9OBJECT_I64_LOAD(currentThread, threadObj, vm->virtualThreadInspectorCountOffset) != 0) {
 		/* Thread is being inspected, wait. */
 		VM_VMHelpers::pushObjectInSpecialFrame(currentThread, threadObj);
 		vmFuncs->internalExitVMToJNI(currentThread);
@@ -330,6 +336,11 @@ JVM_VirtualThreadMountEnd(JNIEnv *env, jobject thread, jboolean firstMount)
 	vmFuncs->internalEnterVMFromJNI(currentThread);
 	f_monitorEnter(vm->liveVirtualThreadListMutex);
 	j9object_t threadObj = J9_JNI_UNWRAP_REFERENCE(thread);
+	PORT_ACCESS_FROM_JAVAVM(vm);
+	j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, threadObj);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, contObject);
+	j9tty_printf(PORTLIB, "JVM_VirtualThreadMountEnd currentThread=%p, firstMount=%zu, threadObj=%p, contObject=%p, J9VMContinuation=%p\n",
+														currentThread, firstMount, threadObj, contObject, continuation);
 
 	if (firstMount) {
 		TRIGGER_J9HOOK_VM_VIRTUAL_THREAD_STARTED(vm->hookInterface, currentThread);
@@ -355,7 +366,13 @@ JVM_VirtualThreadUnmountBegin(JNIEnv *env, jobject thread, jboolean lastUnmount)
 	f_monitorEnter(vm->liveVirtualThreadListMutex);
 	j9object_t threadObj = J9_JNI_UNWRAP_REFERENCE(thread);
 
-	while (J9OBJECT_I64_LOAD(currentThread, threadObj, vm->virtualThreadInspectorCountOffset) > 0) {
+	PORT_ACCESS_FROM_JAVAVM(vm);
+	j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, threadObj);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, contObject);
+	j9tty_printf(PORTLIB, "JVM_VirtualThreadUnmountBegin currentThread=%p, lastUnmount=%zu, threadObj=%p, contObject=%p, J9VMContinuation=%p\n",
+														currentThread, lastUnmount, threadObj, contObject, continuation);
+
+	while (J9OBJECT_I64_LOAD(currentThread, threadObj, vm->virtualThreadInspectorCountOffset) != 0) {
 		/* Thread is being inspected, wait. */
 		VM_VMHelpers::pushObjectInSpecialFrame(currentThread, threadObj);
 		vmFuncs->internalExitVMToJNI(currentThread);
@@ -397,9 +414,15 @@ JVM_VirtualThreadUnmountEnd(JNIEnv *env, jobject thread, jboolean lastUnmount)
 	f_monitorEnter(vm->liveVirtualThreadListMutex);
 	j9object_t threadObj = J9_JNI_UNWRAP_REFERENCE(thread);
 
+	PORT_ACCESS_FROM_JAVAVM(vm);
 	j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, threadObj);
-	J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
-	mmFuncs->postMountContinuation(currentThread, (j9object_t) contObject);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, contObject);
+	j9tty_printf(PORTLIB, "JVM_VirtualThreadUnmountEnd currentThread=%p, lastUnmount=%zu, threadObj=%p, contObject=%p, J9VMContinuation=%p\n",
+														currentThread, lastUnmount, threadObj, contObject, continuation);
+
+//	j9object_t contObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, threadObj);
+//	J9MemoryManagerFunctions *mmFuncs = vm->memoryManagerFunctions;
+//	mmFuncs->postDismountContinuation(currentThread, (j9object_t) contObject);
 
 	if (lastUnmount) {
 		vmFuncs->freeTLS(currentThread, threadObj);

@@ -183,6 +183,10 @@ stackSlotIteratorForGlobalMarkCardScrubber(J9JavaVM *javaVM, J9Object **slotPtr,
 {
 	StackIteratorData4GlobalMarkCardScrubber *data = (StackIteratorData4GlobalMarkCardScrubber *)localData;
 	if (*data->doScrub) {
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "stackSlotIteratorForGlobalMarkCardScrubber *slot=%p, fromObject=%p\n", *slotPtr, data->fromObject);
+
 		*data->doScrub = data->globalMarkCardScrubber->mayScrubReference(data->env, data->fromObject, *slotPtr);
 	}
 	/* It's unfortunate, but we probably cannot terminate iteration of slots once we do see for one slot that we cannot scurb */

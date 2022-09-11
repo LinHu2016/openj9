@@ -4500,10 +4500,7 @@ typedef struct J9MemoryManagerFunctions {
 	UDATA ( *continuationObjectCreated)(struct J9VMThread *vmThread, j9object_t object) ;
 	void ( *preMountContinuation)(struct J9VMThread *vmThread, j9object_t object) ;
 	void ( *postDismountContinuation)(struct J9VMThread *vmThread, j9object_t object) ;
-<<<<<<< Upstream, based on Upstream/master
 
-=======
->>>>>>> 5eac883 Continuation Scan Update for generational GC or concurrent GC
 	void  ( *j9gc_notifyGCOfClassReplacement)(struct J9VMThread *vmThread, J9Class *originalClass, J9Class *replacementClass, UDATA isFastHCR) ;
 	I_32  ( *j9gc_get_jit_string_dedup_policy)(struct J9JavaVM *javaVM) ;
 	UDATA ( *j9gc_stringHashFn)(void *key, void *userData);

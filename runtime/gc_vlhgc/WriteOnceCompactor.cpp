@@ -1216,6 +1216,9 @@ MM_WriteOnceCompactor::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObjec
 		J9Object *forwardedPtr = getForwardingPtr(pointer);
 		if (pointer != forwardedPtr) {
 			*slot = forwardedPtr;
+			if (getForwardingPtr(forwardedPtr) != forwardedPtr) {
+				Assert_MM_unreachable();
+			}
 		}
 		_interRegionRememberedSet->rememberReferenceForCompact(env, fromObject, forwardedPtr);
 	}
@@ -1228,7 +1231,12 @@ void
 stackSlotIteratorForWriteOnceCompactor(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4WriteOnceCompactor *data = (StackIteratorData4WriteOnceCompactor *)localData;
+
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "stackSlotIteratorForWriteOnceCompactor  slot=%p, *slot=%p, fromObject=%p, walkState->walkThread=%p\n", slotPtr, *slotPtr, data->fromObject, walkState->walkThread);
+
 	data->writeOnceCompactor->doStackSlot(data->env, data->fromObject, slotPtr);
+	j9tty_printf(PORTLIB, "after stackSlotIteratorForWriteOnceCompactor  slot=%p, *slot=%p, fromObject=%p, walkState->walkThread=%p\n", slotPtr, *slotPtr, data->fromObject, walkState->walkThread);
 }
 
 void
@@ -1610,11 +1618,14 @@ private:
 	void * const _heapTop;
 
 public:
+bool debugCurrentContinuation;
+
 	MM_WriteOnceCompactFixupRoots(MM_EnvironmentVLHGC *env, MM_WriteOnceCompactor* compactScheme, void *heapBase, void *heapTop)
 		: MM_RootScanner(env)
 		, _compactScheme(compactScheme)
 		, _heapBase(heapBase)
 		, _heapTop(heapTop)
+		, debugCurrentContinuation(false)
 	{
 		_typeId = __FUNCTION__;
 		setIncludeStackFrameClassReferences(false);
@@ -1647,10 +1658,25 @@ public:
 		if ((pointer >= _heapBase) && (pointer < _heapTop)) {
 			J9Object *newPointer = _compactScheme->getForwardingPtr(pointer);
 			if (pointer != newPointer) {
+				if (debugCurrentContinuation) {
+					Assert_MM_unreachable();
+				}
 				*slot = newPointer;
+				if (_compactScheme->getForwardingPtr(*slot) != *slot) {
+					Assert_MM_unreachable();
+				}
 			}
 		}
 	}
+
+#if JAVA_SPEC_VERSION >= 19
+	virtual void scanCurrentContinuation(J9VMThread *vmThread, J9VMContinuation *continuation, void *userData, J9MODRON_OSLOTITERATOR *oSlotIterator, bool includeStackFrameClassReferences, bool trackVisibleFrameDepth)
+	{
+		debugCurrentContinuation = true;
+		MM_RootScanner::scanCurrentContinuation(vmThread, continuation, userData, oSlotIterator, includeStackFrameClassReferences, trackVisibleFrameDepth);
+		debugCurrentContinuation = false;
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	virtual void doClass(J9Class *clazz)
 	{

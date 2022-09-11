@@ -1,6 +1,6 @@
 
 /*******************************************************************************
- * Copyright (c) 1991, 2017 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -60,7 +60,9 @@ public:
 
 	virtual void doSlot(omrobjectptr_t *slotPtr) {
 		/* we only process thread and stack slots with this scanner */
-		Assert_MM_unreachable();
+		/* but for mounted vthread case, process related continuation Object */
+		_scavenger->rescanThreadSlot(MM_EnvironmentStandard::getEnvironment(_env), slotPtr);
+		//Assert_MM_unreachable();
 	}
 
 	virtual void doClass(J9Class *clazz) {

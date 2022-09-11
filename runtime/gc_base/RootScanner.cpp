@@ -475,8 +475,11 @@ MM_RootScanner::scanClassLoaders(MM_EnvironmentBase *env)
 void
 stackSlotIterator(J9JavaVM *javaVM, J9Object **slot, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "RootScanner stackSlotIterator slot=%p, *slot=%p, walkState->walkThread=%p\n", slot, *slot, walkState->walkThread);
 	StackIteratorData *data = (StackIteratorData *)localData;
 	data->rootScanner->doStackSlot(slot, walkState, stackLocation);
+	j9tty_printf(PORTLIB, "after RootScanner stackSlotIterator slot=%p, *slot=%p, walkState->walkThread=%p\n", slot, *slot, walkState->walkThread);
 }
 
 /**
@@ -537,17 +540,29 @@ MM_RootScanner::scanOneThread(MM_EnvironmentBase *env, J9VMThread* walkThread, v
 	}
 
 	J9VMThread *currentThread = (J9VMThread *)env->getOmrVMThread()->_language_vmthread;
+	/* In a case this thread is a carrier thread, and a virtual thread is mounted, we will scan virtual thread's stack. */
 	GC_VMThreadStackSlotIterator::scanSlots(currentThread, walkThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
 
 	if (NULL != walkThread->currentContinuation)
 	{
-		j9object_t vthreadObject = walkThread->threadObject;
-		j9object_t continuationObject = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, vthreadObject);
-		doSlot(&continuationObject);
+		/* At this point we know that a virtual thread is mounted. We previously scanned its stack, and now we need to scan carrier's stack, too.
+		 * Currently, Continuation struct is pointing to it. doSlot will now only push Continuation object for scanning,
+		 * what will eventually get Continuation object and struct scanned, but carrier's stack too. */
+#if JAVA_SPEC_VERSION >= 19
+		scanCurrentContinuation(currentThread, walkThread->currentContinuation, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	}
 	return false;
 }
 
+
+#if JAVA_SPEC_VERSION >= 19
+void
+MM_RootScanner::scanCurrentContinuation(J9VMThread *vmThread, J9VMContinuation *continuation, void *userData, J9MODRON_OSLOTITERATOR *oSlotIterator, bool includeStackFrameClassReferences, bool trackVisibleFrameDepth)
+{
+	GC_VMThreadStackSlotIterator::scanSlots(vmThread, continuation, userData, oSlotIterator, includeStackFrameClassReferences, trackVisibleFrameDepth);
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 /**
  * This function scans exactly one thread for potential roots.
  * @param walkThead the thread to be scanned

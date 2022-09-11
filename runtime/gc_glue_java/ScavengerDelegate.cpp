@@ -186,7 +186,7 @@ MM_ScavengerDelegate::mainSetupForGC(MM_EnvironmentBase * envBase)
 	private_setupForOwnableSynchronizerProcessing(MM_EnvironmentStandard::getEnvironment(envBase));
 
 	_shouldScavengeContinuationObjects = false;
-	private_setupForContinuationProcessing(MM_EnvironmentStandard::getEnvironment(envBase));
+//	private_setupForContinuationProcessing(MM_EnvironmentStandard::getEnvironment(envBase));
 
 	/* Sort all hot fields for all classes if scavenger dynamicBreadthFirstScanOrdering is enabled */
 	if (MM_GCExtensions::OMR_GC_SCAVENGER_SCANORDERING_DYNAMIC_BREADTH_FIRST == _extensions->scavengerScanOrdering) {
@@ -722,24 +722,24 @@ MM_ScavengerDelegate::private_setupForOwnableSynchronizerProcessing(MM_Environme
 	}
 }
 
-void
-MM_ScavengerDelegate::private_setupForContinuationProcessing(MM_EnvironmentStandard *env)
-{
-	MM_HeapRegionDescriptorStandard *region = NULL;
-	GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
-	while (NULL != (region = regionIterator.nextRegion())) {
-		MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
-			MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
-			if ((MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW))) {
-				list->startProcessing();
-			} else {
-				list->backupList();
-			}
-		}
-	}
-}
-
+//void
+//MM_ScavengerDelegate::private_setupForContinuationProcessing(MM_EnvironmentStandard *env)
+//{
+//	MM_HeapRegionDescriptorStandard *region = NULL;
+//	GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
+//	while (NULL != (region = regionIterator.nextRegion())) {
+//		MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+//		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+//			MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+//			if ((MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW))) {
+//				list->startProcessing();
+//			} else {
+//				list->backupList();
+//			}
+//		}
+//	}
+//}
+//
 bool
 MM_ScavengerDelegate::private_shouldPercolateGarbageCollect_classUnloading(MM_EnvironmentBase *envBase)
 {

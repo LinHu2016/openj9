@@ -416,7 +416,9 @@ public:
 	virtual CompletePhaseCode scanClassesComplete(MM_EnvironmentBase *env);
 
  	virtual bool scanOneThread(MM_EnvironmentBase *env, J9VMThread* walkThread, void* localData);
-	
+#if JAVA_SPEC_VERSION >= 19
+	virtual void scanCurrentContinuation(J9VMThread *vmThread, J9VMContinuation *continuation, void *userData, J9MODRON_OSLOTITERATOR *oSlotIterator, bool includeStackFrameClassReferences, bool trackVisibleFrameDepth);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 	virtual void scanClassLoaders(MM_EnvironmentBase *env);
 	virtual void scanThreads(MM_EnvironmentBase *env);
  	virtual void scanSingleThread(MM_EnvironmentBase *env, J9VMThread* walkThread);

@@ -36,17 +36,36 @@ private:
 	MM_CompactScheme* _compactScheme;
 
 public:
+	bool debugCurrentContinuation;
+
 	MM_CompactSchemeFixupRoots(MM_EnvironmentBase *env, MM_CompactScheme* compactScheme) :
 		MM_RootScanner(env),
 		_compactScheme(compactScheme)
 	{
 		setIncludeStackFrameClassReferences(false);
+		debugCurrentContinuation = false;
 	}
 
 	virtual void doSlot(omrobjectptr_t* slot)
 	{
-		*slot = _compactScheme->getForwardingPtr(*slot);
+		J9Object *newPointer = _compactScheme->getForwardingPtr(*slot);
+		if (*slot != newPointer) {
+			if (debugCurrentContinuation) {
+				Assert_MM_unreachable();
+			}
+			*slot = newPointer;
+		}
+//		*slot = _compactScheme->getForwardingPtr(*slot);
 	}
+
+#if JAVA_SPEC_VERSION >= 19
+	virtual void scanCurrentContinuation(J9VMThread *vmThread, J9VMContinuation *continuation, void *userData, J9MODRON_OSLOTITERATOR *oSlotIterator, bool includeStackFrameClassReferences, bool trackVisibleFrameDepth)
+	{
+		debugCurrentContinuation = true;
+		MM_RootScanner::scanCurrentContinuation(vmThread, continuation, userData, oSlotIterator, includeStackFrameClassReferences, trackVisibleFrameDepth);
+		debugCurrentContinuation = false;
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 	virtual void doClass(J9Class *clazz)
 	{

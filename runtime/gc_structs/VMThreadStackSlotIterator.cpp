@@ -112,7 +112,11 @@ GC_VMThreadStackSlotIterator::scanSlots(
 		stackWalkState.flags |= J9_STACKWALK_ITERATE_METHOD_CLASS_SLOTS;
 	}
 
+	PORT_ACCESS_FROM_JAVAVM(vm);
+	j9tty_printf(PORTLIB, "GC_VMThreadStackSlotIterator::scanSlots walkThread=%p, includeStackFrameClassReferences=%zu, trackVisibleFrameDepth=%zu\n", walkThread, includeStackFrameClassReferences, trackVisibleFrameDepth);
+
 	vm->walkStackFrames(vmThread, &stackWalkState);
+	j9tty_printf(PORTLIB, "after GC_VMThreadStackSlotIterator::scanSlots walkThread=%p\n", walkThread);
 }
 
 void
@@ -150,5 +154,58 @@ GC_VMThreadStackSlotIterator::scanSlots(
 		stackWalkState.flags |= J9_STACKWALK_ITERATE_METHOD_CLASS_SLOTS;
 	}
 
+#if JAVA_SPEC_VERSION >= 19
+	PORT_ACCESS_FROM_JAVAVM(vm);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObjectPtr);
+	j9tty_printf(PORTLIB, "GC_VMThreadStackSlotIterator::scanSlots continuationObjectPtr=%p, J9VMContinuation=%p, includeStackFrameClassReferences=%zu, trackVisibleFrameDepth=%zu\n", continuationObjectPtr, continuation, includeStackFrameClassReferences, trackVisibleFrameDepth);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
 	VM_VMHelpers::walkContinuationStackFramesWrapper(vmThread, continuationObjectPtr, &stackWalkState);
+#if JAVA_SPEC_VERSION >= 19
+	j9tty_printf(PORTLIB, "after GC_VMThreadStackSlotIterator::scanSlots continuationObjectPtr=%p, J9VMContinuation=%p, stackWalkState.walkThread=%p\n", continuationObjectPtr, continuation, stackWalkState.walkThread);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 }
+
+#if JAVA_SPEC_VERSION >= 19
+void
+GC_VMThreadStackSlotIterator::scanSlots(
+			J9VMThread *vmThread,
+			J9VMContinuation *continuation,
+			void *userData,
+			J9MODRON_OSLOTITERATOR *oSlotIterator,
+			bool includeStackFrameClassReferences,
+			bool trackVisibleFrameDepth
+		)
+{
+	J9StackWalkState stackWalkState;
+	J9JavaVM *vm = vmThread->javaVM;
+
+	stackWalkState.objectSlotWalkFunction = vmThreadStackDoOSlotIterator;
+	stackWalkState.userData1 = (void *)oSlotIterator;
+	stackWalkState.userData2 = (void *)vm;
+	stackWalkState.userData3 = userData;
+
+	stackWalkState.flags = J9_STACKWALK_ITERATE_O_SLOTS | J9_STACKWALK_DO_NOT_SNIFF_AND_WHACK;
+
+	if (trackVisibleFrameDepth) {
+		stackWalkState.skipCount = 0;
+		stackWalkState.flags |= J9_STACKWALK_VISIBLE_ONLY;
+	} else {
+		if (NULL != vm->collectJitPrivateThreadData) {
+			stackWalkState.frameWalkFunction = vmThreadStackFrameIterator;
+			stackWalkState.flags |= J9_STACKWALK_ITERATE_FRAMES;
+		}
+		stackWalkState.flags |= J9_STACKWALK_SKIP_INLINES;
+	}
+
+	if (includeStackFrameClassReferences) {
+		stackWalkState.flags |= J9_STACKWALK_ITERATE_METHOD_CLASS_SLOTS;
+	}
+
+	PORT_ACCESS_FROM_JAVAVM(vm);
+	j9tty_printf(PORTLIB, "GC_VMThreadStackSlotIterator::scanSlots J9VMContinuation=%p, includeStackFrameClassReferences=%zu, trackVisibleFrameDepth=%zu\n", continuation, includeStackFrameClassReferences, trackVisibleFrameDepth);
+
+	vmThread->javaVM->internalVMFunctions->walkContinuationStackFrames(vmThread, continuation, &stackWalkState);
+	j9tty_printf(PORTLIB, "after GC_VMThreadStackSlotIterator::scanSlots J9VMContinuation=%p,  stackWalkState.walkThread=%p\n", continuation,  stackWalkState.walkThread);
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */

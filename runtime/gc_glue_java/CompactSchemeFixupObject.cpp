@@ -53,7 +53,13 @@ MM_CompactSchemeFixupObject::fixupMixedObject(omrobjectptr_t objectPtr)
 void
 MM_CompactSchemeFixupObject::doStackSlot(MM_EnvironmentBase *env, omrobjectptr_t fromObject, omrobjectptr_t *slot)
 {
-	*slot = _compactScheme->getForwardingPtr(*slot);
+	omrobjectptr_t forward = _compactScheme->getForwardingPtr(*slot);
+	if (forward != *slot) {
+		*slot = forward;
+		if (_compactScheme->getForwardingPtr(forward) != forward) {
+			Assert_MM_unreachable();
+		}
+	}
 }
 
 /**
@@ -63,7 +69,10 @@ void
 stackSlotIteratorForCompactScheme(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4CompactSchemeFixupObject *data = (StackIteratorData4CompactSchemeFixupObject *)localData;
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "stackSlotIteratorForCompactScheme  slot=%p, *slot=%p, fromObject=%p, walkState->walkThread=%p\n", slotPtr, *slotPtr, data->fromObject, walkState->walkThread);
 	data->compactSchemeFixupObject->doStackSlot(data->env, data->fromObject, slotPtr);
+	j9tty_printf(PORTLIB, "after stackSlotIteratorForCompactScheme  slot=%p, *slot=%p, fromObject=%p, walkState->walkThread=%p\n", slotPtr, *slotPtr, data->fromObject, walkState->walkThread);
 }
 
 
