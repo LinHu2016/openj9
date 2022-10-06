@@ -113,18 +113,11 @@ protected:
 
 private:
 	/* New methods */
-	void rememberObject(MM_EnvironmentBase *env, J9Object *object);
 	void rememberObjectIfBarrierEnabled(J9VMThread *vmThread, J9Object* object);
 
 	bool preObjectStoreInternal(J9VMThread *vmThread, J9Object *destClass, J9Object **destAddress, J9Object *value, bool isVolatile);
 	bool preObjectStoreInternal(J9VMThread *vmThread, J9Object *destObject, fj9object_t *destAddress, J9Object *value, bool isVolatile);
 	bool preObjectStoreInternal(J9VMThread *vmThread, J9Object **destAddress, J9Object *value, bool isVolatile);
-
-	MMINLINE bool isBarrierActive(MM_EnvironmentBase* env)
-	{
-		MM_GCExtensions* extensions = MM_GCExtensions::getExtensions(env);
-		return !extensions->sATBBarrierRememberedSet->isGlobalFragmentIndexPreserved();
-	}
 
 	MMINLINE bool isDoubleBarrierActiveOnThread(J9VMThread *vmThread)
 	{
@@ -139,6 +132,13 @@ private:
 	void scanContiguousArray(MM_EnvironmentRealtime *env, J9IndexableObject *objectPtr);
 
 public:
+	void rememberObject(MM_EnvironmentBase *env, J9Object *object);
+	MMINLINE bool isBarrierActive(MM_EnvironmentBase* env)
+	{
+		MM_GCExtensions* extensions = MM_GCExtensions::getExtensions(env);
+		return !extensions->sATBBarrierRememberedSet->isGlobalFragmentIndexPreserved();
+	}
+
 	static MM_RealtimeAccessBarrier *newInstance(MM_EnvironmentBase *env);
 	MMINLINE void setDoubleBarrierActive() { _doubleBarrierActive = true; }
 	MMINLINE void setDoubleBarrierInactive() { _doubleBarrierActive = false; }
@@ -150,6 +150,11 @@ public:
 	virtual bool preObjectStore(J9VMThread *vmThread, J9Object *destObject, fj9object_t *destAddress, J9Object *value, bool isVolatile=false);
 	virtual bool preObjectStore(J9VMThread *vmThread, J9Object *destClass, J9Object **destAddress, J9Object *value, bool isVolatile=false);
 	virtual bool preObjectStore(J9VMThread *vmThread, J9Object **destAddress, J9Object *value, bool isVolatile=false);
+
+	virtual bool postBatchObjectStore(J9VMThread *vmThread, J9Object *destObject, bool isVolatile=false)
+	{
+		return true;
+	}
 
 	virtual I_32 backwardReferenceArrayCopyIndex(J9VMThread *vmThread, J9IndexableObject *srcObject, J9IndexableObject *destObject, I_32 srcIndex, I_32 destIndex, I_32 lengthInSlots);
 	virtual I_32 forwardReferenceArrayCopyIndex(J9VMThread *vmThread, J9IndexableObject *srcObject, J9IndexableObject *destObject, I_32 srcIndex, I_32 destIndex, I_32 lengthInSlots);

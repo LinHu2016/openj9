@@ -45,6 +45,10 @@ MM_StackSlotValidator::reportStackSlot(MM_EnvironmentBase* env, const char* mess
 	J9VMThread* walkThread = _walkState->walkThread;
 	Trc_MM_StackSlotValidator_reportStackSlot_Entry(env->getLanguageVMThread(), walkThread);
 
+	if (walkThread->omrVMThread == NULL) {
+		Assert_GC_true_with_message2(env, false, "%s, object=%p\n", message, _slotValue);
+	}
+
 	char* threadName = getOMRVMThreadName(walkThread->omrVMThread);
 	j9tty_printf(PORTLIB, "%p: %s in thread %s\n", walkThread, message, NULL == threadName ? "NULL" : threadName);
 	Trc_MM_StackSlotValidator_thread(env->getLanguageVMThread(), message, NULL == threadName ? "NULL" : threadName);

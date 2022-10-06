@@ -179,6 +179,12 @@ public:
 	bool initialize(MM_EnvironmentBase *env);
 	void tearDown(MM_EnvironmentBase *env);
 
+	void scanContinuationJavaStack(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr)
+	{
+		MM_ScavengeScanReason reason = SCAN_REASON_SCAVENGE;
+		doContinuationObject(env, objectPtr, reason);
+	}
+
 	MM_ScavengerDelegate(MM_EnvironmentBase* env);
 };
 

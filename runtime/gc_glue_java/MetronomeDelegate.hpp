@@ -25,6 +25,7 @@
 
 #include "j9.h"
 #include "j9cfg.h"
+#include "ModronAssertions.h"
 
 #if defined(J9VM_GC_REALTIME)
 
@@ -177,6 +178,10 @@ public:
 	void unsetUnmarkedImpliesCleared();
 
 	UDATA scanContinuationObject(MM_EnvironmentRealtime *env, J9Object *objectPtr);
+	void scanContinuationJavaStack(MM_EnvironmentRealtime *env, J9Object *objectPtr)
+	{
+		scanContinuationObject(env, objectPtr);
+	}
 
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 	MMINLINE void
@@ -237,7 +242,8 @@ public:
 		   pointersScanned = 0;
 		   break;
 		default:
-			Assert_MM_unreachable();
+//			Assert_MM_unreachable();
+			Assert_GC_true_with_message2(env, false, "Unknown scanType=%zu, object=%p\n", _extensions->objectModel.getScanType(objectPtr), objectPtr);
 		}
 		
 		return pointersScanned;

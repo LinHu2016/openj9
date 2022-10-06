@@ -1626,10 +1626,20 @@ stackSlotIteratorForRealtimeGC(J9JavaVM *javaVM, J9Object **slotPtr, void *local
 	MM_EnvironmentRealtime *env = data->env;
 
 	J9Object *object = *slotPtr;
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "stackSlotIteratorForRealtimeGC object=%p, fromObject=%p\n", object, data->fromObject);
 	if (realtimeMarkingScheme->isHeapObject(object)) {
 		/* heap object - validate and mark */
 		Assert_MM_validStackSlot(MM_StackSlotValidator(0, object, stackLocation, walkState).validate(env));
-		realtimeMarkingScheme->markObject(env, object);
+		if (MUTATOR_THREAD == env->getThreadType()) {
+			/* extra scan for preMountContinuation case */
+			MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+			((MM_RealtimeAccessBarrier *)extensions->accessBarrier)->rememberObject(env, object);
+		} else {
+			/* GC Thread scan object */
+			//Assert_MM_true();
+			realtimeMarkingScheme->markObject(env, object);
+		}
 	} else if (NULL != object) {
 		/* stack object - just validate */
 		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, object, stackLocation, walkState).validate(env));
@@ -1653,7 +1663,11 @@ MM_MetronomeDelegate::scanContinuationObject(MM_EnvironmentRealtime *env, J9Obje
 
 		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForRealtimeGC, bStackFrameClassWalkNeeded, false);
 	}
-	return scanMixedObject(env, objectPtr);
+	if (MUTATOR_THREAD == env->getThreadType()) {
+		return 0;
+	} else {
+		return scanMixedObject(env, objectPtr);
+	}
 }
 
 #endif /* defined(J9VM_GC_REALTIME) */

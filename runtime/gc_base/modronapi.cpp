@@ -49,13 +49,43 @@
 #include "VMInterface.hpp"
 #include "VMThreadListIterator.hpp"
 #include "VMAccess.hpp"
+#include "EnvironmentRealtime.hpp"
+#include "RealtimeGC.hpp"
+#include "MetronomeDelegate.hpp"
+#include "EnvironmentStandard.hpp"
+#include "Scavenger.hpp"
+#include "ScavengerDelegate.hpp"
+#include "RealtimeAccessBarrier.hpp"
+
 
 extern "C" {
 
 void
 preMountContinuation(J9VMThread *vmThread, j9object_t object)
 {
-	/* need read barrier to handle concurrent scavenger and gcpolicy:metronome case */
+	/* need to handle concurrent scavenger and gcpolicy:metronome case */
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "preMountContinuation vmThread=%p, object=%p\n", vmThread, object);
+
+	if (!extensions->disableConcurrentSupportForContinuation) {
+		J9JavaVM *const javaVM = vmThread->javaVM;
+		if (extensions->isConcurrentScavengerInProgress()) {
+			j9tty_printf(PORTLIB, "preMountContinuation ConcurrentScavengerInProgress vmThread=%p, object=%p\n", vmThread, object);
+			/* concurrent scavenger in progress */
+			extensions->scavenger->getDelegate()->scanContinuationJavaStack((MM_EnvironmentStandard *)env, object);
+		}
+		if (J9_GC_POLICY_METRONOME == javaVM->gcPolicy) {
+			j9tty_printf(PORTLIB, "preMountContinuation metronome in progress vmThread=%p isCollectorRootMarking()=%zu, isCollectorConcurrentTracing()=%zu, isBarrierActive(env)=%zu, getGcPhase()=%zu, isBarrierEnabled()=%zu\n",
+					vmThread, extensions->realtimeGC->isCollectorRootMarking(), extensions->realtimeGC->isCollectorConcurrentTracing(), ((MM_RealtimeAccessBarrier *)extensions->accessBarrier)->isBarrierActive(env), extensions->realtimeGC->getGcPhase(), extensions->realtimeGC->isBarrierEnabled());
+			if (((MM_RealtimeAccessBarrier *)extensions->accessBarrier)->isBarrierActive(env)) {
+				j9tty_printf(PORTLIB, "preMountContinuation metronome in progress vmThread=%p, object=%p\n", vmThread, object);
+				/* metronome in progress */
+				extensions->realtimeGC->getRealtimeDelegate()->scanContinuationJavaStack((MM_EnvironmentRealtime *)env, object);
+			}
+		}		
+	}
 }
 
 void
@@ -63,7 +93,15 @@ postUnmountContinuation(J9VMThread *vmThread, j9object_t object)
 {
 	/* Conservatively assume that via mutations of stack slots (which are not subject to access barriers),
 	 * all post-write barriers have been triggered on this Continuation object, since it's been mounted. */
-	vmThread->javaVM->memoryManagerFunctions->J9WriteBarrierBatch(vmThread, object);
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "postUnmountContinuation vmThread=%p, object=%p\n", vmThread, object);
+
+	if (!MM_GCExtensions::getExtensions(env)->disableConcurrentSupportForContinuation) {
+		j9tty_printf(PORTLIB, "postUnmountContinuation in progress vmThread=%p, object=%p\n", vmThread, object);
+		vmThread->javaVM->memoryManagerFunctions->J9WriteBarrierBatch(vmThread, object);
+	}
 }
 
 UDATA

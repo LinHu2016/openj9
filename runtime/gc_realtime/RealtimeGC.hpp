@@ -165,6 +165,8 @@ public:
 	uintptr_t gcCount() { return  _extensions->globalGCStats.gcCount; }
 
 	MMINLINE bool isBarrierEnabled()			{ return (_gcPhase == GC_PHASE_ROOT || _gcPhase == GC_PHASE_TRACE  || _gcPhase == GC_PHASE_CONCURRENT_TRACE); }
+	MMINLINE uintptr_t getGcPhase() { return _gcPhase; }
+
 
 	MMINLINE bool isCollectorIdle()				{ return (_gcPhase == GC_PHASE_IDLE);	 }
 	MMINLINE bool isCollectorRootMarking()		{ return (_gcPhase == GC_PHASE_ROOT);	 }
