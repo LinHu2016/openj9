@@ -2322,7 +2322,7 @@ MMINLINE void
 MM_CopyForwardScheme::scanContinuationNativeSlots(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *reservingContext, J9Object *objectPtr, ScanReason reason)
 {
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
-	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr)) {
+	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr, _extensions->disableScanMountedContinuationObject)) {
 		StackIteratorData4CopyForward localData;
 		localData.copyForwardScheme = this;
 		localData.env = env;

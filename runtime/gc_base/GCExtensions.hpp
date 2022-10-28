@@ -197,6 +197,8 @@ public:
 	UDATA freeSizeThresholdForSurvivor; /**< if average freeSize(freeSize/freeCount) of the region is smaller than the Threshold, the region would not be reused by collector as survivor, for balanced GC only */
 	bool recycleRemainders; /**< true if need to recycle TLHRemainders at the end of PGC, for balanced GC only */
 
+	bool disableScanMountedContinuationObject;
+	bool enableContinuationMountingMutex;
 protected:
 private:
 protected:
@@ -337,6 +339,8 @@ public:
 		, minimumFreeSizeForSurvivor(DEFAULT_SURVIVOR_MINIMUM_FREESIZE)
 		, freeSizeThresholdForSurvivor(DEFAULT_SURVIVOR_THRESHOLD)
 		, recycleRemainders(true)
+		, disableScanMountedContinuationObject(false)
+		, enableContinuationMountingMutex(false)
 	{
 		_typeId = __FUNCTION__;
 	}

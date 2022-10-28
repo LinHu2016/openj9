@@ -5003,6 +5003,7 @@ typedef struct J9VMContinuation {
 	struct J9I2JState i2jState;
 	struct J9VMEntryLocalStorage* oldEntryLocalStorage;
 	struct J9VMThread* carrierThread;
+	omrthread_monitor_t mountingMutex;
 } J9VMContinuation;
 #endif /* JAVA_SPEC_VERSION >= 19 */
 

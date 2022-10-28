@@ -345,14 +345,15 @@ MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, o
 	bool shouldRemember = false;
 
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
-	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr)) {
+	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr, _extensions->disableScanMountedContinuationObject)) {
 		StackIteratorData4Scavenge localData;
 		localData.scavengerDelegate = this;
 		localData.env = env;
 		localData.reason = reason;
 		localData.shouldRemember = &shouldRemember;
+		bool  bNeedMutex = _extensions->isConcurrentScavengerInProgress() && _extensions->enableContinuationMountingMutex;
 
-		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false);
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false, bNeedMutex);
 	}
 	return 	shouldRemember;
 }

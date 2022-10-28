@@ -261,7 +261,7 @@ void
 MM_MarkingDelegate::scanContinuationNativeSlots(MM_EnvironmentBase *env, omrobjectptr_t objectPtr)
 {
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
-	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr)) {
+	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr, _extensions->disableScanMountedContinuationObject)) {
 		StackIteratorData4MarkingDelegate localData;
 		localData.markingDelegate = this;
 		localData.env = env;
@@ -272,7 +272,8 @@ MM_MarkingDelegate::scanContinuationNativeSlots(MM_EnvironmentBase *env, omrobje
 		bStackFrameClassWalkNeeded = isDynamicClassUnloadingEnabled();
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 
-		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForMarkingDelegate, bStackFrameClassWalkNeeded, false);
+		bool bNeedMutex = _extensions->enableContinuationMountingMutex && _extensions->shouldScavengeNotifyGlobalGCOfOldToOldReference();
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForMarkingDelegate, bStackFrameClassWalkNeeded, false, bNeedMutex);
 	}
 }
 

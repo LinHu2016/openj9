@@ -199,7 +199,7 @@ MM_MetronomeDelegate::initialize(MM_EnvironmentBase *env)
 	if (NULL == accessBarrier) {
 		return false;
 	}
-	MM_GCExtensions::getExtensions(_javaVM)->accessBarrier = (MM_ObjectAccessBarrier *)accessBarrier;
+	_extensions->accessBarrier = (MM_ObjectAccessBarrier *)accessBarrier;
 
 	_javaVM->realtimeHeapMapBasePageRounded = _markingScheme->_markMap->getHeapMapBaseRegionRounded();
 	_javaVM->realtimeHeapMapBits = _markingScheme->_markMap->getHeapMapBits();
@@ -1647,7 +1647,7 @@ void
 MM_MetronomeDelegate::scanContinuationNativeSlots(MM_EnvironmentRealtime *env, J9Object *objectPtr)
 {
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
-	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr)) {
+	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr, _extensions->disableScanMountedContinuationObject)) {
 		StackIteratorData4RealtimeMarkingScheme localData;
 		localData.realtimeMarkingScheme = _markingScheme;
 		localData.env = env;
@@ -1658,7 +1658,9 @@ MM_MetronomeDelegate::scanContinuationNativeSlots(MM_EnvironmentRealtime *env, J
 		bStackFrameClassWalkNeeded = isDynamicClassUnloadingEnabled();
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 
-		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForRealtimeGC, bStackFrameClassWalkNeeded, false);
+		bool bNeedMutex = _extensions->enableContinuationMountingMutex && _realtimeGC->isCollectorConcurrentTracing();
+
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForRealtimeGC, bStackFrameClassWalkNeeded, false, bNeedMutex);
 	}
 }
 

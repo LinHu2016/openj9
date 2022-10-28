@@ -192,7 +192,7 @@ bool MM_GlobalMarkCardScrubber::scrubContinuationNativeSlots(MM_EnvironmentVLHGC
 {
 	bool doScrub = true;
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
-	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr)) {
+	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr, MM_GCExtensions::getExtensions(env)->disableScanMountedContinuationObject)) {
 		StackIteratorData4GlobalMarkCardScrubber localData;
 		localData.globalMarkCardScrubber = this;
 		localData.env = env;

@@ -19,6 +19,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 OR LicenseRef-GPL-2.0 WITH Assembly-exception
  *******************************************************************************/
+#include <assert.h>
 #include "j9.h"
 #include "j9comp.h"
 #include "j9protos.h"
@@ -32,6 +33,14 @@
 
 
 extern "C" {
+
+void randomSleep()
+{
+	UDATA count = rand() % 10;
+	for (UDATA cnt=0; cnt < count; cnt++) {
+		omrthread_nanosleep(10);
+	}
+}
 
 BOOLEAN
 createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
@@ -50,6 +59,11 @@ createContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	}
 
 	memset(continuation, 0, sizeof(J9VMContinuation));
+
+	if (0 != omrthread_monitor_init_with_name(&continuation->mountingMutex, 0, "J9VMContinuation::mountingMutex")) {
+		result = FALSE;
+		goto end;
+	}
 
 #ifdef J9VM_INTERP_GROWABLE_STACKS
 #define VMTHR_INITIAL_STACK_SIZE ((vm->initialStackSize > (UDATA) vm->stackSize) ? vm->stackSize : vm->initialStackSize)
@@ -96,7 +110,16 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, continuationObject);
 
 	Assert_VM_Null(currentThread->currentContinuation);
-
+	Assert_VM_notNull(continuation->mountingMutex);
+	if (0 != omrthread_monitor_try_enter(continuation->mountingMutex)) {
+		randomSleep();
+		internalReleaseVMAccess(currentThread);
+		randomSleep();
+		omrthread_monitor_enter(continuation->mountingMutex);
+		randomSleep();
+		internalAcquireVMAccess(currentThread);
+		randomSleep();
+	}
 
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation, started);
 
@@ -133,6 +156,8 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 		*--currentThread->sp = (UDATA)continuationObject;
 	}
 
+	omrthread_monitor_exit(continuation->mountingMutex);
+
 	return result;
 }
 
@@ -143,11 +168,22 @@ yieldContinuation(J9VMThread *currentThread)
 	J9VMContinuation *continuation = currentThread->currentContinuation;
 
 	Assert_VM_notNull(currentThread->currentContinuation);
+	Assert_VM_notNull(continuation->mountingMutex);
+	if (0 != omrthread_monitor_try_enter(continuation->mountingMutex)) {
+		randomSleep();
+		internalReleaseVMAccess(currentThread);
+		randomSleep();
+		omrthread_monitor_enter(continuation->mountingMutex);
+		randomSleep();
+		internalAcquireVMAccess(currentThread);
+		randomSleep();
+	}
 
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation);
 	continuation->carrierThread = NULL;
 	currentThread->currentContinuation = NULL;
 
+	omrthread_monitor_exit(continuation->mountingMutex);
 	/* We need a full fence here to preserve happens-before relationship on PPC and other weakly
 	 * ordered architectures since learning/reservation is turned on by default. Since we have the
 	 * global pin lock counters we only need to need to address yield points, as thats the
@@ -172,6 +208,11 @@ freeContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 			freeJavaStack(currentThread->javaVM, currentStack);
 			currentStack = previous;
 		} while (NULL != currentStack);
+
+		if (NULL != continuation->mountingMutex) {
+			omrthread_monitor_destroy(continuation->mountingMutex);
+			continuation->mountingMutex = (omrthread_monitor_t) NULL;
+		}
 
 		/* Free the J9VMContinuation struct */
 		j9mem_free_memory(continuation);

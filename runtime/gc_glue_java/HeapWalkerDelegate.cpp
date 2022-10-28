@@ -25,6 +25,7 @@
 
 #include "j9.h"
 #include "EnvironmentBase.hpp"
+#include "GCExtensions.hpp"
 #include "ObjectModel.hpp"
 #include "VMHelpers.hpp"
 #include "VMThreadStackSlotIterator.hpp"
@@ -58,7 +59,8 @@ void
 MM_HeapWalkerDelegate::doContinuationNativeSlots(MM_EnvironmentBase *env, omrobjectptr_t objectPtr, MM_HeapWalkerSlotFunc function, void *userData)
 {
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
-	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr)) {
+
+	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr, MM_GCExtensions::getExtensions(env)->disableScanMountedContinuationObject)) {
 		StackIteratorData4HeapWalker localData;
 		localData.heapWalker = _heapWalker;
 		localData.env = env;

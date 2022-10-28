@@ -23,6 +23,7 @@
 #if !defined(VMHELPERS_HPP_)
 #define VMHELPERS_HPP_
 
+#include <assert.h>
 #include "j9cfg.h"
 
 #if defined(OMR_OVERRIDE_COMPRESS_OBJECT_REFERENCES)
@@ -2048,13 +2049,30 @@ exit:
 #endif /* JAVA_SPEC_VERSION > 11 */
 	}
 
+	static VMINLINE void
+	randomSleep()
+	{
+		UDATA count = rand() % 10;
+		for (UDATA cnt=0; cnt < count; cnt++) {
+			omrthread_nanosleep(10);
+		}
+	}
+
 	static VMINLINE UDATA
-	walkContinuationStackFramesWrapper(J9VMThread *vmThread, j9object_t continuationObject, J9StackWalkState *walkState)
+	walkContinuationStackFramesWrapper(J9VMThread *vmThread, j9object_t continuationObject, J9StackWalkState *walkState, bool bNeedMutex)
 	{
 		UDATA rc = J9_STACKWALK_RC_NONE;
 #if JAVA_SPEC_VERSION >= 19
 		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObject);
+		if (bNeedMutex && (NULL != continuation)) {
+			randomSleep();
+			omrthread_monitor_enter(continuation->mountingMutex);
+			randomSleep();
+		}
 		rc = vmThread->javaVM->internalVMFunctions->walkContinuationStackFrames(vmThread, continuation, walkState);
+		if (bNeedMutex && (NULL != continuation)) {
+			omrthread_monitor_exit(continuation->mountingMutex);
+		}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 		return rc;
 	}
