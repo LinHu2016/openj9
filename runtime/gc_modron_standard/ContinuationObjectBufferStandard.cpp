@@ -76,6 +76,7 @@ MM_ContinuationObjectBufferStandard::flushImpl(MM_EnvironmentBase* env)
 	MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[_continuationObjectListIndex];
 
 	list->addAll(env, _head, _tail);
+	list->incrementObjectCount(_objectCount);
 	_continuationObjectListIndex += 1;
 	if (regionExtension->_maxListIndex == _continuationObjectListIndex) {
 		_continuationObjectListIndex = 0;

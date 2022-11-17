@@ -2272,6 +2272,10 @@ MM_ObjectAccessBarrier::setContinuationLink(j9object_t object, j9object_t value)
 	UDATA linkOffset = _continuationLinkOffset;
 	/* offset will be UDATA_MAX until Continuation is loaded */
 	Assert_MM_true(UDATA_MAX != linkOffset);
+	if (NULL == value) {
+		/* set the last object in the list pointing to itself */
+		value = object;
+	}
 	fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
 	GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
 	slot.writeReferenceToSlot(value);

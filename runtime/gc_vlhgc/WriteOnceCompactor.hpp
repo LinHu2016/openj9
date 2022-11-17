@@ -516,7 +516,12 @@ private:
 
 	MMINLINE void addContinuationObjectInList(MM_EnvironmentVLHGC *env, J9Object *objectPtr)
 	{
-		((MM_ContinuationObjectBufferVLHGC*) env->getGCEnvironment()->_continuationObjectBuffer)->addForOnlyCompactedRegion(env, objectPtr);
+		/* if isObjectInContinuationList() return NULL, it means the object isn't in ContinuationList,
+		 * it could be the constructing object which would be added in the list after the construction finish later. ignore the object to avoid duplicated reference in the list.
+		 */
+		if (NULL != _extensions->accessBarrier->isObjectInContinuationList(objectPtr)) {
+			((MM_ContinuationObjectBufferVLHGC*) env->getGCEnvironment()->_continuationObjectBuffer)->addForOnlyCompactedRegion(env, objectPtr);
+		}
 	}
 
 #if defined(J9VM_GC_FINALIZATION)

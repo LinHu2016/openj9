@@ -43,9 +43,9 @@ private:
 	j9object_t _priorHead; /**< the head of the linked list before Continuation object processing */
 	MM_ContinuationObjectList *_nextList; /**< a pointer to the next Continuation list in the global linked list of lists */
 	MM_ContinuationObjectList *_previousList; /**< a pointer to the previous Continuation list in the global linked list of lists */
-#if defined(J9VM_GC_VLHGC)
+//#if defined(J9VM_GC_VLHGC)
 	uintptr_t _objectCount; /**< the number of objects in the list */
-#endif /* defined(J9VM_GC_VLHGC) */
+//#endif /* defined(J9VM_GC_VLHGC) */
 protected:
 public:
 
@@ -79,7 +79,7 @@ public:
 		_priorHead = _head;
 		_head = NULL;
 #if defined(J9VM_GC_VLHGC)
-		clearObjectCount();
+//		clearObjectCount();
 #endif /* defined(J9VM_GC_VLHGC) */
 	}
 
@@ -139,14 +139,16 @@ public:
 	 */
 	MM_ContinuationObjectList();
 
-#if defined(J9VM_GC_VLHGC)
+//#if defined(J9VM_GC_VLHGC)
 	MMINLINE uintptr_t getObjectCount() { return _objectCount; }
 	MMINLINE void clearObjectCount() { _objectCount = 0; }
 	MMINLINE void incrementObjectCount(uintptr_t count)
 	{
 		MM_AtomicOperations::add((volatile uintptr_t *)&_objectCount, count);
 	}
-#endif /* defined(J9VM_GC_VLHGC) */
+//#endif /* defined(J9VM_GC_VLHGC) */
 
+	/* Debug and called under STW/clearable phase only */
+	void checkCircularList(MM_EnvironmentBase* env, bool start);
 };
 #endif /* CONTINUATIONOBJECTLIST_HPP_ */

@@ -22,6 +22,7 @@
 
 #if !defined(VMHELPERS_HPP_)
 #define VMHELPERS_HPP_
+#include <assert.h>
 
 #include "j9cfg.h"
 
@@ -521,7 +522,12 @@ public:
 			}
 #if JAVA_SPEC_VERSION >= 19
 			if (classFlags & J9AccClassContinuation) {
-				currentThread->javaVM->memoryManagerFunctions->continuationObjectCreated(currentThread, object);
+				if (J9VMJDKINTERNALVMCONTINUATION_GCLINKED(currentThread, object)) {
+					assert(false);
+				} else {
+					currentThread->javaVM->memoryManagerFunctions->continuationObjectCreated(currentThread, object);
+					J9VMJDKINTERNALVMCONTINUATION_SET_GCLINKED(currentThread, object, true);
+				}
 			}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 		}

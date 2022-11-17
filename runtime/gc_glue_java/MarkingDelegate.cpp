@@ -151,14 +151,54 @@ MM_MarkingDelegate::workerCompleteGC(MM_EnvironmentBase *env)
 	GC_Environment *gcEnv = env->getGCEnvironment();
 	gcEnv->_referenceObjectBuffer->flush(env);
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "workerCompleteGC shouldScanContinuationObjects=%zu\n",shouldScanContinuationObjects());
 	if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_soft;
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_weak;
+
+//		if (shouldScanContinuationObjects()) {
+			MM_HeapRegionDescriptorStandard *region = NULL;
+			GC_HeapRegionIteratorStandard regionIterator(_extensions->heap->getHeapRegionManager());
+			while (NULL != (region = regionIterator.nextRegion())) {
+				MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+				j9tty_printf(PORTLIB, "MM_MarkingDelegate::workerCompleteGC region=%p, regionExtension=%p, _maxListIndex=%zu\n", region, regionExtension, regionExtension->_maxListIndex);
+				for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+					MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+					if (!list->wasEmpty()) {
+						list->checkCircularList(env ,true);
+						list->clearObjectCount();
+					}
+				}
+			}
+//		}
+
 		env->_currentTask->releaseSynchronizedGCThreads(env);
 	}
 	MM_MarkingSchemeRootClearer rootClearer(env, _markingScheme, this);
 	rootClearer.setStringTableAsRoot(!_collectStringConstantsEnabled);
+//	j9tty_printf(PORTLIB, "MM_MarkingDelegate::scanClearable env=%p\n",env);
 	rootClearer.scanClearable(env);
+
+	if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
+//		if (shouldScanContinuationObjects()) {
+			MM_HeapRegionDescriptorStandard *region = NULL;
+			GC_HeapRegionIteratorStandard regionIterator(_extensions->heap->getHeapRegionManager());
+			while (NULL != (region = regionIterator.nextRegion())) {
+				MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+				j9tty_printf(PORTLIB, "after MM_MarkingDelegate::workerCompleteGC region=%p, regionExtension=%p, _maxListIndex=%zu\n", region, regionExtension, regionExtension->_maxListIndex);
+				for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+					MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+					if (!list->wasEmpty()) {
+						list->checkCircularList(env ,false);
+					}
+				}
+			}
+//		}
+
+		env->_currentTask->releaseSynchronizedGCThreads(env);
+	}
+
 }
 
 void

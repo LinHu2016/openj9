@@ -203,6 +203,7 @@ public:
 	{
 		reportScanningStarted(RootScannerEntity_ContinuationObjects);
 
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
 		/* Only walk MEMORY_TYPE_NEW regions since MEMORY_TYPE_OLD regions would not contain
 		 * any objects that would move during a nursery contract.
 		 */
@@ -213,6 +214,8 @@ public:
 				MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
 				for (UDATA i = 0; i < regionExtension->_maxListIndex; i++) {
 					regionExtension->_continuationObjectLists[i].startProcessing();
+					j9tty_printf(PORTLIB, "ContractslotScanner::scanContinuationObjects region=%p, list=%p, getHeadOfList()=%p, getPriorList()=%p, getObjectCount()=%zu\n", region, &regionExtension->_continuationObjectLists[i], regionExtension->_continuationObjectLists[i].getHeadOfList(), regionExtension->_continuationObjectLists[i].getPriorList(), regionExtension->_continuationObjectLists[i].getObjectCount());
+					regionExtension->_continuationObjectLists[i].clearObjectCount();
 				}
 			}
 		}

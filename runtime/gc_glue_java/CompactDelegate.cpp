@@ -139,6 +139,7 @@ MM_CompactDelegate::workerCleanupAfterGC(MM_EnvironmentBase *env)
 void
 MM_CompactDelegate::mainSetupForGC(MM_EnvironmentBase *env)
 {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
 	MM_GCExtensionsBase *extensions = env->getExtensions();
 	MM_HeapRegionDescriptorStandard *region = NULL;
 	GC_HeapRegionIteratorStandard regionIterator(extensions->getHeap()->getHeapRegionManager());
@@ -147,6 +148,8 @@ MM_CompactDelegate::mainSetupForGC(MM_EnvironmentBase *env)
 		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
 			regionExtension->_ownableSynchronizerObjectLists[i].startOwnableSynchronizerProcessing();
 			regionExtension->_continuationObjectLists[i].startProcessing();
+			j9tty_printf(PORTLIB, "MM_CompactDelegate::mainSetupForGC region=%p, list=%p, getHeadOfList()=%p, getPriorList()=%p, getObjectCount()=%zu\n", region, &regionExtension->_continuationObjectLists[i], regionExtension->_continuationObjectLists[i].getHeadOfList(), regionExtension->_continuationObjectLists[i].getPriorList(), regionExtension->_continuationObjectLists[i].getObjectCount());
+			regionExtension->_continuationObjectLists[i].clearObjectCount();
 		}
 	}
 }

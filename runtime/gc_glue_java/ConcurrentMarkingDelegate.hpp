@@ -42,6 +42,7 @@
 #include "GCExtensionsBase.hpp"
 #include "MarkingScheme.hpp"
 #include "ReferenceObjectBuffer.hpp"
+#include "ContinuationObjectBuffer.hpp"
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 #include "ScanClassesMode.hpp"
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
@@ -292,6 +293,7 @@ public:
 	{
 		bool wasEmpty = env->getGCEnvironment()->_referenceObjectBuffer->isEmpty();
 		env->getGCEnvironment()->_referenceObjectBuffer->flush(env);
+		env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
 		return !wasEmpty;
 	}
 

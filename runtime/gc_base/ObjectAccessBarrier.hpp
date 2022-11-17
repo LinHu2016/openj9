@@ -510,6 +510,32 @@ public:
 		UDATA linkOffset = _continuationLinkOffset;
 		fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
 		GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
+		j9object_t next = slot.readReferenceFromSlot();
+		if (object == next) {
+			/* reach end of list(last item points to itself), return NULL */
+			next = NULL;
+		}
+		return next;
+	}
+
+	j9object_t getContinuationLink(j9object_t object, j9object_t originalObject)
+	{
+		UDATA linkOffset = _continuationLinkOffset;
+		fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
+		GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
+		j9object_t next = slot.readReferenceFromSlot();
+		if (originalObject == next) {
+			/* reach end of list(last item points to itself), return NULL */
+			next = NULL;
+		}
+		return next;
+	}
+
+	j9object_t isObjectInContinuationList(j9object_t object)
+	{
+		UDATA linkOffset = _continuationLinkOffset;
+		fj9object_t *continuationLink = (fj9object_t*)((UDATA)object + linkOffset);
+		GC_SlotObject slot(_extensions->getOmrVM(), continuationLink);
 		return slot.readReferenceFromSlot();
 	}
 

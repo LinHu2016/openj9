@@ -37,6 +37,7 @@
 #include "ParallelTask.hpp"
 #include "ReferenceObjectBuffer.hpp"
 #include "RootScanner.hpp"
+#include "HeapRegionIteratorStandard.hpp"
 #include "Scavenger.hpp"
 #include "ScavengerDelegate.hpp"
 #include "ScavengerRootClearer.hpp"
@@ -166,17 +167,61 @@ public:
 	virtual void
 	scanClearable(MM_EnvironmentBase *env)
 	{
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "scanClearable shouldScanContinuationObjects=%zu\n",_scavengerDelegate->getShouldScavengeContinuationObjects());
+
 		if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
 			/* Soft and weak references resurrected by finalization need to be cleared immediately since weak and soft processing has already completed.
 			 * This has to be set before unfinalizable (and phantom) processing
 			 */
 			env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_soft;
 			env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_weak;
+
+
+//			if (_scavengerDelegate->getShouldScavengeContinuationObjects()) {
+				MM_HeapRegionDescriptorStandard *region = NULL;
+				GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
+				while (NULL != (region = regionIterator.nextRegion())) {
+					if (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)) {
+						MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+						j9tty_printf(PORTLIB, "scanClearable region=%p, regionExtension=%p, _maxListIndex=%zu\n", region, regionExtension, regionExtension->_maxListIndex);
+						for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+							MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+							if (!list->wasEmpty()) {
+								list->checkCircularList(env ,true);
+								list->clearObjectCount();
+							}
+						}
+					}
+				}
+//			}
+
 			env->_currentTask->releaseSynchronizedGCThreads(env);
 		}
 		Assert_GC_true_with_message(env, env->getGCEnvironment()->_referenceObjectBuffer->isEmpty(), "Non-empty reference buffer in MM_EnvironmentBase* env=%p before scanClearable\n", env);
+//		j9tty_printf(PORTLIB, "ScavengerRootCleaner::scanClearable\n");
 		_rootClearer.scanClearable(env);
 		Assert_GC_true_with_message(env, _extensions->isScavengerBackOutFlagRaised() || env->getGCEnvironment()->_referenceObjectBuffer->isEmpty(), "Non-empty reference buffer in MM_EnvironmentBase* env=%p after scanClearable\n", env);
+		if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
+//			if (_scavengerDelegate->getShouldScavengeContinuationObjects()) {
+				MM_HeapRegionDescriptorStandard *region = NULL;
+				GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
+				while (NULL != (region = regionIterator.nextRegion())) {
+					if (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)) {
+						MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+						j9tty_printf(PORTLIB, "after scanClearable region=%p, regionExtension=%p, _maxListIndex=%zu\n", region, regionExtension, regionExtension->_maxListIndex);
+						for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+							MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+							if (!list->wasEmpty()) {
+								list->checkCircularList(env ,false);
+							}
+						}
+					}
+				}
+//			}
+
+			env->_currentTask->releaseSynchronizedGCThreads(env);
+		}
 	}
 
 	virtual void
