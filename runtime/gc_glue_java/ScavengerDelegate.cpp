@@ -305,7 +305,12 @@ MM_ScavengerDelegate::doStackSlot(MM_EnvironmentStandard *env, omrobjectptr_t *s
 	if (scavenger->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
 		switch (reason) {
 		case SCAN_REASON_SCAVENGE:
+		{
 			*shouldRemember |= scavenger->copyObjectSlot(env, slotPtr);
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "after slotPtr=%p, ObjPtr=%p, isObjectInEvacuateMemory=%zu, header=%p\n", slotPtr, *slotPtr, scavenger->isObjectInEvacuateMemory(*slotPtr), **slotPtr);
+
+		}
 			break;
 		case SCAN_REASON_FIXUP:
 #if defined(OMR_GC_CONCURRENT_SCAVENGER)
@@ -336,25 +341,28 @@ void
 stackSlotIteratorForScavenge(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4Scavenge *data = (StackIteratorData4Scavenge *)localData;
+	PORT_ACCESS_FROM_ENVIRONMENT(data->env);
+	j9tty_printf(PORTLIB, "doStackSlot slotPtr=%p, ObjPtr=%p, contiObj=%p\n", slotPtr, *slotPtr, data->objectPtr);
 	data->scavengerDelegate->doStackSlot(data->env, slotPtr, data->reason, data->shouldRemember);
 }
 
 bool
-MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, MM_ScavengeScanReason reason)
+MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, MM_ScavengeScanReason reason, bool concurrentScavenger)
 {
 	bool shouldRemember = false;
 
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
-	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr)) {
+	if (VM_VMHelpers::needScanStacksForContinuation(currentThread, objectPtr, concurrentScavenger)) {
 		StackIteratorData4Scavenge localData;
 		localData.scavengerDelegate = this;
 		localData.env = env;
 		localData.reason = reason;
 		localData.shouldRemember = &shouldRemember;
+		localData.objectPtr = objectPtr;
 		/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
 		bool  syncWithContinuationMounting = _extensions->isConcurrentScavengerInProgress();
 
-		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false, syncWithContinuationMounting);
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false, syncWithContinuationMounting && !concurrentScavenger);
 	}
 	return 	shouldRemember;
 }

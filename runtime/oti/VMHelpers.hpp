@@ -2118,6 +2118,8 @@ exit:
 				return rc;
 			}
 		}
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "walkContinuationStackFramesWrapper continuationObject=%p, continuation=%p\n", continuationObject, continuation);
 		rc = vmThread->javaVM->internalVMFunctions->walkContinuationStackFrames(vmThread, continuation, walkState);
 		if (syncWithContinuationMounting && (NULL != continuation)) {
 			exitConcurrentGCScan(continuation);
@@ -2136,11 +2138,12 @@ exit:
 	 * @return true if we need to scan the java stack
 	 */
 	static VMINLINE bool
-	needScanStacksForContinuation(J9VMThread *vmThread, j9object_t continuationObject)
+	needScanStacksForContinuation(J9VMThread *vmThread, j9object_t continuationObject, bool concurrentScavenger = false)
 	{
 		bool needScan = false;
 #if JAVA_SPEC_VERSION >= 19
 		jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(vmThread, continuationObject);
+		jboolean finished = J9VMJDKINTERNALVMCONTINUATION_FINISHED(vmThread, continuationObject);
 		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObject);
 		/**
 		 * We don't scan mounted continuations:
@@ -2152,7 +2155,13 @@ exit:
 		 *
 		 * We don't scan currently scanned either - one scan is enough.
 		 */
-		needScan = started && (NULL != continuation) && (!isContinuationMountedOrConcurrentlyScanned(continuation));
+		needScan = started && !finished && (NULL != continuation) && ((!isContinuationMountedOrConcurrentlyScanned(continuation) || (concurrentScavenger && !isConcurrentlyScannedFromContinuationState(continuation->state))));
+		PORT_ACCESS_FROM_VMC(vmThread);
+		if (NULL != continuation) {
+			j9tty_printf(PORTLIB, "needScanStacksForContinuation continuationObject=%p, needScan=%zu, continuation->state=%p\n", continuationObject, needScan, continuation->state);
+		} else {
+			j9tty_printf(PORTLIB, "needScanStacksForContinuation continuationObject=%p, needScan=%zu, continuation=%p\n", continuationObject, needScan, continuation);
+		}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 		return needScan;
 	}

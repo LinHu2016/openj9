@@ -156,6 +156,8 @@ MM_ConcurrentMarkingDelegate::scanThreadRoots(MM_EnvironmentBase *env)
 	GC_VMThreadStackSlotIterator::scanSlots(vmThread, vmThread, (void *)&localData, concurrentStackSlotIterator, true, false);
 
 #if JAVA_SPEC_VERSION >= 19
+	PORT_ACCESS_FROM_VMC(vmThread);
+	j9tty_printf(PORTLIB, "MM_ConcurrentMarkingDelegate::scanThreadRoots vmThread=%p, vmThread->currentContinuation=%p\n", vmThread, vmThread->currentContinuation);
 	if (NULL != vmThread->currentContinuation) {
 		GC_VMThreadStackSlotIterator::scanSlots(vmThread, vmThread->currentContinuation, (void *)&localData, concurrentStackSlotIterator, true, false);
 	}

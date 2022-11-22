@@ -1032,8 +1032,9 @@ continuationObjectCreated(J9VMThread *vmThread, j9object_t object)
 {
 	Assert_MM_true(NULL != object);
 	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
-
-	env->getGCEnvironment()->_continuationObjectBuffer->add(env, object);
+	if (!MM_GCExtensions::getExtensions(env)->disableContinuationList) {
+		env->getGCEnvironment()->_continuationObjectBuffer->add(env, object);
+	}
 	MM_ObjectAllocationInterface *objectAllocation = env->_objectAllocationInterface;
 	if (NULL != objectAllocation) {
 		objectAllocation->getAllocationStats()->_continuationObjectCount += 1;

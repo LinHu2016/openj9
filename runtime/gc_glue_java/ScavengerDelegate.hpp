@@ -156,7 +156,7 @@ public:
 
 	void setShouldScavengeUnfinalizedObjects(bool shouldScavenge) { _shouldScavengeUnfinalizedObjects = shouldScavenge; }
 	void setShouldScavengeContinuationObjects(bool shouldScavenge) { _shouldScavengeContinuationObjects = shouldScavenge; }
-	bool scanContinuationNativeSlots(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, MM_ScavengeScanReason reason);
+	bool scanContinuationNativeSlots(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, MM_ScavengeScanReason reason, bool concurrentScavenger = false);
 
 	volatile bool getShouldScavengeFinalizableObjects() { return _shouldScavengeFinalizableObjects; }
 	volatile bool getShouldScavengeUnfinalizedObjects() { return _shouldScavengeUnfinalizedObjects; }
@@ -188,6 +188,7 @@ typedef struct StackIteratorData4Scavenge {
 	MM_EnvironmentStandard *env;
 	MM_ScavengeScanReason reason;
 	bool *shouldRemember;
+	omrobjectptr_t objectPtr;
 } StackIteratorData4Scavenge;
 
 #endif /* SCAVENGERDELEGATEJAVA_HPP_ */

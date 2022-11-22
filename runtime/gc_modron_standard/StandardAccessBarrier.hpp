@@ -100,6 +100,8 @@ public:
 	virtual void recentlyAllocatedObject(J9VMThread *vmThread, J9Object *object); 
 
 	virtual void preMountContinuation(J9VMThread *vmThread, j9object_t contObject);
+	virtual void postMountContinuation(J9VMThread *vmThread, j9object_t contObject);
+	virtual void preUnmountContinuation(J9VMThread *vmThread, j9object_t contObject);
 	virtual void postUnmountContinuation(J9VMThread *vmThread, j9object_t contObject);
 
 	virtual void* jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray array, jboolean *isCopy);

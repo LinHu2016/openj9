@@ -843,6 +843,20 @@ preMountContinuation(J9VMThread *vmThread, j9object_t object)
 }
 
 void
+postMountContinuation(J9VMThread *vmThread, j9object_t object)
+{
+	MM_ObjectAccessBarrier *barrier = MM_GCExtensions::getExtensions(vmThread->javaVM)->accessBarrier;
+	barrier->postMountContinuation(vmThread, object);
+}
+
+void
+preUnmountContinuation(J9VMThread *vmThread, j9object_t object)
+{
+	MM_ObjectAccessBarrier *barrier = MM_GCExtensions::getExtensions(vmThread->javaVM)->accessBarrier;
+	barrier->preUnmountContinuation(vmThread, object);
+}
+
+void
 postUnmountContinuation(J9VMThread *vmThread, j9object_t object)
 {
 	MM_ObjectAccessBarrier *barrier = MM_GCExtensions::getExtensions(vmThread->javaVM)->accessBarrier;

@@ -198,7 +198,14 @@ yieldContinuation(J9VMThread *currentThread)
 	 * must be maintained for weakly ordered CPUs, to unsure that once the continuation is again available for GC scan (on potentially remote CPUs), all CPUs see up-to-date stack .
 	 */
 	Assert_VM_true((uintptr_t)currentThread == continuation->state);
-	continuation->state = J9_GC_CONTINUATION_STATE_INITIAL;
+
+//	J9JavaVM *vm = currentThread->javaVM;
+//	j9object_t threadPrev = J9OBJECT_OBJECT_LOAD(currentThread, currentThread->threadObject, vm->virtualThreadLinkPreviousOffset);
+//	j9object_t threadNext = J9OBJECT_OBJECT_LOAD(currentThread, currentThread->threadObject, vm->virtualThreadLinkNextOffset);
+
+//	if ((NULL != threadPrev) || (NULL != threadNext)) {
+		continuation->state = J9_GC_CONTINUATION_STATE_INITIAL;
+//	}
 
 	return result;
 }

@@ -5235,6 +5235,9 @@ ffi_OOM:
 			rc = GOTO_RUN_METHOD;
 		}
 
+		/* Notify GC of Continuation stack swap */
+		_vm->memoryManagerFunctions->postMountContinuation(_currentThread, continuationObject);
+
 		VMStructHasBeenUpdated(REGISTER_ARGS);
 
 		return rc;
@@ -5248,11 +5251,13 @@ ffi_OOM:
 
 		buildInternalNativeStackFrame(REGISTER_ARGS);
 		updateVMStruct(REGISTER_ARGS);
+		j9object_t continuationObject = J9VMJAVALANGTHREAD_CONT(_currentThread, _currentThread->carrierThreadObject);
+		/* Notify GC of Continuation stack swap */
+		_vm->memoryManagerFunctions->preUnmountContinuation(_currentThread, continuationObject);
 
 		/* store the current Continuation state and swap to carrier thread stack */
 		yieldContinuation(_currentThread);
 
-		j9object_t continuationObject = J9VMJAVALANGTHREAD_CONT(_currentThread, _currentThread->carrierThreadObject);
 		/* Notify GC of Continuation stack swap */
 		_vm->memoryManagerFunctions->postUnmountContinuation(_currentThread, continuationObject);
 

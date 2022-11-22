@@ -542,6 +542,8 @@ MM_RootScanner::scanOneThread(MM_EnvironmentBase *env, J9VMThread* walkThread, v
 	GC_VMThreadStackSlotIterator::scanSlots(currentThread, walkThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
 
 #if JAVA_SPEC_VERSION >= 19
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "MM_RootScanner::scanOneThread walkThread=%p, walkThread->currentContinuation=%p\n", walkThread, walkThread->currentContinuation);
 	if (NULL != walkThread->currentContinuation)
 	{
 		/* At this point we know that a virtual thread is mounted. We previously scanned its stack,
