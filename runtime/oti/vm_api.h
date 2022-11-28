@@ -4367,6 +4367,16 @@ copyFieldsFromContinuation(J9VMThread *currentThread, J9VMThread *vmThread, J9VM
  */
 UDATA
 walkContinuationStackFrames(J9VMThread *currentThread, J9VMContinuation *continuation, J9StackWalkState *walkState);
+
+/**
+ * @brief Walk all stackframes in the VM.
+ *
+ * @param currentThread
+ * @param walkState walkstate holding initial walk parameters to be used in each stackwalk
+ * @return 0 on success and non-zero on failure
+ */
+UDATA
+walkAllStackFrames(J9VMThread *currentThread, J9StackWalkState *walkState);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 /* ---------------- hookableAsync.c ---------------- */

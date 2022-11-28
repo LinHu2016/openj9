@@ -4941,6 +4941,7 @@ typedef struct J9InternalVMFunctions {
 	void (*freeContinuation)(struct J9VMThread *currentThread, j9object_t continuationObject);
 	void (*freeTLS)(struct J9VMThread *currentThread, j9object_t threadObj);
 	UDATA (*walkContinuationStackFrames)(struct J9VMThread *currentThread, struct J9VMContinuation *continuation, J9StackWalkState *walkState);
+	UDATA (*walkAllStackFrames)(struct J9VMThread *currentThread, J9StackWalkState *walkState);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 } J9InternalVMFunctions;
 
