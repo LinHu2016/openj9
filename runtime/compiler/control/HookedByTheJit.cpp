@@ -6549,11 +6549,8 @@ static void jitReleaseCodeStackWalk(OMR_VMThread *omrVMThread, condYieldFromGCFu
       vmFuncs->walkAllStackFrames(vmThread, &walkState);
    }
 #else /* JAVA_SPEC_VERSION >= 19 */
-
    bool yieldHappened = false;
    bool doStackWalkForThread = true;
-
-   bool isRealTimeGC = TR::Options::getCmdLineOptions()->realTimeGC();
    do
       {
       J9VMThread *thread = vmThread;
