@@ -303,9 +303,6 @@ walkAllStackFrames(J9VMThread *currentThread, J9StackWalkState *walkState)
 		localWalkState = *walkState;
 		localWalkState.walkThread = targetThread;
 		rc = vm->walkStackFrames(currentThread, &localWalkState);
-		if (J9_STACKWALK_RC_NONE != rc) {
-			goto exit;
-		}
 		targetThread = targetThread->linkNext;
 	} while (targetThread != vm->mainThread);
 
@@ -322,9 +319,6 @@ walkAllStackFrames(J9VMThread *currentThread, J9StackWalkState *walkState)
 				localWalkState = *walkState;
 				/* walk live continuation's stack */
 				rc = walkContinuationStackFrames(currentThread, continuation, &localWalkState);
-				if (J9_STACKWALK_RC_NONE != rc) {
-					goto exit;
-				}
 			}
 			nextVThread = J9OBJECT_OBJECT_LOAD(currentThread, nextVThread, vm->virtualThreadLinkNextOffset);
 		}
@@ -346,7 +340,6 @@ walkAllStackFrames(J9VMThread *currentThread, J9StackWalkState *walkState)
 			iter = iter.next();
 		}
 	 */
-exit:
 	return rc;
 }
 } /* extern "C" */
