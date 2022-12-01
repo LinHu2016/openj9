@@ -51,7 +51,6 @@ class GC_VMClassSlotIterator;
 class MM_HeapRegionDescriptor;
 class MM_HeapRegionManager;
 class MM_OwnableSynchronizerObjectList;
-class MM_ContinuationObjectList;
 class MM_UnfinalizedObjectList;
 
 #define TEMP_RCW_STACK_SIZE (10 * 1024 * 1024)
@@ -538,13 +537,6 @@ MM_ReferenceChainWalker::doOwnableSynchronizerObject(J9Object *objectPtr, MM_Own
 {
 	J9Object *object = objectPtr;
 	doSlot(&object, J9GC_ROOT_TYPE_OWNABLE_SYNCHRONIZER_OBJECT, -1, NULL);
-}
-
-void
-MM_ReferenceChainWalker::doContinuationObject(J9Object *objectPtr, MM_ContinuationObjectList *list)
-{
-	J9Object *object = objectPtr;
-	doSlot(&object, J9GC_ROOT_TYPE_CONTINUATION_OBJECT, -1, NULL);
 }
 
 /**

@@ -41,7 +41,6 @@
 #include "MarkingSchemeRootClearer.hpp"
 #include "ModronAssertions.h"
 #include "OwnableSynchronizerObjectBuffer.hpp"
-#include "ContinuationObjectBuffer.hpp"
 #include "VMHelpers.hpp"
 #include "ParallelDispatcher.hpp"
 #include "ReferenceObjectBuffer.hpp"
@@ -302,47 +301,6 @@ MM_MarkingSchemeRootClearer::scanOwnableSynchronizerObjects(MM_EnvironmentBase *
 		/* restore everything to a flushed state before exiting */
 		gcEnv->_ownableSynchronizerObjectBuffer->flush(env);
 		reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
-	}
-}
-
-void
-MM_MarkingSchemeRootClearer::scanContinuationObjects(MM_EnvironmentBase *env)
-{
-	if (_markingDelegate->shouldScanContinuationObjects()) {
-		/* allow the marking scheme to handle this */
-		reportScanningStarted(RootScannerEntity_ContinuationObjects);
-		GC_Environment *gcEnv = env->getGCEnvironment();
-
-		MM_HeapRegionDescriptorStandard *region = NULL;
-		GC_HeapRegionIteratorStandard regionIterator(_extensions->heap->getHeapRegionManager());
-		while (NULL != (region = regionIterator.nextRegion())) {
-			MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-			for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
-				MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
-				if (!list->wasEmpty()) {
-					if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
-						omrobjectptr_t object = list->getPriorList();
-						while (NULL != object) {
-							gcEnv->_markJavaStats._continuationCandidates += 1;
-							omrobjectptr_t next = _extensions->accessBarrier->getContinuationLink(object);
-							if (_markingScheme->isMarked(object)) {
-								/* object was already marked. */
-								gcEnv->_continuationObjectBuffer->add(env, object);
-							} else {
-								/* object was not previously marked */
-								gcEnv->_markJavaStats._continuationCleared += 1;
-								VM_VMHelpers::cleanupContinuationObject((J9VMThread *)env->getLanguageVMThread(), object);
-							}
-							object = next;
-						}
-					}
-				}
-			}
-		}
-
-		/* restore everything to a flushed state before exiting */
-		gcEnv->_continuationObjectBuffer->flush(env);
-		reportScanningEnded(RootScannerEntity_ContinuationObjects);
 	}
 }
 

@@ -41,32 +41,7 @@
 #include "SlotObject.hpp"
 #include "UnfinalizedObjectBuffer.hpp"
 #include "UnfinalizedObjectList.hpp"
-#include "ContinuationObjectBuffer.hpp"
-#include "ContinuationObjectList.hpp"
 #include "ScavengerRootScanner.hpp"
-
-void
-MM_ScavengerRootScanner::startContinuationProcessing(MM_EnvironmentBase *env)
-{
-	if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
-		_scavengerDelegate->setShouldScavengeContinuationObjects(false);
-
-		MM_HeapRegionDescriptorStandard *region = NULL;
-		GC_HeapRegionIteratorStandard regionIterator(env->getExtensions()->getHeap()->getHeapRegionManager());
-		while(NULL != (region = regionIterator.nextRegion())) {
-			if ((MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW))) {
-				MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-				for (UDATA i = 0; i < regionExtension->_maxListIndex; i++) {
-					MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
-					list->startProcessing();
-					if (!list->wasEmpty()) {
-						_scavengerDelegate->setShouldScavengeContinuationObjects(true);
-					}
-				}
-			}
-		}
-	}
-}
 
 #if defined(J9VM_GC_FINALIZATION)
 void

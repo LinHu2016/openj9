@@ -42,7 +42,6 @@
 #include "MixedObjectIterator.hpp"
 #include "ObjectAccessBarrier.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
-#include "ContinuationObjectList.hpp"
 #include "PointerArrayIterator.hpp"
 #include "SlotObject.hpp"
 #include "VMInterface.hpp"
@@ -521,47 +520,6 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 			objectPtr = barrier->getOwnableSynchronizerLink(objectPtr);
 		}
 		ownableSynchronizerObjectList = ownableSynchronizerObjectList->getNextList();
-	}
-	return returnCode;
-}
-
-/**
- * Walk all continuation objects, call user provided function.
- * @param flags The flags describing the walk (unused currently)
- * @param func The function to call on each object descriptor.
- * @param userData Pointer to storage for userData.
- * @return return 0 on successfully iterating entire list, return user provided function call if it did not return JVMTI_ITERATION_CONTINUE
- */
-jvmtiIterationControl
-j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData)
-{
-	J9JavaVM *javaVM = vmThread->javaVM;
-	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(javaVM->omrVM);
-	MM_ObjectAccessBarrier *barrier = extensions->accessBarrier;
-	MM_ContinuationObjectList *continuationObjectList = extensions->getContinuationObjectListsExternal(vmThread);
-
-	Assert_MM_true(NULL != continuationObjectList);
-
-	J9MM_IterateObjectDescriptor objectDescriptor;
-	J9MM_IterateRegionDescriptor regionDesc;
-	jvmtiIterationControl returnCode = JVMTI_ITERATION_CONTINUE;
-
-	while (NULL != continuationObjectList) {
-		J9Object *objectPtr = continuationObjectList->getHeadOfList();
-		while (NULL != objectPtr) {
-			UDATA regionFound = j9mm_find_region_for_pointer(javaVM, objectPtr, &regionDesc);
-			if (0 != regionFound) {
-				initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
-				returnCode = func(vmThread, &objectDescriptor, userData);
-				if (JVMTI_ITERATION_ABORT == returnCode) {
-					return returnCode;
-				}
-			} else {
-				Assert_MM_unreachable();
-			}
-			objectPtr = barrier->getContinuationLink(objectPtr);
-		}
-		continuationObjectList = continuationObjectList->getNextList();
 	}
 	return returnCode;
 }

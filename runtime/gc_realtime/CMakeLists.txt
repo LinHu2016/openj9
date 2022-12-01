@@ -23,7 +23,6 @@
 set(gc_realtime_sources
 	AllocationContextRealtime.cpp
 	ConfigurationRealtime.cpp
-	ContinuationObjectBufferRealtime.cpp
 	EnvironmentRealtime.cpp
 	GlobalAllocationManagerRealtime.cpp
 	HeapRegionDescriptorRealtime.cpp

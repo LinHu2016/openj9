@@ -280,13 +280,6 @@ MM_GCExtensions::getOwnableSynchronizerObjectListsExternal(J9VMThread *vmThread)
 	return ownableSynchronizerObjectLists;
 }
 
-MM_ContinuationObjectList *
-MM_GCExtensions::getContinuationObjectListsExternal(J9VMThread *vmThread)
-{
-	return continuationObjectLists;
-}
-
-
 void
 MM_GCExtensions::registerScavenger(MM_Scavenger *scavenger)
 {

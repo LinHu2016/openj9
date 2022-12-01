@@ -96,18 +96,10 @@ public:
 		/* empty, move ownable synchronizer processing in fixupObject */
 	}
 
-	virtual void scanContinuationObjects(MM_EnvironmentBase *env) {
-		/* allow the compact scheme to handle this */
-		reportScanningStarted(RootScannerEntity_ContinuationObjects);
-		fixupContinuationObjects(env);
-		reportScanningEnded(RootScannerEntity_ContinuationObjects);
-	}
-
 private:
 #if defined(J9VM_GC_FINALIZATION)
 	void fixupFinalizableObjects(MM_EnvironmentBase *env);
 	void fixupUnfinalizedObjects(MM_EnvironmentBase *env);
 #endif
-	void fixupContinuationObjects(MM_EnvironmentBase *env);
 };
 #endif /* FIXUPROOTS_HPP_ */

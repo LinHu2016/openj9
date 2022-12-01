@@ -82,7 +82,6 @@ public:
 	bool allocateAndInitializeReferenceObjectLists(MM_EnvironmentBase *env);
 	bool allocateAndInitializeUnfinalizedObjectLists(MM_EnvironmentBase *env);
 	bool allocateAndInitializeOwnableSynchronizerObjectLists(MM_EnvironmentBase *env);
-	bool allocateAndInitializeContinuationObjectLists(MM_EnvironmentBase *env);
 
 #if defined(J9VM_GC_FINALIZATION)	
 	bool isFinalizationRequired() { return _finalizationRequired; }
@@ -142,7 +141,6 @@ public:
 
 	UDATA getUnfinalizedObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 	UDATA getOwnableSynchronizerObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
-	UDATA getContinuationObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 	UDATA getReferenceObjectListCount(MM_EnvironmentBase *env) { return _extensions->gcThreadCount; }
 
 	void defaultMemorySpaceAllocated(MM_GCExtensionsBase *extensions, void* defaultMemorySpace);
@@ -526,12 +524,6 @@ public:
 	 */
 	void scanOwnableSynchronizerObjects(MM_EnvironmentRealtime *env);
 
-	/**
-	 * Wraps the MM_RootScanner::scanContinuationObjects method to disable yielding during the scan
-	 * then yield after scanning.
-	 * @see MM_RootScanner::scanContinuationObjects()
-	 */
-	void scanContinuationObjects(MM_EnvironmentRealtime *env);
 private:
 	/**
 	 * Called by the root scanner to scan all WeakReference objects discovered by the mark phase,

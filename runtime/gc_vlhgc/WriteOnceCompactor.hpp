@@ -42,8 +42,6 @@
 #include "HeapRegionManager.hpp"
 #include "MarkMap.hpp"
 #include "ParallelTask.hpp"
-#include "ContinuationObjectBufferVLHGC.hpp"
-#include "ContinuationObjectList.hpp"
 
 #if defined(J9VM_GC_MODRON_COMPACTION)
 

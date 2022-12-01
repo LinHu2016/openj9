@@ -31,7 +31,6 @@
 #include "HeapRegionDataForCompactVLHGC.hpp"
 #include "LightweightNonReentrantLock.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
-#include "ContinuationObjectList.hpp"
 #include "ReferenceObjectList.hpp"
 #include "RememberedSetCardList.hpp"
 #include "UnfinalizedObjectList.hpp"
@@ -106,7 +105,6 @@ private:
 
 	MM_UnfinalizedObjectList _unfinalizedObjectList; /**< A list of unfinalized objects in this region */
 	MM_OwnableSynchronizerObjectList _ownableSynchronizerObjectList; /**< A list of ownable synchronizer objects in this region */
-	MM_ContinuationObjectList _continuationObjectList; /**< A list of continuation objects in this region */
 	MM_ReferenceObjectList _referenceObjectList; /**< A list of reference objects (i.e. weak/soft/phantom) in this region */
 	
 	/*
@@ -256,11 +254,6 @@ public:
 	 */
 	MM_OwnableSynchronizerObjectList *getOwnableSynchronizerObjectList() { return &_ownableSynchronizerObjectList; }
 	
-	/**
-	 * Fetch the list of continuation objects within this region.
-	 * @return the list
-	 */
-	MM_ContinuationObjectList *getContinuationObjectList() { return &_continuationObjectList; }
 	/**
 	 * Fetch the list of reference objects within this region.
 	 * @return the list

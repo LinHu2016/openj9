@@ -37,8 +37,6 @@
 #include "ObjectAccessBarrier.hpp"
 #include "OwnableSynchronizerObjectBuffer.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
-#include "ContinuationObjectBuffer.hpp"
-#include "ContinuationObjectList.hpp"
 #include "RootScanner.hpp"
 #include "RootScannerTypes.h"
 #include "UnfinalizedObjectBuffer.hpp"
@@ -196,60 +194,6 @@ public:
 		/* restore everything to a flushed state before exiting */
 		env->getGCEnvironment()->_ownableSynchronizerObjectBuffer->flush(env);
 		reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
-	}
-
-	virtual void
-	scanContinuationObjects(MM_EnvironmentBase *env)
-	{
-		reportScanningStarted(RootScannerEntity_ContinuationObjects);
-
-		/* Only walk MEMORY_TYPE_NEW regions since MEMORY_TYPE_OLD regions would not contain
-		 * any objects that would move during a nursery contract.
-		 */
-		MM_HeapRegionDescriptorStandard *region = NULL;
-		GC_HeapRegionIteratorStandard regionIterator(env->getExtensions()->heap->getHeapRegionManager());
-		while (NULL != (region = regionIterator.nextRegion())) {
-			if ((MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW))) {
-				MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-				for (UDATA i = 0; i < regionExtension->_maxListIndex; i++) {
-					regionExtension->_continuationObjectLists[i].startProcessing();
-				}
-			}
-		}
-
-		GC_HeapRegionIteratorStandard regionIterator2(env->getExtensions()->heap->getHeapRegionManager());
-		while (NULL != (region = regionIterator2.nextRegion())) {
-			if ((MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW))) {
-				MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-				for (UDATA i = 0; i < regionExtension->_maxListIndex; i++) {
-					MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
-					if (!list->wasEmpty()) {
-						J9Object *object = list->getPriorList();
-						while (NULL != object) {
-							J9Object *movePtr = object;
-							if ((movePtr >= (J9Object *)_srcBase) && (movePtr < (J9Object *)_srcTop)) {
-								movePtr = (J9Object *)((((UDATA)movePtr) - ((UDATA)_srcBase)) + ((UDATA)_dstBase));
-							}
-							/* read the next link out of the moved copy of the object before we add it to the buffer */
-							J9Object *next = _extensions->accessBarrier->getContinuationLink(movePtr);
-							/* the last object in the list pointing itself, after the object moved, the link still points to old object address */
-							if (object != next) {
-								object = next;
-							} else {
-								/* reach the end of the list */
-								object = NULL;
-							}
-							/* store the object in this thread's buffer. It will be flushed to the appropriate list when necessary. */
-							env->getGCEnvironment()->_continuationObjectBuffer->add(env, movePtr);
-						}
-					}
-				}
-			}
-		}
-
-		/* restore everything to a flushed state before exiting */
-		env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
-		reportScanningEnded(RootScannerEntity_ContinuationObjects);
 	}
 
 #if defined(J9VM_GC_FINALIZATION)

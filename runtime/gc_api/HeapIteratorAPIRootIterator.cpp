@@ -94,9 +94,6 @@ HeapIteratorAPI_RootIterator::scanAllSlots()
 	if (_flags & SCAN_OWNABLE_SYNCHRONIZER) {
 		scanOwnableSynchronizerObjects();
 	}
-	if (_flags & SCAN_CONTINUATION) {
-		scanContinuationObjects();
-	}
 }
 
 

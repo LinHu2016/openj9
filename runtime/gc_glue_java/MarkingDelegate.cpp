@@ -49,7 +49,6 @@
 #include "MarkingSchemeRootMarker.hpp"
 #include "MarkingSchemeRootClearer.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
-#include "ContinuationObjectList.hpp"
 #include "VMHelpers.hpp"
 #include "ParallelDispatcher.hpp"
 #include "ReferenceObjectBuffer.hpp"
@@ -204,7 +203,6 @@ MM_MarkingDelegate::startRootListProcessing(MM_EnvironmentBase *env)
 	if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 		_shouldScanUnfinalizedObjects = false;
 		_shouldScanOwnableSynchronizerObjects = false;
-		_shouldScanContinuationObjects = false;
 
 		MM_HeapRegionDescriptorStandard *region = NULL;
 		GC_HeapRegionIteratorStandard regionIterator(_extensions->heap->getHeapRegionManager());
@@ -222,12 +220,6 @@ MM_MarkingDelegate::startRootListProcessing(MM_EnvironmentBase *env)
 				ownableSynchronizerObjectList->startOwnableSynchronizerProcessing();
 				if (!ownableSynchronizerObjectList->wasEmpty()) {
 					_shouldScanOwnableSynchronizerObjects = true;
-				}
-				/* Start continuation processing for region */
-				MM_ContinuationObjectList *continuationObjectList = &(regionExtension->_continuationObjectLists[i]);
-				continuationObjectList->startProcessing();
-				if (!continuationObjectList->wasEmpty()) {
-					_shouldScanContinuationObjects = true;
 				}
 			}
 		}

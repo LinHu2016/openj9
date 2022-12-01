@@ -52,7 +52,6 @@ private:
 	bool _collectStringConstantsEnabled;
 	bool _shouldScanUnfinalizedObjects;
 	bool _shouldScanOwnableSynchronizerObjects;
-	bool _shouldScanContinuationObjects;
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 	MM_MarkMap *_markMap;							/**< This is set when dynamic class loading is enabled, NULL otherwise */
 	volatile bool _anotherClassMarkPass;			/**< Used in completeClassMark for another scanning request*/
@@ -82,7 +81,6 @@ public:
 		, _collectStringConstantsEnabled(false)
 		, _shouldScanUnfinalizedObjects(false)
 		, _shouldScanOwnableSynchronizerObjects(false)
-		, _shouldScanContinuationObjects(false)
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 		, _markMap(NULL)
 		, _anotherClassMarkPass(false)
@@ -212,21 +210,10 @@ public:
 		return _shouldScanOwnableSynchronizerObjects;
 	}
 
-	MMINLINE bool
-	shouldScanContinuationObjects()
-	{
-		return _shouldScanContinuationObjects;
-	}
-
 	MMINLINE void
 	shouldScanOwnableSynchronizerObjects(bool shouldScanOwnableSynchronizerObjects)
 	{
 		_shouldScanOwnableSynchronizerObjects = shouldScanOwnableSynchronizerObjects;
-	}
-	MMINLINE void
-	shouldScanContinuationObjects(bool shouldScanContinuationObjects)
-	{
-		_shouldScanContinuationObjects = shouldScanContinuationObjects;
 	}
 
 	void scanClass(MM_EnvironmentBase *env, J9Class *clazz);

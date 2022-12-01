@@ -25,8 +25,6 @@ set(gc_base_sources
 	AsyncCallbackHandler.cpp
 	ClassLoaderLinkedListIterator.cpp
 	ClassLoaderManager.cpp
-	ContinuationObjectBuffer.cpp
-	ContinuationObjectList.cpp
 	FinalizeListManager.cpp
 	FinalizerSupport.cpp
 	GCExtensions.cpp

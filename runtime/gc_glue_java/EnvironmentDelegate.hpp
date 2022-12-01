@@ -41,7 +41,6 @@ typedef struct GCmovedObjectHashCode {
 
 class MM_EnvironmentBase;
 class MM_OwnableSynchronizerObjectBuffer;
-class MM_ContinuationObjectBuffer;
 class MM_ReferenceObjectBuffer;
 class MM_UnfinalizedObjectBuffer;
 
@@ -60,7 +59,6 @@ public:
 	MM_ReferenceObjectBuffer *_referenceObjectBuffer; /**< The thread-specific buffer of recently discovered reference objects */
 	MM_UnfinalizedObjectBuffer *_unfinalizedObjectBuffer; /**< The thread-specific buffer of recently allocated unfinalized objects */
 	MM_OwnableSynchronizerObjectBuffer *_ownableSynchronizerObjectBuffer; /**< The thread-specific buffer of recently allocated ownable synchronizer objects */
-	MM_ContinuationObjectBuffer *_continuationObjectBuffer; /**< The thread-specific buffer of recently allocated continuation objects */
 
 	struct GCmovedObjectHashCode movedObjectHashCodeCache; /**< Structure to aid on object movement and hashing */
 
@@ -72,7 +70,6 @@ public:
 		:_referenceObjectBuffer(NULL)
 		,_unfinalizedObjectBuffer(NULL)
 		,_ownableSynchronizerObjectBuffer(NULL)
-		,_continuationObjectBuffer(NULL)
 	{}
 };
 

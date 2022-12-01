@@ -84,8 +84,6 @@
 #include "OMRVMInterface.hpp"
 #include "OwnableSynchronizerObjectBuffer.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
-#include "ContinuationObjectBuffer.hpp"
-#include "ContinuationObjectList.hpp"
 #include "VMHelpers.hpp"
 #include "ParallelDispatcher.hpp"
 #include "ParallelGlobalGC.hpp"
@@ -184,8 +182,6 @@ MM_ScavengerDelegate::mainSetupForGC(MM_EnvironmentBase * envBase)
 	_shouldScavengeUnfinalizedObjects = false;
 
 	private_setupForOwnableSynchronizerProcessing(MM_EnvironmentStandard::getEnvironment(envBase));
-
-	_shouldScavengeContinuationObjects = false;
 
 	/* Sort all hot fields for all classes if scavenger dynamicBreadthFirstScanOrdering is enabled */
 	if (MM_GCExtensions::OMR_GC_SCAVENGER_SCANORDERING_DYNAMIC_BREADTH_FIRST == _extensions->scavengerScanOrdering) {
@@ -878,7 +874,6 @@ MM_ScavengerDelegate::MM_ScavengerDelegate(MM_EnvironmentBase* env)
 	, _extensions(MM_GCExtensions::getExtensions(env))
 	, _shouldScavengeFinalizableObjects(false)
 	, _shouldScavengeUnfinalizedObjects(false)
-	, _shouldScavengeContinuationObjects(false)
 	, _shouldScavengeSoftReferenceObjects(false)
 	, _shouldScavengeWeakReferenceObjects(false)
 	, _shouldScavengePhantomReferenceObjects(false)

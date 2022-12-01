@@ -189,7 +189,6 @@ public:
 	 * which modifies elements with-in the list.
 	 */
 	virtual void scanOwnableSynchronizerObjects();
-	virtual void scanContinuationObjects();
 	void scanStringTable();
 	void scanJNIGlobalReferences();
 	void scanJNIWeakGlobalReferences();
@@ -210,7 +209,6 @@ public:
 	 * @todo Provide function documentation
 	 */
 	virtual void doOwnableSynchronizerObject(J9Object *objectPtr);
-	virtual void doContinuationObject(J9Object *objectPtr);
 
 	virtual void doMonitorReference(J9ObjectMonitor *objectMonitor, GC_HashTableIterator *monitorReferenceIterator);
 

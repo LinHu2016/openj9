@@ -36,9 +36,6 @@
 #include "Task.hpp"
 #include "UnfinalizedObjectBuffer.hpp"
 #include "UnfinalizedObjectList.hpp"
-#include "ContinuationObjectBuffer.hpp"
-#include "ContinuationObjectList.hpp"
-
 
 #if defined(J9VM_GC_FINALIZATION)
 void
@@ -131,45 +128,3 @@ MM_CompactSchemeFixupRoots::fixupUnfinalizedObjects(MM_EnvironmentBase *env)
 	env->getGCEnvironment()->_unfinalizedObjectBuffer->flush(env);
 }
 #endif /* J9VM_GC_FINALIZATION */
-
-
-void
-MM_CompactSchemeFixupRoots::fixupContinuationObjects(MM_EnvironmentBase *env)
-{
-	MM_GCExtensions* extensions = MM_GCExtensions::getExtensions(env);
-	if (env->_currentTask->synchronizeGCThreadsAndReleaseMain(env, UNIQUE_ID)) {
-		MM_HeapRegionDescriptorStandard *region = NULL;
-		GC_HeapRegionIteratorStandard regionIterator(extensions->getHeap()->getHeapRegionManager());
-		while(NULL != (region = regionIterator.nextRegion())) {
-			MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-			for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
-				MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
-				list->startProcessing();
-			}
-		}
-		env->_currentTask->releaseSynchronizedGCThreads(env);
-	}
-	MM_HeapRegionDescriptorStandard *region = NULL;
-	GC_HeapRegionIteratorStandard regionIterator(extensions->getHeap()->getHeapRegionManager());
-	while(NULL != (region = regionIterator.nextRegion())) {
-		MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
-			MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
-			if (!list->wasEmpty()) {
-				if(J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
-					omrobjectptr_t object = list->getPriorList();
-					while (NULL != object) {
-						omrobjectptr_t forwardedPtr = _compactScheme->getForwardingPtr(object);
-						/* read the next link out of the moved copy of the object before we add it to the buffer */
-						object = extensions->accessBarrier->getContinuationLink(forwardedPtr);
-						/* store the object in this thread's buffer. It will be flushed to the appropriate list when necessary. */
-						env->getGCEnvironment()->_continuationObjectBuffer->add(env, forwardedPtr);
-					}
-				}
-			}
-		}
-	}
-
-	/* restore everything to a flushed state before exiting */
-	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
-}

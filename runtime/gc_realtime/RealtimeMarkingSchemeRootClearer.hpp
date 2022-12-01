@@ -241,16 +241,6 @@ public:
 		reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
 	}
 
-	virtual void
-	scanContinuationObjects(MM_EnvironmentBase *envBase)	{
-		MM_EnvironmentRealtime *env = MM_EnvironmentRealtime::getEnvironment(envBase);
-
-		reportScanningStarted(RootScannerEntity_ContinuationObjects);
-		/* allow the marking scheme to handle this */
-		_realtimeGC->getRealtimeDelegate()->scanContinuationObjects(env);
-		reportScanningEnded(RootScannerEntity_ContinuationObjects);
-	}
-
 	/**
 	 * Wraps the MM_RootScanner::scanJNIWeakGlobalReferences method to disable yielding during the scan.
 	 * @see MM_RootScanner::scanJNIWeakGlobalReferences()

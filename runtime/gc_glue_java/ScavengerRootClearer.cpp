@@ -39,8 +39,6 @@
 #include "SlotObject.hpp"
 #include "UnfinalizedObjectBuffer.hpp"
 #include "UnfinalizedObjectList.hpp"
-#include "ContinuationObjectBuffer.hpp"
-#include "ContinuationObjectList.hpp"
 #include "VMHelpers.hpp"
 
 #include "ScavengerRootClearer.hpp"
@@ -217,47 +215,6 @@ MM_ScavengerRootClearer::scavengeUnfinalizedObjects(MM_EnvironmentStandard *env)
 	env->enableHotFieldDepthCopy();
 }
 #endif /* J9VM_GC_FINALIZATION */
-
-void
-MM_ScavengerRootClearer::scavengeContinuationObjects(MM_EnvironmentStandard *env)
-{
-	MM_HeapRegionDescriptorStandard *region = NULL;
-	GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
-	GC_Environment *gcEnv = env->getGCEnvironment();
-	bool const compressed = _extensions->compressObjectReferences();
-	while (NULL != (region = regionIterator.nextRegion())) {
-		if (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)) {
-			MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-			for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
-				MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
-				if (!list->wasEmpty()) {
-					if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
-						omrobjectptr_t object = list->getPriorList();
-						while (NULL != object) {
-							omrobjectptr_t next = _extensions->accessBarrier->getContinuationLink(object);
-							gcEnv->_scavengerJavaStats._continuationCandidates += 1;
-
-							MM_ForwardedHeader forwardedHeader(object, compressed);
-							if (!forwardedHeader.isForwardedPointer()) {
-								Assert_GC_true_with_message2(env, _scavenger->isObjectInEvacuateMemory(object), "Continuation object  %p should be a dead object, forwardedHeader=%p\n", object, &forwardedHeader);
-								gcEnv->_scavengerJavaStats._continuationCleared += 1;
-								VM_VMHelpers::cleanupContinuationObject((J9VMThread *)env->getLanguageVMThread(), object);
-							} else {
-								omrobjectptr_t forwardedPtr = forwardedHeader.getForwardedObject();
-								Assert_GC_true_with_message(env, NULL != forwardedPtr, "Continuation object  %p should be forwarded\n", object);
-								gcEnv->_continuationObjectBuffer->add(env, forwardedPtr);
-							}
-							object = next;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	/* restore everything to a flushed state before exiting */
-	gcEnv->_continuationObjectBuffer->flush(env);
-}
 
 #endif /* defined(OMR_GC_MODRON_SCAVENGER) */
 

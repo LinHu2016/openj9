@@ -64,7 +64,6 @@ public:
 	virtual void scanUnfinalizedObjects(MM_EnvironmentBase *env);
 	virtual CompletePhaseCode scanUnfinalizedObjectsComplete(MM_EnvironmentBase *env);
 	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env);
-	virtual void scanContinuationObjects(MM_EnvironmentBase *env);
 	virtual void doMonitorReference(J9ObjectMonitor *objectMonitor, GC_HashTableIterator *monitorReferenceIterator);
 	virtual CompletePhaseCode scanMonitorReferencesComplete(MM_EnvironmentBase *envBase);
 	virtual void doJNIWeakGlobalReference(omrobjectptr_t *slotPtr);

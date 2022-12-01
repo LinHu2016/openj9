@@ -39,7 +39,6 @@ set(gc_vlhgc_sources
 	CopyScanCacheChunkVLHGCInHeap.cpp
 	CopyScanCacheListVLHGC.cpp
 	CopyScanCacheVLHGC.cpp
-	ContinuationObjectBufferVLHGC.cpp
 	CycleStateVLHGC.cpp
 	EnvironmentVLHGC.cpp
 	GlobalAllocationManagerTarok.cpp

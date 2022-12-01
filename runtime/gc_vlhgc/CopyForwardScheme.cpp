@@ -62,8 +62,6 @@
 #include "EnvironmentVLHGC.hpp"
 #include "FinalizableObjectBuffer.hpp"
 #include "FinalizableReferenceBuffer.hpp"
-#include "ContinuationObjectBuffer.hpp"
-#include "ContinuationObjectList.hpp"
 #include "VMHelpers.hpp"
 #include "FinalizeListManager.hpp"
 #include "ForwardedHeader.hpp"
@@ -477,7 +475,6 @@ MM_CopyForwardScheme::preProcessRegions(MM_EnvironmentVLHGC *env)
 					ownableSynchronizerCountInEden += region->getOwnableSynchronizerObjectList()->getObjectCount();
 				}
 				region->getOwnableSynchronizerObjectList()->startOwnableSynchronizerProcessing();
-				region->getContinuationObjectList()->startProcessing();
 				Assert_MM_true(region->getRememberedSetCardList()->isAccurate());
 				if ((region->_criticalRegionsInUse > 0) || !env->_cycleState->_shouldRunCopyForward || (100 == _extensions->fvtest_forceCopyForwardHybridRatio) || (randomDecideForceNonEvacuatedRegion(_extensions->fvtest_forceCopyForwardHybridRatio))) {
 					/* set the region is noEvacuation for copyforward collector */
@@ -796,7 +793,6 @@ MM_CopyForwardScheme::acquireEmptyRegion(MM_EnvironmentVLHGC *env, MM_ReservedRe
 
 			Assert_MM_true(NULL == newRegion->getUnfinalizedObjectList()->getHeadOfList());
 			Assert_MM_true(NULL == newRegion->getOwnableSynchronizerObjectList()->getHeadOfList());
-			Assert_MM_true(NULL == newRegion->getContinuationObjectList()->getHeadOfList());
 			Assert_MM_false(newRegion->_markData._shouldMark);
 
 			/*
@@ -3520,50 +3516,6 @@ MM_CopyForwardScheme::scanUnfinalizedObjects(MM_EnvironmentVLHGC *env)
 #endif /* J9VM_GC_FINALIZATION */
 
 void
-MM_CopyForwardScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
-{
-	MM_HeapRegionDescriptorVLHGC *region = NULL;
-	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
-	while(NULL != (region = regionIterator.nextRegion())) {
-		if (region->_copyForwardData._evacuateSet && !region->getContinuationObjectList()->wasEmpty()) {
-			if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
-				J9Object *pointer = region->getContinuationObjectList()->getPriorList();
-
-				while (NULL != pointer) {
-					env->_copyForwardStats._continuationCandidates += 1;
-					Assert_MM_true(region->isAddressInRegion(pointer));
-
-					/* NOTE: it is safe to read from the forwarded object since either:
-					 * 1. it was copied before continuation processing began, or
-					 * 2. it was copied by this thread.
-					 */
-					MM_ForwardedHeader forwardedHeader(pointer, _extensions->compressObjectReferences());
-					J9Object* forwardedPtr = forwardedHeader.getForwardedObject();
-					if (NULL == forwardedPtr) {
-						if (_markMap->isBitSet(pointer)) {
-							forwardedPtr = pointer;
-						}
-					}
-
-					J9Object* next = _extensions->accessBarrier->getContinuationLink(pointer);
-					if (NULL == forwardedPtr) {
-						/* object was not previously marked, clean up */
-						env->_copyForwardStats._continuationCleared += 1;
-						VM_VMHelpers::cleanupContinuationObject((J9VMThread *)env->getLanguageVMThread(), pointer);
-					} else {
-						env->getGCEnvironment()->_continuationObjectBuffer->add(env, forwardedPtr);
-					}
-					pointer = next;
-				}
-			}
-		}
-	}
-
-	/* restore everything to a flushed state before exiting */
-	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
-}
-
-void
 MM_CopyForwardScheme::cleanCardTable(MM_EnvironmentVLHGC *env)
 {
 	Assert_MM_true(MM_CycleState::CT_PARTIAL_GARBAGE_COLLECTION == env->_cycleState->_collectionType);
@@ -3971,13 +3923,6 @@ private:
 	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env) {
 		/* allow the scheme to handle this, since it knows which regions are interesting */
 		/* empty, move ownable synchronizer processing in copy-continuous phase */
-	}
-
-	virtual void scanContinuationObjects(MM_EnvironmentBase *env) {
-		/* allow the scheme to handle this, since it knows which regions are interesting */
-		reportScanningStarted(RootScannerEntity_ContinuationObjects);
-		_copyForwardScheme->scanContinuationObjects(MM_EnvironmentVLHGC::getEnvironment(env));
-		reportScanningEnded(RootScannerEntity_ContinuationObjects);
 	}
 
 	virtual void scanPhantomReferenceObjects(MM_EnvironmentBase *env) {
@@ -4574,16 +4519,6 @@ private:
 		if(!_copyForwardScheme->_abortInProgress && !_copyForwardScheme->isObjectInNoEvacuationRegions(env, objectPtr) && _copyForwardScheme->verifyIsPointerInEvacute(env, objectPtr)) {
 			PORT_ACCESS_FROM_ENVIRONMENT(env);
 			j9tty_printf(PORTLIB, "OwnableSynchronizer object list points into evacuate!  list %p object %p\n", list, objectPtr);
-			Assert_MM_unreachable();
-		}
-	}
-
-	virtual void doContinuationObject(J9Object *objectPtr, MM_ContinuationObjectList *list) {
-		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
-
-		if(!_copyForwardScheme->_abortInProgress && !_copyForwardScheme->isObjectInNoEvacuationRegions(env, objectPtr) && _copyForwardScheme->verifyIsPointerInEvacute(env, objectPtr)) {
-			PORT_ACCESS_FROM_ENVIRONMENT(env);
-			j9tty_printf(PORTLIB, "Continuation object list points into evacuate!  list %p object %p\n", list, objectPtr);
 			Assert_MM_unreachable();
 		}
 	}

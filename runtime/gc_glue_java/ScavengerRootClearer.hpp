@@ -53,8 +53,6 @@ private:
 	void scavengeUnfinalizedObjects(MM_EnvironmentStandard *env);
 #endif /* defined(J9VM_GC_FINALIZATION) */
 
-	void scavengeContinuationObjects(MM_EnvironmentStandard *env);
-
 public:
 	MM_ScavengerRootClearer(MM_EnvironmentBase *env, MM_Scavenger *scavenger) :
 	MM_RootScanner(env),
@@ -153,17 +151,6 @@ public:
 
 	/* empty, move ownable synchronizer processing in main scan phase */
 	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env) {}
-
-	virtual void
-	scanContinuationObjects(MM_EnvironmentBase *env)
-	{
-		if (_scavenger->getDelegate()->getShouldScavengeContinuationObjects()) {
-			/* allow the scavenger to handle this */
-			reportScanningStarted(RootScannerEntity_ContinuationObjects);
-			scavengeContinuationObjects(MM_EnvironmentStandard::getEnvironment(env));
-			reportScanningEnded(RootScannerEntity_ContinuationObjects);
-		}
-	}
 
 	virtual void
 	scanPhantomReferenceObjects(MM_EnvironmentBase *env)

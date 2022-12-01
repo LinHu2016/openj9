@@ -57,7 +57,6 @@
 #include "ObjectHeapIteratorAddressOrderedList.hpp"
 #include "ObjectModel.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
-#include "ContinuationObjectList.hpp"
 #include "VMHelpers.hpp"
 #include "ParallelDispatcher.hpp"
 #include "PointerArrayIterator.hpp"
@@ -165,21 +164,8 @@ MM_RootScanner::doOwnableSynchronizerObject(J9Object *objectPtr, MM_OwnableSynch
 	Assert_MM_unreachable();
 }
 
-void
-MM_RootScanner::doContinuationObject(J9Object *objectPtr, MM_ContinuationObjectList *list)
-{
-	Assert_MM_unreachable();
-}
-
-
 MM_RootScanner::CompletePhaseCode
 MM_RootScanner::scanOwnableSynchronizerObjectsComplete(MM_EnvironmentBase *env)
-{
-	return complete_phase_OK;
-}
-
-MM_RootScanner::CompletePhaseCode
-MM_RootScanner::scanContinuationObjectsComplete(MM_EnvironmentBase *env)
 {
 	return complete_phase_OK;
 }
@@ -763,27 +749,6 @@ MM_RootScanner::scanOwnableSynchronizerObjects(MM_EnvironmentBase *env)
 	reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
 }
 
-void
-MM_RootScanner::scanContinuationObjects(MM_EnvironmentBase *env)
-{
-	reportScanningStarted(RootScannerEntity_ContinuationObjects);
-
-	MM_ObjectAccessBarrier *barrier = _extensions->accessBarrier;
-	MM_ContinuationObjectList *continuationObjectList = _extensions->getContinuationObjectLists();
-	while(NULL != continuationObjectList) {
-		if (_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
-			J9Object *objectPtr = continuationObjectList->getHeadOfList();
-			while (NULL != objectPtr) {
-				doContinuationObject(objectPtr, continuationObjectList);
-				objectPtr = barrier->getContinuationLink(objectPtr);
-			}
-		}
-		continuationObjectList = continuationObjectList->getNextList();
-	}
-
-	reportScanningEnded(RootScannerEntity_ContinuationObjects);
-}
-
 /**
  * Scan the per-thread object monitor lookup caches.
  * Note that this is not a root since the cache contains monitors from the global monitor table
@@ -1042,7 +1007,6 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 	}
 
 	scanOwnableSynchronizerObjects(env);
-	scanContinuationObjects(env);
 
 #if defined(J9VM_GC_MODRON_SCAVENGER)
 	/* Remembered set is clearable in a generational system -- if an object in old
@@ -1122,7 +1086,6 @@ MM_RootScanner::scanAllSlots(MM_EnvironmentBase *env)
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
 	scanOwnableSynchronizerObjects(env);
-	scanContinuationObjects(env);
 }
 
 bool

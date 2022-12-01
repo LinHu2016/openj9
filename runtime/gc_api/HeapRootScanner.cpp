@@ -48,7 +48,6 @@
 #include "ObjectHeapIterator.hpp"
 #include "ObjectModel.hpp"
 #include "OwnableSynchronizerObjectList.hpp"
-#include "ContinuationObjectList.hpp"
 #include "PointerArrayIterator.hpp"
 #include "SegmentIterator.hpp"
 #include "StringTable.hpp"
@@ -70,12 +69,6 @@ MM_HeapRootScanner::doClassLoader(J9ClassLoader *classLoader)
 
 void
 MM_HeapRootScanner::doOwnableSynchronizerObject(J9Object *objectPtr)
-{
-	doObject(objectPtr);
-}
-
-void
-MM_HeapRootScanner::doContinuationObject(J9Object *objectPtr)
 {
 	doObject(objectPtr);
 }
@@ -484,26 +477,6 @@ MM_HeapRootScanner::scanOwnableSynchronizerObjects()
 		ownableSynchronizerObjectList = ownableSynchronizerObjectList->getNextList();
 	}
 	reportScanningEnded(RootScannerEntity_OwnableSynchronizerObjects);
-}
-
-void
-MM_HeapRootScanner::scanContinuationObjects()
-{
-	reportScanningStarted(RootScannerEntity_ContinuationObjects);
-	setReachability(RootScannerEntityReachability_Weak);
-
-	MM_ObjectAccessBarrier *barrier = _extensions->accessBarrier;
-	MM_ContinuationObjectList *continuationObjectList = _extensions->getContinuationObjectLists();
-
-	while (NULL != continuationObjectList) {
-		J9Object *objectPtr = continuationObjectList->getHeadOfList();
-		while (NULL != objectPtr) {
-			doContinuationObject(objectPtr);
-			objectPtr = barrier->getContinuationLink(objectPtr);
-		}
-		continuationObjectList = continuationObjectList->getNextList();
-	}
-	reportScanningEnded(RootScannerEntity_ContinuationObjects);
 }
 
 /**
