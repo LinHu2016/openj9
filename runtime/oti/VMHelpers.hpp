@@ -23,6 +23,7 @@
 #if !defined(VMHELPERS_HPP_)
 #define VMHELPERS_HPP_
 
+#include <assert.h>
 #include "j9cfg.h"
 
 #if defined(OMR_OVERRIDE_COMPRESS_OBJECT_REFERENCES)
@@ -2141,6 +2142,7 @@ exit:
 		bool needScan = false;
 #if JAVA_SPEC_VERSION >= 19
 		jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(vmThread, continuationObject);
+		jboolean finished = J9VMJDKINTERNALVMCONTINUATION_FINISHED(vmThread, continuationObject);
 		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObject);
 		/**
 		 * We don't scan mounted continuations:
@@ -2151,8 +2153,12 @@ exit:
 		 * For fully STW GCs, there is no harm to scan them, but it's a waste of time since they are scanned during root scanning already.
 		 *
 		 * We don't scan currently scanned either - one scan is enough.
+		 * we don't scan the continuation object before started and after finished - java stack does not exist.
 		 */
-		needScan = started && (NULL != continuation) && (!isContinuationMountedOrConcurrentlyScanned(continuation));
+		if (started && !finished) {
+			assert(NULL != continuation);
+			needScan = !isContinuationMountedOrConcurrentlyScanned(continuation);
+		}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 		return needScan;
 	}

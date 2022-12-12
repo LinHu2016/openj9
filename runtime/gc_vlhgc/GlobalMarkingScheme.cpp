@@ -803,7 +803,10 @@ MM_GlobalMarkingScheme::scanContinuationNativeSlots(MM_EnvironmentVLHGC *env, J9
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 
 		/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
-		bool syncWithContinuationMounting = (MM_VLHGCIncrementStats::mark_concurrent == static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._globalMarkIncrementType);
+//		bool syncWithContinuationMounting = (MM_VLHGCIncrementStats::mark_concurrent == static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._globalMarkIncrementType);
+		bool syncWithContinuationMounting = true;
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "scanContinuationNativeSlots objectPtr=%p, finished = %zu, syncWithContinuationMounting=%zu\n", objectPtr, J9VMJDKINTERNALVMCONTINUATION_FINISHED(currentThread, objectPtr), syncWithContinuationMounting);
 
 		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForGlobalMarkingScheme, stackFrameClassWalkNeeded, false, syncWithContinuationMounting);
 	}

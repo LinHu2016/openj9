@@ -229,6 +229,8 @@ MM_GlobalMarkDelegate::performMarkIncremental(MM_EnvironmentVLHGC *env, I_64 mar
 	bool result = false;
 	bool timeout = false;
 
+	j9tty_printf(PORTLIB, "performMarkIncremental markIncrementEndTime=%zu\n", markIncrementEndTime);
+
 	static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._globalMarkIncrementType = MM_VLHGCIncrementStats::mark_incremental;
 
 	while (!timeout) {
@@ -329,6 +331,9 @@ MM_GlobalMarkDelegate::performMarkConcurrent(MM_EnvironmentVLHGC *env, UDATA tot
 {
 	Assert_MM_true(MM_CycleState::state_process_work_packets_after_initial_mark == env->_cycleState->_markDelegateState);
 	
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "performMarkConcurrent totalBytesToScan=%zu\n",totalBytesToScan);
+
 	static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._globalMarkIncrementType = MM_VLHGCIncrementStats::mark_concurrent;
 
 	MM_ConcurrentGlobalMarkTask markTask(env, _dispatcher, _markingScheme, MARK_SCAN, totalBytesToScan, forceExit, env->_cycleState);

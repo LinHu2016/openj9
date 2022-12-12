@@ -641,5 +641,8 @@ MM_VLHGCAccessBarrier::postUnmountContinuation(J9VMThread *vmThread, j9object_t 
 	/* Conservatively assume that via mutations of stack slots (which are not subject to access barriers),
 	 * all post-write barriers have been triggered on this Continuation object, since it's been mounted.
 	 */
+	PORT_ACCESS_FROM_VMC(vmThread);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, contObject);
+	j9tty_printf(PORTLIB, "MM_VLHGCAccessBarrier::postUnmountContinuation vmThread=%p, contObject=%p, continuation=%p\n", vmThread, contObject, continuation);
 	postBatchObjectStore(vmThread, contObject);
 }
