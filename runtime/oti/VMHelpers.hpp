@@ -2119,6 +2119,7 @@ exit:
 				return rc;
 			}
 		}
+
 		rc = vmThread->javaVM->internalVMFunctions->walkContinuationStackFrames(vmThread, continuation, walkState);
 		if (syncWithContinuationMounting && (NULL != continuation)) {
 			exitConcurrentGCScan(continuation);

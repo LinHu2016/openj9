@@ -4308,6 +4308,8 @@ typedef struct J9MemoryManagerFunctions {
 	void  ( *J9WriteBarrierPostClass)(struct J9VMThread *vmThread, J9Class *destinationClazz, j9object_t storedObject) ;
 	void  ( *J9WriteBarrierClassBatch)(struct J9VMThread *vmThread, J9Class *destinationClazz) ;
 	void ( *preMountContinuation)(struct J9VMThread *vmThread, j9object_t object) ;
+	void ( *postMountContinuation)(struct J9VMThread *vmThread, j9object_t object) ;
+	void ( *preUnmountContinuation)(struct J9VMThread *vmThread, j9object_t object) ;
 	void ( *postUnmountContinuation)(struct J9VMThread *vmThread, j9object_t object) ;
 	UDATA  ( *allocateMemoryForSublistFragment)(void *vmThread, J9VMGC_SublistFragment *fragmentPrimitive) ;
 	UDATA  ( *j9gc_heap_free_memory)(struct J9JavaVM *javaVM) ;

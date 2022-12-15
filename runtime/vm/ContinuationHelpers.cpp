@@ -98,6 +98,9 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, J9VMContinuation *con
 
 	Assert_VM_Null(VM_VMHelpers::getCarrierThreadFromContinuationState(oldContinuationState));
 
+//	PORT_ACCESS_FROM_JAVAVM(currentThread->javaVM);
+//	j9tty_printf(PORTLIB, "walkContinuationStackFramesWrapper continuation=%p, oldContinuationState=%p\n", currentThread, continuation, oldContinuationState);
+
 	if (VM_VMHelpers::isConcurrentlyScannedFromContinuationState(oldContinuationState)) {
 		/* currentThread was low tagged (GC was already in progress), but by 'or'-ing our ID, we let GC know there is a pending mount */
 		internalReleaseVMAccess(currentThread);
@@ -198,14 +201,7 @@ yieldContinuation(J9VMThread *currentThread)
 	 * must be maintained for weakly ordered CPUs, to unsure that once the continuation is again available for GC scan (on potentially remote CPUs), all CPUs see up-to-date stack .
 	 */
 	Assert_VM_true((uintptr_t)currentThread == continuation->state);
-
-	J9JavaVM *vm = currentThread->javaVM;
-	j9object_t threadPrev = J9OBJECT_OBJECT_LOAD(currentThread, currentThread->threadObject, vm->virtualThreadLinkPreviousOffset);
-	j9object_t threadNext = J9OBJECT_OBJECT_LOAD(currentThread, currentThread->threadObject, vm->virtualThreadLinkNextOffset);
-
-	if ((NULL != threadPrev) || (NULL != threadNext)) {
-		continuation->state = J9_GC_CONTINUATION_STATE_INITIAL;
-	}
+	continuation->state = J9_GC_CONTINUATION_STATE_INITIAL;
 
 	return result;
 }
