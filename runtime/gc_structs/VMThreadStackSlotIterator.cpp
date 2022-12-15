@@ -141,7 +141,6 @@ GC_VMThreadStackSlotIterator::scanSlots(
 		)
 {
 	J9StackWalkState stackWalkState;
-
 	initializeStackWalkState(&stackWalkState, vmThread, userData, oSlotIterator, includeStackFrameClassReferences, trackVisibleFrameDepth);
 	VM_VMHelpers::walkContinuationStackFramesWrapper(vmThread, continuationObjectPtr, &stackWalkState, syncWithContinuationMounting);
 }

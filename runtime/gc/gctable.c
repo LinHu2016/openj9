@@ -34,6 +34,8 @@ J9MemoryManagerFunctions MemoryManagerFunctions = {
 	J9WriteBarrierPostClass,
 	J9WriteBarrierClassBatch,
 	preMountContinuation,
+	postMountContinuation,
+	preUnmountContinuation,
 	postUnmountContinuation,
 	allocateMemoryForSublistFragment,
 	j9gc_heap_free_memory,

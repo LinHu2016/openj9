@@ -268,6 +268,8 @@ public:
 	virtual bool postObjectRead(J9VMThread *vmThread, J9Class *srcClass, J9Object **srcAddress);
 
 	virtual void preMountContinuation(J9VMThread *vmThread, j9object_t contObject) {}
+	virtual void postMountContinuation(J9VMThread *vmThread, j9object_t contObject)	{}
+	virtual void preUnmountContinuation(J9VMThread *vmThread, j9object_t contObject) {}
 	virtual void postUnmountContinuation(J9VMThread *vmThread, j9object_t contObject) {}
 	/**
 	 * Return back true if object references are compressed

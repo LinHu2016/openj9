@@ -1040,9 +1040,13 @@ MM_StandardAccessBarrier::checkClassLive(J9JavaVM *javaVM, J9Class *classPtr)
 void
 MM_StandardAccessBarrier::preMountContinuation(J9VMThread *vmThread, j9object_t contObject)
 {
+	PORT_ACCESS_FROM_VMC(vmThread);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, contObject);
+	j9tty_printf(PORTLIB, "MM_StandardAccessBarrier::preMountContinuation vmThread=%p, contObject=%p, continuation=%p\n", vmThread, contObject, continuation);
 #if defined(OMR_GC_CONCURRENT_SCAVENGER)
 	if (_extensions->isConcurrentScavengerInProgress()) {
 		/* concurrent scavenger in progress */
+		j9tty_printf(PORTLIB, "scanContinuationNativeSlots vmThread=%p, contObject=%p, continuation=%p\n", vmThread, contObject, continuation);
 		MM_EnvironmentStandard *env = MM_EnvironmentStandard::getEnvironment(vmThread->omrVMThread);
 		MM_ScavengeScanReason reason = SCAN_REASON_SCAVENGE;
 		_scavenger->getDelegate()->scanContinuationNativeSlots(env, contObject, reason);
@@ -1051,10 +1055,31 @@ MM_StandardAccessBarrier::preMountContinuation(J9VMThread *vmThread, j9object_t 
 }
 
 void
+MM_StandardAccessBarrier::postMountContinuation(J9VMThread *vmThread, j9object_t contObject)
+{
+}
+
+void
+MM_StandardAccessBarrier::preUnmountContinuation(J9VMThread *vmThread, j9object_t contObject)
+{
+}
+
+void
 MM_StandardAccessBarrier::postUnmountContinuation(J9VMThread *vmThread, j9object_t contObject)
 {
 	/* Conservatively assume that via mutations of stack slots (which are not subject to access barriers),
 	 * all post-write barriers have been triggered on this Continuation object, since it's been mounted.
 	 */
+	PORT_ACCESS_FROM_VMC(vmThread);
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, contObject);
+	j9tty_printf(PORTLIB, "MM_StandardAccessBarrier::postUnmountContinuation vmThread=%p, contObject=%p, continuation=%p\n", vmThread, contObject, continuation);
+	#if defined(OMR_GC_CONCURRENT_SCAVENGER)
+		if (_extensions->isConcurrentScavengerInProgress()) {
+			j9tty_printf(PORTLIB, "MM_StandardAccessBarrier::postUnmountContinuation OMR_GC_CONCURRENT_SCAVENGER vmThread=%p, contObject=%p, continuation=%p\n", vmThread, contObject, continuation);
+			MM_EnvironmentStandard *env = MM_EnvironmentStandard::getEnvironment(vmThread->omrVMThread);
+			MM_ScavengeScanReason reason = SCAN_REASON_SCAVENGE;
+			_scavenger->getDelegate()->scanContinuationNativeSlots(env, contObject, reason);
+		}
+	#endif /* OMR_GC_CONCURRENT_SCAVENGER */
 	postBatchObjectStore(vmThread, contObject);
 }

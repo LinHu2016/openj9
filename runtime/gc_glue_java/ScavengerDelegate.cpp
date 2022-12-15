@@ -305,14 +305,24 @@ MM_ScavengerDelegate::doStackSlot(MM_EnvironmentStandard *env, omrobjectptr_t *s
 	if (scavenger->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
 		switch (reason) {
 		case SCAN_REASON_SCAVENGE:
+		{
 			*shouldRemember |= scavenger->copyObjectSlot(env, slotPtr);
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "after slotPtr=%p, ObjPtr=%p, isObjectInEvacuateMemory=%zu, header=%p\n", slotPtr, *slotPtr, scavenger->isObjectInEvacuateMemory(*slotPtr), **slotPtr);
+
+		}
 			break;
 		case SCAN_REASON_FIXUP:
+		{
 #if defined(OMR_GC_CONCURRENT_SCAVENGER)
 			scavenger->fixupSlot(slotPtr);
 #endif /* OMR_GC_CONCURRENT_SCAVENGER */
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "SCAN_REASON_FIXUP after slotPtr=%p, ObjPtr=%p\n", slotPtr, *slotPtr);
+		}
 			break;
 		case SCAN_REASON_BACKOUT:
+		{
 #if defined(OMR_GC_CONCURRENT_SCAVENGER)
 			if (_extensions->concurrentScavenger) {
 				scavenger->fixupSlotWithoutCompression(slotPtr);
@@ -321,9 +331,16 @@ MM_ScavengerDelegate::doStackSlot(MM_EnvironmentStandard *env, omrobjectptr_t *s
 			{
 				scavenger->backOutFixSlotWithoutCompression(slotPtr);
 			}
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "SCAN_REASON_BACKOUT after slotPtr=%p, ObjPtr=%p, _extensions->concurrentScavenger=%zu\n", slotPtr, *slotPtr, _extensions->concurrentScavenger);
+		}
 			break;
 		case SCAN_REASON_SHOULDREMEMBER:
-			*shouldRemember = scavenger->shouldRememberSlot(slotPtr);
+		{
+			*shouldRemember |= scavenger->shouldRememberSlot(slotPtr);
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "SCAN_REASON_SHOULDREMEMBER after slotPtr=%p, ObjPtr=%p, *shouldRemember=%zu\n", slotPtr, *slotPtr, *shouldRemember);
+		}
 			break;
 		}
 	}
@@ -336,6 +353,8 @@ void
 stackSlotIteratorForScavenge(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4Scavenge *data = (StackIteratorData4Scavenge *)localData;
+	PORT_ACCESS_FROM_ENVIRONMENT(data->env);
+	j9tty_printf(PORTLIB, "doStackSlot slotPtr=%p, ObjPtr=%p, contiObj=%p, data->reason=%zu\n", slotPtr, *slotPtr, data->objectPtr, data->reason);
 	data->scavengerDelegate->doStackSlot(data->env, slotPtr, data->reason, data->shouldRemember);
 }
 
@@ -351,6 +370,7 @@ MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, o
 		localData.env = env;
 		localData.reason = reason;
 		localData.shouldRemember = &shouldRemember;
+		localData.objectPtr = objectPtr;
 		/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
 		bool  syncWithContinuationMounting = _extensions->isConcurrentScavengerInProgress();
 

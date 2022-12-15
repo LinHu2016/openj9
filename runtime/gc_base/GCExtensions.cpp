@@ -339,6 +339,12 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 	if (started && !finished) {
 		Assert_MM_true(NULL != continuation);
 		needScan = !VM_VMHelpers::isContinuationMountedOrConcurrentlyScanned(continuation);
+		PORT_ACCESS_FROM_VMC(vmThread);
+		if (NULL != continuation) {
+			j9tty_printf(PORTLIB, "needScanStacksForContinuation continuationObject=%p, needScan=%zu, continuation->state=%p\n", objectPtr, needScan, continuation->state);
+		} else {
+			j9tty_printf(PORTLIB, "needScanStacksForContinuation continuationObject=%p, needScan=%zu, continuation=%p\n", objectPtr, needScan, continuation);
+		}
 	}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 	return needScan;

@@ -239,8 +239,12 @@ MM_MarkingDelegate::doStackSlot(MM_EnvironmentBase *env, omrobjectptr_t objectPt
 {
 	omrobjectptr_t object = *slotPtr;
 	if (_markingScheme->isHeapObject(object) && !_extensions->heap->objectIsInGap(object)) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "doStackSlot slotPtr=%p, ObjPtr=%p, fromObject=%p, isConcurrentScavengerEnabled()=%zu, isConcurrentScavengerEnabled=%zu, isScavengerBackOutFlagRaised=%zu\n", 
+					slotPtr, object, objectPtr, _extensions->isConcurrentScavengerEnabled(), _extensions->isScavengerBackOutFlagRaised());
 		if (_extensions->isConcurrentScavengerEnabled() && _extensions->isScavengerBackOutFlagRaised()) {
 			_markingScheme->fixupForwardedSlot(slotPtr);
+			j9tty_printf(PORTLIB, "_markingScheme->fixupForwardedSlot slotPtr=%p, ObjPtr=%p, fromObject=%p\n", slotPtr, object, objectPtr);
 		}
 		_markingScheme->inlineMarkObject(env, *slotPtr);
 	}
@@ -253,6 +257,8 @@ void
 stackSlotIteratorForMarkingDelegate(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4MarkingDelegate *data = (StackIteratorData4MarkingDelegate *)localData;
+	PORT_ACCESS_FROM_ENVIRONMENT(data->env);
+	j9tty_printf(PORTLIB, "markingDelegate->doStackSlot slotPtr=%p, ObjPtr=%p, fromObject=%p\n", slotPtr, *slotPtr, data->fromObject);
 	data->markingDelegate->doStackSlot(data->env, data->fromObject, slotPtr);
 }
 

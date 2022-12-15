@@ -98,6 +98,9 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, J9VMContinuation *con
 
 	Assert_VM_Null(VM_VMHelpers::getCarrierThreadFromContinuationState(oldContinuationState));
 
+//	PORT_ACCESS_FROM_JAVAVM(currentThread->javaVM);
+//	j9tty_printf(PORTLIB, "walkContinuationStackFramesWrapper continuation=%p, oldContinuationState=%p\n", currentThread, continuation, oldContinuationState);
+
 	if (VM_VMHelpers::isConcurrentlyScannedFromContinuationState(oldContinuationState)) {
 		/* currentThread was low tagged (GC was already in progress), but by 'or'-ing our ID, we let GC know there is a pending mount */
 		internalReleaseVMAccess(currentThread);
