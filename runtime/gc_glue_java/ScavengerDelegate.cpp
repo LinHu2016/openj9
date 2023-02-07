@@ -336,6 +336,8 @@ void
 stackSlotIteratorForScavenge(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4Scavenge *data = (StackIteratorData4Scavenge *)localData;
+	PORT_ACCESS_FROM_ENVIRONMENT(data->env);
+	j9tty_printf(PORTLIB, "stackSlotIteratorForScavenge doStackSlot slotPtr=%p, ObjPtr=%p, contiObj=%p, data->reason=%zu\n", slotPtr, *slotPtr, data->objectPtr, data->reason);
 	data->scavengerDelegate->doStackSlot(data->env, slotPtr, data->reason, data->shouldRemember);
 }
 
@@ -352,9 +354,12 @@ MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, o
 		localData.env = env;
 		localData.reason = reason;
 		localData.shouldRemember = &shouldRemember;
+		localData.objectPtr = objectPtr;
 		/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
 		bool isConcurrentGC = _extensions->isConcurrentScavengerInProgress();
 
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_ScavengerDelegate::scanContinuationNativeSlots objectPtr=%p, reason=%zu\n",objectPtr, reason);
 		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false, isConcurrentGC, isGlobalGC);
 	}
 	return 	shouldRemember;

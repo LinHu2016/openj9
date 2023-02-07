@@ -253,6 +253,8 @@ void
 stackSlotIteratorForMarkingDelegate(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4MarkingDelegate *data = (StackIteratorData4MarkingDelegate *)localData;
+	PORT_ACCESS_FROM_ENVIRONMENT(data->env);
+	j9tty_printf(PORTLIB, "markingDelegate->doStackSlot slotPtr=%p, ObjPtr=%p, fromObject=%p\n", slotPtr, *slotPtr, data->fromObject);
 	data->markingDelegate->doStackSlot(data->env, data->fromObject, slotPtr);
 }
 
@@ -274,6 +276,9 @@ MM_MarkingDelegate::scanContinuationNativeSlots(MM_EnvironmentBase *env, omrobje
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 		/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
 		bool isConcurrentGC = J9_ARE_ANY_BITS_SET(currentThread->privateFlags, J9_PRIVATE_FLAGS_CONCURRENT_MARK_ACTIVE);
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MarkingDelegate::scanContinuationNativeSlots ObjPtr=%p\n", objectPtr);
 
 		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForMarkingDelegate, stackFrameClassWalkNeeded, false, isConcurrentGC, isGlobalGC);
 	}

@@ -476,7 +476,10 @@ void
 stackSlotIterator(J9JavaVM *javaVM, J9Object **slot, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData *data = (StackIteratorData *)localData;
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	J9Object *orig = *slot;
 	data->rootScanner->doStackSlot(slot, walkState, stackLocation);
+	j9tty_printf(PORTLIB, "Rootscan stackSlotIterator slotPtr=%p, ObjPtr=%p, afterObjPtr=%p, walkThread=%p\n", slot, orig, *slot, walkState->walkThread);
 }
 
 /**
@@ -542,6 +545,8 @@ MM_RootScanner::scanOneThread(MM_EnvironmentBase *env, J9VMThread* walkThread, v
 	GC_VMThreadStackSlotIterator::scanSlots(currentThread, walkThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);
 
 #if JAVA_SPEC_VERSION >= 19
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "MM_RootScanner::scanOneThread walkThread=%p, walkThread->currentContinuation=%p\n", walkThread, walkThread->currentContinuation);
 	if (NULL != walkThread->currentContinuation)
 	{
 		/* At this point we know that a virtual thread is mounted. We previously scanned its stack,
