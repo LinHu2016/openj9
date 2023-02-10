@@ -1038,6 +1038,10 @@ UDATA
 continuationObjectCreated(J9VMThread *vmThread, j9object_t object)
 {
 	Assert_MM_true(NULL != object);
+
+//	PORT_ACCESS_FROM_VMC(vmThread);
+//	j9tty_printf(PORTLIB, "continuationObjectCreated vmThread conObj=%p vmThread=%p\n", object, vmThread);
+
 	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
 
 	if (MM_GCExtensions::disable_continuation_list != MM_GCExtensions::getExtensions(env)->continuationListOption) {

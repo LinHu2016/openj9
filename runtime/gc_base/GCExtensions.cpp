@@ -311,7 +311,7 @@ MM_GCExtensions::releaseNativesForContinuationObject(MM_EnvironmentBase* env, j9
 }
 
 bool
-MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9object_t objectPtr, bool isGlobalGC)
+MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9object_t objectPtr, bool isConcurrentGC, bool isGlobalGC, bool beingMounted)
 {
 	bool needScan = false;
 #if JAVA_SPEC_VERSION >= 19
@@ -323,6 +323,7 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 	 *
 	 * for concurrent GCs, since stack is actively changing. Instead, we scan them during preMount or during root scanning if already mounted at cycle start or during postUnmount (might be indirectly via card cleaning) or during final STW (via root re-scan) if still mounted at cycle end
 	 * for sliding compacts to avoid double slot fixups
+	 * If continuation is currently being mounted by this thread, we must be in preMount/postUnmount callback and must scan.
 	 *
 	 * For fully STW GCs, there is no harm to scan them, but it's a waste of time since they are scanned during root scanning already.
 	 *
@@ -333,8 +334,22 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 	 */
 	if (started && !finished) {
 		Assert_MM_true(NULL != continuation);
-		needScan = !VM_VMHelpers::isContinuationMountedOrConcurrentlyScanned(continuation, isGlobalGC);
+		uintptr_t continuationState = continuation->state;
+		if (beingMounted) {
+			needScan = !VM_VMHelpers::isConcurrentlyScannedFromContinuationState(continuationState, isGlobalGC);
+//		} else if (isConcurrentGC) {
+//			needScan = !VM_VMHelpers::isContinuationMountedOrConcurrentlyScanned(continuationState, isGlobalGC);
+		} else {
+			needScan = !VM_VMHelpers::isContinuationFullyMountedOrConcurrentlyScanned(continuationState, isGlobalGC);
+		}
 	}
+	
+//	PORT_ACCESS_FROM_VMC(vmThread);
+//	if (NULL != continuation) {
+//		j9tty_printf(PORTLIB, "needScanStacksForContinuation started=%zu,finished=%zu, continuation=%p, continuationObject=%p, needScan=%zu, continuation->state=%p, isConcurrentGC=%zu, isGlobalGC=%zu, beingMounted=%zu\n", started, finished, continuation, objectPtr, needScan, continuation->state, isConcurrentGC, isGlobalGC, beingMounted);
+//	} else {
+//		j9tty_printf(PORTLIB, "needScanStacksForContinuation started=%zu,finished=%zu, continuation=%p, continuationObject=%p, needScan=%zu, isConcurrentGC=%zu, isGlobalGC=%zu, beingMounted=%zu\n", started, finished, continuation, objectPtr, needScan, isConcurrentGC, isGlobalGC, beingMounted);
+//	}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 	return needScan;
 }

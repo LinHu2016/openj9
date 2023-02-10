@@ -43,6 +43,7 @@
 #include "ute.h"
 #include "AtomicSupport.hpp"
 #include "ObjectAllocationAPI.hpp"
+#include "objhelp.h"
 
 typedef enum {
 	J9_BCLOOP_SEND_TARGET_INITIAL_STATIC = 0,
@@ -2080,27 +2081,87 @@ exit:
 		return J9_ARE_ANY_BITS_SET(continuationState, concurrentGCMask);
 	}
 
+	static VMINLINE uintptr_t
+	setConcurrentlyScannedToContinuationState(uintptr_t continuationState, bool isGlobalGC)
+	{
+		return continuationState | getConcurrentGCMask(isGlobalGC);
+	}
+
+	static VMINLINE uintptr_t
+	resetConcurrentlyScannedToContinuationState(uintptr_t continuationState, bool isGlobalGC)
+	{
+		return continuationState & (~getConcurrentGCMask(isGlobalGC));
+	}
+
+	static VMINLINE uintptr_t getPendingToBeMountedMask()
+	{
+		return J9_GC_CONTINUATION_STATE_PENDING_TO_BE_MOUNTED;
+	}
+
+	static VMINLINE bool
+	isPendingToBeMountedFromContinuationState(uintptr_t continuationState)
+	{
+		return J9_ARE_ANY_BITS_SET(continuationState, J9_GC_CONTINUATION_STATE_PENDING_TO_BE_MOUNTED);
+	}
+
 	/**
 	 * Check if the related J9VMContinuation is mounted to carrier thread
+	 * if carrierThreadID has been set in j9vmcontinuation->state, the continuation might be mounted,
+	 * there also is pending to be mounted case, when the mounting is blocked by the concurrent continuation
+	 * scanning or related vm access.
+	 *
 	 * @param[in] continuation the related J9VMContinuation
 	 * @return true if it is mounted.
 	 */
 	static VMINLINE bool
-	isContinuationMounted(J9VMContinuation *continuation)
+	isContinuationMountedFromContinuationState(uintptr_t continuationState)
 	{
-		return J9_ARE_ANY_BITS_SET(continuation->state, ~(uintptr_t)J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_ANY);
+		return J9_ARE_ANY_BITS_SET(continuationState, ~(uintptr_t)J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_ANY);
+	}
+	
+	static VMINLINE bool
+	isContinuationFullyMountedFromContinuationState(uintptr_t continuationState)
+	{
+		bool mounted = isContinuationMountedFromContinuationState(continuationState);
+		if (mounted && isPendingToBeMountedFromContinuationState(continuationState)) {
+			mounted = false;
+		}
+		return mounted;
+	}
+
+	static VMINLINE bool isContinuationMountedWithCarrierThread(uintptr_t continuationState, J9VMThread *carrierThread)
+	{
+		return (uintptr_t)carrierThread == continuationState;
+	}
+
+	static VMINLINE uintptr_t
+	setCarrierThreadToContinuationState(uintptr_t continuationState, J9VMThread *carrierThread)
+	{
+		return continuationState | (uintptr_t)carrierThread;
 	}
 
 	static VMINLINE J9VMThread *
 	getCarrierThreadFromContinuationState(uintptr_t continuationState)
 	{
-		return (J9VMThread *)(continuationState & (~(uintptr_t)J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_ANY));
+		return (J9VMThread *)(continuationState & J9_GC_CONTINUATION_STATE_CARRIERID_MASK);
 	}
 
 	static VMINLINE bool
-	isContinuationMountedOrConcurrentlyScanned(J9VMContinuation *continuation, bool isGlobalGC)
+	isContinuationFullyMountedOrConcurrentlyScanned(uintptr_t continuationState, bool isGlobalGC)
 	{
-		return isContinuationMounted(continuation) || isConcurrentlyScannedFromContinuationState(continuation->state, isGlobalGC);
+		return isContinuationFullyMountedFromContinuationState(continuationState) || isConcurrentlyScannedFromContinuationState(continuationState, isGlobalGC);
+	}
+
+	static VMINLINE bool
+	isContinuationMountedOrConcurrentlyScanned(uintptr_t continuationState, bool isGlobalGC)
+	{
+		return isContinuationMountedFromContinuationState(continuationState) || isConcurrentlyScannedFromContinuationState(continuationState, isGlobalGC);
+	}
+
+	static VMINLINE void
+	resetContinationState(J9VMContinuation *continuation)
+	{
+		continuation->state = J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_NONE;
 	}
 
 /*
@@ -2111,22 +2172,45 @@ exit:
  *	If low tagging(bit0 or bit1) failed due to either
  *
  *   a carrier thread winning to mount, we don't need to do anything, since it will be compensated by pre/post mount actions
+ *   if it is pending to be mounted case(another concurrent scanning block the mounting),
  *   another GC thread winning to scan(bit0/bit1,bit0 and bit1 is irrelevant and independent), again don't do anything, and let the winning thread do the work, instead
  */
 	static VMINLINE bool
-	tryWinningConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC)
+	tryWinningConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC, bool beingMounted, J9VMThread *vmThread, j9object_t continuationObject)
 	{
-		uintptr_t complementGCConcurrentState = J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_NONE;
-		uintptr_t returnedState = J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_NONE;
-		do {
-			/* preserve the concurrent GC state for the other type of GC */
-			complementGCConcurrentState = continuation->state & getConcurrentGCMask(!isGlobalGC);
-			returnedState = VM_AtomicSupport::lockCompareExchange(&continuation->state, complementGCConcurrentState, complementGCConcurrentState | getConcurrentGCMask(isGlobalGC));
-		/* if the other GC happened to change its concurrentGC state since us taking a snapshot of their state, we'll have to retry */
-		} while (complementGCConcurrentState != (returnedState & complementGCConcurrentState));
 
-		/* if returned state does not contain carrier ID, return that we won */
-		return (complementGCConcurrentState == returnedState);
+//		PORT_ACCESS_FROM_VMC(vmThread);
+
+		volatile uintptr_t *localAddr = &continuation->state;
+//		jboolean finished = J9VMJDKINTERNALVMCONTINUATION_FINISHED(vmThread, continuationObject);
+//		j9tty_printf(PORTLIB, "tryWinningConcurrentGCScan continuation=%p, continuation->state=%p, isGlobalGC=%zu, beingMounted=%zu, vmThread=%p, finished=%zu\n", continuation, *localAddr, isGlobalGC, beingMounted, vmThread, finished);
+		do {
+			uintptr_t oldContinuationState = *localAddr;
+
+			/* If it's being concurrently scanned within the same type of GC by another thread , it's unnecessary to do it again */
+			if (!isConcurrentlyScannedFromContinuationState(oldContinuationState, isGlobalGC)) {
+				/* If it's fully mounted, it's unnecessary to scan now, since it will be compensated by pre/post mount actions.
+				   If it's being mounted by this thread, we must be in pre/post mount (would be nice, but not trivial to assert it),
+				   therefore we must scan.
+				 */
+				if (beingMounted || !isContinuationFullyMountedFromContinuationState(oldContinuationState)) {
+					/* Try to set scan bit for this GC type */
+					uintptr_t newContinuationState = setConcurrentlyScannedToContinuationState(oldContinuationState, isGlobalGC);
+					uintptr_t returnedState = VM_AtomicSupport::lockCompareExchange(localAddr, oldContinuationState, newContinuationState);
+					/* If no other thread changed anything (mounted or won scanning for any GC), we succeeded, otherwise retry */
+					if (oldContinuationState == returnedState) {
+//						j9tty_printf(PORTLIB, "tryWinningConcurrentGCScan true continuation=%p, continuation->state=%p, vmThread=%p\n", continuation, *localAddr, vmThread);
+						return true;
+					} else {
+//						j9tty_printf(PORTLIB, "tryWinningConcurrentGCScan retry continuation=%p, continuation->state=%p, vmThread=%p\n", continuation, *localAddr, vmThread);
+					continue;
+					}
+				}
+			}
+		} while (false);
+		/* We did not even try to win, since it was either mounted or already being scanned */
+//		j9tty_printf(PORTLIB, "tryWinningConcurrentGCScan false ccontinuation=%p, ontinuation->state=%p, vmThread=%p\n", continuation, *localAddr, vmThread);
+		return false;
 	}
 
 	/**
@@ -2135,12 +2219,27 @@ exit:
 	 * @param [in] checkConcurrentState can be J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_LOCAL or J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_GLOBAL
 	 */
 	static VMINLINE void
-	exitConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC)
+	exitConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC, J9VMThread *vmThread)
 	{
 		/* clear CONCURRENTSCANNING flag bit0:LocalConcurrentScanning /bit1:GlobalConcurrentScanning */
-		uintptr_t oldContinuationState = VM_AtomicSupport::bitAnd(&continuation->state, ~getConcurrentGCMask(isGlobalGC));
-		uintptr_t complementGCConcurrentState = oldContinuationState & getConcurrentGCMask(!isGlobalGC);
-		if (!complementGCConcurrentState) {
+		volatile uintptr_t *localAddr = &continuation->state;
+
+//		PORT_ACCESS_FROM_VMC(vmThread);
+//		j9tty_printf(PORTLIB, "exitConcurrentGCScan continuation=%p, continuation->state=%p, isGlobalGC=%zu, vmThread=%p\n", continuation, *localAddr, isGlobalGC, vmThread);
+
+		uintptr_t oldContinuationState = *localAddr;
+		uintptr_t newContinuationState = resetConcurrentlyScannedToContinuationState(oldContinuationState, isGlobalGC);
+		while (VM_AtomicSupport::lockCompareExchange(localAddr, oldContinuationState, newContinuationState) != oldContinuationState) {
+			oldContinuationState = *localAddr;
+			newContinuationState = resetConcurrentlyScannedToContinuationState(oldContinuationState, isGlobalGC);
+		}
+//		j9tty_printf(PORTLIB, "exitConcurrentGCScan bitAnd continuation=%p, continuation->state=%p, oldContinuationState=%p, isGlobalGC=%zu, vmThread=%p\n", continuation, *localAddr, oldContinuationState, isGlobalGC, vmThread);
+//
+//		uintptr_t oldContinuationState = VM_AtomicSupport::bitAnd(&continuation->state, ~getConcurrentGCMask(isGlobalGC));
+//		uintptr_t complementGCConcurrentState = oldContinuationState & getConcurrentGCMask(!isGlobalGC);
+//		if (!complementGCConcurrentState) {
+//		if (!isConcurrentlyScannedFromContinuationState(oldContinuationState, !isGlobalGC)) {
+		if (!isConcurrentlyScannedFromContinuationState(*localAddr)) {
 			J9VMThread *carrierThread = getCarrierThreadFromContinuationState(oldContinuationState);
 			if (NULL != carrierThread) {
 				omrthread_monitor_enter(carrierThread->publicFlagsMutex);
@@ -2154,20 +2253,25 @@ exit:
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 	static VMINLINE UDATA
-	walkContinuationStackFramesWrapper(J9VMThread *vmThread, j9object_t continuationObject, J9StackWalkState *walkState, bool isConcurrentGC, bool isGlobalGC)
+	walkContinuationStackFramesWrapper(J9VMThread *vmThread, j9object_t continuationObject, J9StackWalkState *walkState, bool isConcurrentGC, bool isGlobalGC, bool beingMounted)
 	{
 		UDATA rc = J9_STACKWALK_RC_NONE;
 #if JAVA_SPEC_VERSION >= 19
 		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObject);
+		bool wonConcurrentGCScan = false;
 		if (isConcurrentGC && (NULL != continuation)) {
-			if (!tryWinningConcurrentGCScan(continuation, isGlobalGC)) {
+			if (!tryWinningConcurrentGCScan(continuation, isGlobalGC, beingMounted, vmThread, continuationObject)) {
 				/* if continuation is mounted or already being scanned by another GC thread of the same GC type, we do nothing */
 				return rc;
 			}
+			wonConcurrentGCScan = true;
 		}
+//		PORT_ACCESS_FROM_VMC(vmThread);
+//		j9tty_printf(PORTLIB, "walkContinuationStackFrames before continuation=%p, continuation->state=%p, isGlobalGC=%zu, isConcurrentGC=%zu, beingMounted=%zu, vmThread=%p\n", continuation, continuation->state, isGlobalGC, isConcurrentGC, beingMounted, vmThread);
 		rc = vmThread->javaVM->internalVMFunctions->walkContinuationStackFrames(vmThread, continuation, walkState);
-		if (isConcurrentGC && (NULL != continuation)) {
-			exitConcurrentGCScan(continuation, isGlobalGC);
+//		j9tty_printf(PORTLIB, "walkContinuationStackFrames after continuation=%p, continuation->state=%p, isGlobalGC=%zu, isConcurrentGC=%zu, beingMounted=%zu, vmThread=%p\n", continuation, continuation->state, isGlobalGC, isConcurrentGC, beingMounted, vmThread);
+		if (wonConcurrentGCScan) {
+			exitConcurrentGCScan(continuation, isGlobalGC, vmThread);
 		}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 		return rc;

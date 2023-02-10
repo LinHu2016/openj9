@@ -138,13 +138,14 @@ GC_VMThreadStackSlotIterator::scanSlots(
 			bool includeStackFrameClassReferences,
 			bool trackVisibleFrameDepth,
 			bool isConcurrentGC,
-			bool isGlobalGC
+			bool isGlobalGC,
+			bool beingMounted
 		)
 {
 	J9StackWalkState stackWalkState;
 
 	initializeStackWalkState(&stackWalkState, vmThread, userData, oSlotIterator, includeStackFrameClassReferences, trackVisibleFrameDepth);
-	VM_VMHelpers::walkContinuationStackFramesWrapper(vmThread, continuationObjectPtr, &stackWalkState, isConcurrentGC, isGlobalGC);
+	VM_VMHelpers::walkContinuationStackFramesWrapper(vmThread, continuationObjectPtr, &stackWalkState, isConcurrentGC, isGlobalGC, beingMounted);
 }
 
 #if JAVA_SPEC_VERSION >= 19

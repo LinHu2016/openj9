@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2022 IBM Corp. and others
+ * Copyright (c) 1991, 2023 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -1040,12 +1040,17 @@ MM_StandardAccessBarrier::checkClassLive(J9JavaVM *javaVM, J9Class *classPtr)
 void
 MM_StandardAccessBarrier::preMountContinuation(J9VMThread *vmThread, j9object_t contObject)
 {
+//	PORT_ACCESS_FROM_VMC(vmThread);
+//	j9tty_printf(PORTLIB, "preMountContinuation contObject=%p, vmThread=%p, _extensions->isConcurrentScavengerInProgress()=%zu\n", contObject, vmThread, _extensions->isConcurrentScavengerInProgress());
 #if defined(OMR_GC_CONCURRENT_SCAVENGER)
+//	if (_extensions->scavenger->isCurrentPhaseConcurrent()) {
 	if (_extensions->isConcurrentScavengerInProgress()) {
+//	if (vmThread->readBarrierRangeCheckTop != 0) {
 		/* concurrent scavenger in progress */
 		MM_EnvironmentStandard *env = MM_EnvironmentStandard::getEnvironment(vmThread->omrVMThread);
 		MM_ScavengeScanReason reason = SCAN_REASON_SCAVENGE;
-		_scavenger->getDelegate()->scanContinuationNativeSlots(env, contObject, reason);
+		const bool beingMounted = true;
+		_scavenger->getDelegate()->scanContinuationNativeSlots(env, contObject, reason, beingMounted);
 	}
 #endif /* OMR_GC_CONCURRENT_SCAVENGER */
 }
@@ -1056,5 +1061,7 @@ MM_StandardAccessBarrier::postUnmountContinuation(J9VMThread *vmThread, j9object
 	/* Conservatively assume that via mutations of stack slots (which are not subject to access barriers),
 	 * all post-write barriers have been triggered on this Continuation object, since it's been mounted.
 	 */
+//	PORT_ACCESS_FROM_VMC(vmThread);
+//	j9tty_printf(PORTLIB, "postUnmountContinuation contObject=%p, vmThread=%p\n", contObject, vmThread);
 	postBatchObjectStore(vmThread, contObject);
 }

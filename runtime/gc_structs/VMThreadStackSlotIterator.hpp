@@ -68,7 +68,8 @@ public:
 			bool includeStackFrameClassReferences,
 			bool trackVisibleFrameDepth,
 			bool isConcurrentGC,
-			bool isGlobalGC);
+			bool isGlobalGC,
+			bool beingMounted = false);
 
 #if JAVA_SPEC_VERSION >= 19
 	static void scanSlots(

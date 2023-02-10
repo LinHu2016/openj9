@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2022 IBM Corp. and others
+ * Copyright (c) 1991, 2023 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -955,7 +955,8 @@ MM_RealtimeAccessBarrier::preMountContinuation(J9VMThread *vmThread, j9object_t 
 {
 	MM_EnvironmentRealtime *env =  MM_EnvironmentRealtime::getEnvironment(vmThread->omrVMThread);
 	if (isBarrierActive(env)) {
-		_realtimeGC->getRealtimeDelegate()->scanContinuationNativeSlots(env, contObject);
+		const bool beingMounted = true;
+		_realtimeGC->getRealtimeDelegate()->scanContinuationNativeSlots(env, contObject, beingMounted);
 	}
 }
 

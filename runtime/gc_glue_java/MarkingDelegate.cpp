@@ -261,8 +261,14 @@ void
 MM_MarkingDelegate::scanContinuationNativeSlots(MM_EnvironmentBase *env, omrobjectptr_t objectPtr)
 {
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
+	bool isConcurrentGC = J9_ARE_ANY_BITS_SET(currentThread->privateFlags, J9_PRIVATE_FLAGS_CONCURRENT_MARK_ACTIVE);
 	const bool isGlobalGC = true;
-	if (MM_GCExtensions::needScanStacksForContinuationObject(currentThread, objectPtr, isGlobalGC)) {
+
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB, "MM_MarkingDelegate::scanContinuationNativeSlots conObj=%p\n", objectPtr);
+
+	if (MM_GCExtensions::needScanStacksForContinuationObject(currentThread, objectPtr, isConcurrentGC, isGlobalGC)) {
 		StackIteratorData4MarkingDelegate localData;
 		localData.markingDelegate = this;
 		localData.env = env;
@@ -272,8 +278,6 @@ MM_MarkingDelegate::scanContinuationNativeSlots(MM_EnvironmentBase *env, omrobje
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
 		stackFrameClassWalkNeeded = isDynamicClassUnloadingEnabled();
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
-		/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
-		bool isConcurrentGC = J9_ARE_ANY_BITS_SET(currentThread->privateFlags, J9_PRIVATE_FLAGS_CONCURRENT_MARK_ACTIVE);
 
 		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForMarkingDelegate, stackFrameClassWalkNeeded, false, isConcurrentGC, isGlobalGC);
 	}
