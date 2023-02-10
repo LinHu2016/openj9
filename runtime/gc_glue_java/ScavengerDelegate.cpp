@@ -340,22 +340,28 @@ stackSlotIteratorForScavenge(J9JavaVM *javaVM, J9Object **slotPtr, void *localDa
 }
 
 bool
-MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, MM_ScavengeScanReason reason)
+MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, omrobjectptr_t objectPtr, MM_ScavengeScanReason reason, bool beingMounted)
 {
 	bool shouldRemember = false;
 
 	J9VMThread *currentThread = (J9VMThread *)env->getLanguageVMThread();
+	/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
+//	bool isConcurrentGC = _extensions->scavenger->isCurrentPhaseConcurrent();
+//	bool isConcurrentGC = _extensions->isConcurrentScavengerInProgress();
+	bool isConcurrentGC = (0 != currentThread->readBarrierRangeCheckTop);
+
 	const bool isGlobalGC = false;
-	if (MM_GCExtensions::needScanStacksForContinuationObject(currentThread, objectPtr, isGlobalGC)) {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_ScavengerDelegate::scanContinuationNativeSlots conObj=%p, reason=%zu, beingMounted=%zu, isConcurrentGC=%zu, currentThread=%p, isConcurrentScavengerInProgress()=%zu, isCurrentPhaseConcurrent()=%zu, readBarrierRangeCheckTop=%p, readBarrierRangeCheckBase=%p\n",
+			objectPtr, reason, beingMounted, isConcurrentGC, currentThread, _extensions->isConcurrentScavengerInProgress(), _extensions->scavenger->isCurrentPhaseConcurrent(), currentThread->readBarrierRangeCheckTop, currentThread->readBarrierRangeCheckBase);
+	if (MM_GCExtensions::needScanStacksForContinuationObject(currentThread, objectPtr, isConcurrentGC, isGlobalGC, beingMounted)) {
 		StackIteratorData4Scavenge localData;
 		localData.scavengerDelegate = this;
 		localData.env = env;
 		localData.reason = reason;
 		localData.shouldRemember = &shouldRemember;
-		/* In STW GC there are no racing carrier threads doing mount and no need for the synchronization. */
-		bool isConcurrentGC = _extensions->isConcurrentScavengerInProgress();
 
-		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false, isConcurrentGC, isGlobalGC);
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false, isConcurrentGC, isGlobalGC, beingMounted);
 	}
 	return 	shouldRemember;
 }

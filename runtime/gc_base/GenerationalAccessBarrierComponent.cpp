@@ -143,7 +143,10 @@ MM_GenerationalAccessBarrierComponent::postBatchObjectStore(J9VMThread *vmThread
 		/* Since we don't know what the references stored into dstObject were, we have to pessimistically
 		 * assume they included old->new references, and the object should be added to the remembered set */
 		if (extensions->isOld(dstObject)) {
+			PORT_ACCESS_FROM_VMC(vmThread);
+			j9tty_printf(PORTLIB, "postBatchObjectStore dstObject=%p, vmThread=%p\n", dstObject, vmThread);
 			if (extensions->objectModel.atomicSetRememberedState(dstObject, STATE_REMEMBERED)) {
+				j9tty_printf(PORTLIB, "postBatchObjectStore dstObject=%p, vmThread=%p, header=%p\n", dstObject, vmThread, *dstObject);
 				/* Successfully set the remembered bit in the object.  Now allocate an entry from the
 				 * remembered set fragment of the current thread and store the destination object into
 				 * the remembered set. */
@@ -155,6 +158,7 @@ MM_GenerationalAccessBarrierComponent::postBatchObjectStore(J9VMThread *vmThread
 					 * whose REMEMBERED bit is set in an overflow scan) */
 					extensions->setScavengerRememberedSetOverflowState();
 					reportRememberedSetOverflow(vmThread);
+					j9tty_printf(PORTLIB, "postBatchObjectStore dstObject=%p, vmThread=%p RememberedSetOverflow\n", dstObject, vmThread);
 				} else {
 					/* Successfully allocated a slot from the remembered set.  Record the object. */
 					*rememberedSlot = (UDATA)dstObject;

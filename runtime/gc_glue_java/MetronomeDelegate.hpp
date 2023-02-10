@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019, 2022 IBM Corp. and others
+ * Copyright (c) 2019, 2023 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -176,7 +176,7 @@ public:
 	void setUnmarkedImpliesCleared();
 	void unsetUnmarkedImpliesCleared();
 
-	void  scanContinuationNativeSlots(MM_EnvironmentRealtime *env, J9Object *objectPtr);
+	void  scanContinuationNativeSlots(MM_EnvironmentRealtime *env, J9Object *objectPtr, bool beingMounted = false);
 	UDATA scanContinuationObject(MM_EnvironmentRealtime *env, J9Object *objectPtr);
 
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
