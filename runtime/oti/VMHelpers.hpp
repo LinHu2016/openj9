@@ -2081,13 +2081,27 @@ exit:
 
 	/**
 	 * Check if the related J9VMContinuation is mounted to carrier thread
+	 * if carrierThreadID has been set in j9vmcontinuation->state, the continuation might be mounted,
+	 * there also is pending to be mounted case, when the mounting is blocked by the concurrent continuation
+	 * scanning or related vm access, so we need to confirm if carrierThread->currentContinuation
+	 * has been set for mounted case.
+	 *
 	 * @param[in] continuation the related J9VMContinuation
 	 * @return true if it is mounted.
 	 */
 	static VMINLINE bool
 	isContinuationMounted(J9VMContinuation *continuation)
 	{
-		return J9_ARE_ANY_BITS_SET(continuation->state, ~(uintptr_t)J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_ANY);
+		bool mounted = false;
+		uintptr_t continuationState = continuation->state;
+		J9VMThread *carrierThread = getCarrierThreadFromContinuationState(continuationState);
+		if (NULL != carrierThread) {
+			/* if carrierThread->currentContinuation == NULL, it is pending to be mounted, hasn't been mounted yet */
+			if (NULL != carrierThread->currentContinuation) {
+				mounted = true;
+			}
+		}
+		return mounted;
 	}
 
 	static VMINLINE J9VMThread *
@@ -2115,17 +2129,22 @@ exit:
 	static VMINLINE bool
 	tryWinningConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC)
 	{
-		uintptr_t complementGCConcurrentState = J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_NONE;
-		uintptr_t returnedState = J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_NONE;
-		do {
-			/* preserve the concurrent GC state for the other type of GC */
-			complementGCConcurrentState = continuation->state & getConcurrentGCMask(!isGlobalGC);
+		bool ret = false;
+		uintptr_t complementGCConcurrentState = continuation->state;
+		!isContinuationMounted(continuation)
+		while ( !ret && (!isConcurrentlyScannedFromContinuationState(complementGCConcurrentState, isGlobalGC)) && (!isContinuationMounted(continuation)))
+		{
 			returnedState = VM_AtomicSupport::lockCompareExchange(&continuation->state, complementGCConcurrentState, complementGCConcurrentState | getConcurrentGCMask(isGlobalGC));
-		/* if the other GC happened to change its concurrentGC state since us taking a snapshot of their state, we'll have to retry */
-		} while (complementGCConcurrentState != (returnedState & complementGCConcurrentState));
-
-		/* if returned state does not contain carrier ID, return that we won */
-		return (complementGCConcurrentState == returnedState);
+			/* if the other GC happened to change its concurrentGC state since us taking a snapshot of their state, we'll have to retry */
+			ret = complementGCConcurrentState == returnedState;
+			if (isConcurrentlyScannedFromContinuationState(complementGCConcurrentState(returnedState))
+			{
+				break;
+			} else {
+				complementGCConcurrentState = continuation->state;
+			}
+		}
+		return ret;
 	}
 
 	/**
