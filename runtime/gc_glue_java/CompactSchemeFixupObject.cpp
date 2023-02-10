@@ -75,15 +75,15 @@ MM_CompactSchemeFixupObject::fixupContinuationNativeSlots(MM_EnvironmentStandard
 	 * mounted Virtual threads later during root fixup, we will skip it during this heap fixup pass
 	 * (hence passing true for scanOnlyUnmounted parameter).
 	 */
+	const bool isConcurrentGC = false;
 	const bool isGlobalGC = true;
-	if (MM_GCExtensions::needScanStacksForContinuationObject(currentThread, objectPtr, isGlobalGC)) {
+	if (MM_GCExtensions::needScanStacksForContinuationObject(currentThread, objectPtr, isConcurrentGC, isGlobalGC)) {
 		StackIteratorData4CompactSchemeFixupObject localData;
 		localData.compactSchemeFixupObject = this;
 		localData.env = env;
 		localData.fromObject = objectPtr;
-		const bool isConcurrentGC = false;
 
-		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForCompactScheme, false, false, isConcurrentGC, isGlobalGC);
+		GC_VMThreadStackSlotIterator::scanSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForCompactScheme, false, false);
 	}
 }
 

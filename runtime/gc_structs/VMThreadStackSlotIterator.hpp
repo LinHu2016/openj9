@@ -66,9 +66,7 @@ public:
 			void *userData,
 			J9MODRON_OSLOTITERATOR *oSlotIterator,
 			bool includeStackFrameClassReferences,
-			bool trackVisibleFrameDepth,
-			bool isConcurrentGC,
-			bool isGlobalGC);
+			bool trackVisibleFrameDepth);
 
 #if JAVA_SPEC_VERSION >= 19
 	static void scanSlots(
