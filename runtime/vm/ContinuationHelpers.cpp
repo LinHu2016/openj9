@@ -89,28 +89,42 @@ end:
 	return result;
 }
 
-void
-synchronizeWithConcurrentGCScan(J9VMThread *currentThread, J9VMContinuation *continuation)
+j9object_t
+synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuationObject, J9VMContinuation *continuation)
 {
 	volatile uintptr_t *localAddr = &continuation->state;
 	/* atomically 'or' (not 'set') continuation->state  with currentThread */
+//	PORT_ACCESS_FROM_VMC(currentThread);
+//	j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan before continuation=%p, continuationObject=%p, continuation->state=%p, currentThread=%p\n", continuation, continuationObject, *localAddr, currentThread);
+//	uintptr_t oldContinuationState = VM_AtomicSupport::bitOr(localAddr, (uintptr_t)currentThread | VM_VMHelpers::getPendingToBeMountedMask());
 	uintptr_t oldContinuationState = VM_AtomicSupport::bitOr(localAddr, (uintptr_t)currentThread);
+//	j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan bitOr continuation=%p, continuation->state=%p, oldContinuationState=%p, currentThread=%p\n", continuation, *localAddr, oldContinuationState, currentThread);
 
 	Assert_VM_Null(VM_VMHelpers::getCarrierThreadFromContinuationState(oldContinuationState));
 
-	if (VM_VMHelpers::isConcurrentlyScannedFromContinuationState(oldContinuationState)) {
-		/* currentThread was low tagged (GC was already in progress), but by 'or'-ing our ID, we let GC know there is a pending mount */
-		internalReleaseVMAccess(currentThread);
+//	do {
+		if (VM_VMHelpers::isConcurrentlyScannedFromContinuationState(oldContinuationState)) {
+			/* currentThread was low tagged (GC was already in progress), but by 'or'-ing our ID, we let GC know there is a pending mount */
+//			j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan pending to be mounted continuation=%p, continuation->state=%p, oldContinuationState=%p, currentThread=%p\n", continuation, *localAddr, oldContinuationState, currentThread);
+			PUSH_OBJECT_IN_SPECIAL_FRAME(currentThread, continuationObject);
+			internalReleaseVMAccess(currentThread);
 
-		omrthread_monitor_enter(currentThread->publicFlagsMutex);
-		while (VM_VMHelpers::isConcurrentlyScannedFromContinuationState(*localAddr)) {
-			/* GC is still concurrently scanning the continuation(currentThread was still low tagged), wait for GC thread to notify us when it's done. */
-			omrthread_monitor_wait(currentThread->publicFlagsMutex);
+			omrthread_monitor_enter(currentThread->publicFlagsMutex);
+			while (VM_VMHelpers::isConcurrentlyScannedFromContinuationState(*localAddr)) {
+				/* GC is still concurrently scanning the continuation(currentThread was still low tagged), wait for GC thread to notify us when it's done. */
+				omrthread_monitor_wait(currentThread->publicFlagsMutex);
+			}
+			omrthread_monitor_exit(currentThread->publicFlagsMutex);
+
+			internalAcquireVMAccess(currentThread);
+			continuationObject = POP_OBJECT_IN_SPECIAL_FRAME(currentThread);
 		}
-		omrthread_monitor_exit(currentThread->publicFlagsMutex);
+//		oldContinuationState = VM_AtomicSupport::lockCompareExchange(localAddr, (uintptr_t)currentThread | VM_VMHelpers::getPendingToBeMountedMask(), (uintptr_t)currentThread);
+//	} while (oldContinuationState != ((uintptr_t)currentThread | VM_VMHelpers::getPendingToBeMountedMask()));
 
-		internalAcquireVMAccess(currentThread);
-	}
+//	j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan after continuation=%p, continuationObject=%p, continuation->state=%p, oldContinuationState=%p, currentThread=%p\n", continuation, continuationObject, *localAddr, oldContinuationState, currentThread);
+	Assert_VM_true((uintptr_t)currentThread == continuation->state);
+	return continuationObject;
 }
 
 BOOLEAN
@@ -131,12 +145,16 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	}
 	Assert_VM_notNull(continuation);
 
+//	PORT_ACCESS_FROM_VMC(currentThread);
+//	j9tty_printf(PORTLIB, "enterContinuation conObj=%p,continuation=%p, currentThread=%p\n", continuationObject, continuation, currentThread);
 	/* let GC know we are mounting, so they don't need to scan us, or if there is already ongoing scan wait till it's complete. */
-	synchronizeWithConcurrentGCScan(currentThread, continuation);
+	currentThread->currentContinuation = continuation;
+
+	continuationObject = synchronizeWithConcurrentGCScan(currentThread, continuationObject, continuation);
 
 	VM_ContinuationHelpers::swapFieldsWithContinuation(currentThread, continuation, started);
 
-	currentThread->currentContinuation = continuation;
+//	currentThread->currentContinuation = continuation;
 
 	/* Reset counters which determine if the current continuation is pinned. */
 	currentThread->continuationPinCount = 0;
@@ -199,6 +217,8 @@ yieldContinuation(J9VMThread *currentThread)
 	 */
 	Assert_VM_true((uintptr_t)currentThread == continuation->state);
 	continuation->state = J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_NONE;
+//	PORT_ACCESS_FROM_VMC(currentThread);
+//	j9tty_printf(PORTLIB, "yieldContinuation continuation=%p, continuation->state=%p, currentThread=%p\n", continuation, continuation->state, currentThread);
 
 	return result;
 }

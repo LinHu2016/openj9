@@ -188,6 +188,7 @@ typedef struct StackIteratorData4Scavenge {
 	MM_EnvironmentStandard *env;
 	MM_ScavengeScanReason reason;
 	bool *shouldRemember;
+//	omrobjectptr_t objectPtr;
 } StackIteratorData4Scavenge;
 
 #endif /* SCAVENGERDELEGATEJAVA_HPP_ */

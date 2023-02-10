@@ -253,6 +253,8 @@ void
 stackSlotIteratorForMarkingDelegate(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4MarkingDelegate *data = (StackIteratorData4MarkingDelegate *)localData;
+//	PORT_ACCESS_FROM_ENVIRONMENT(data->env);
+//	j9tty_printf(PORTLIB, "doStackSlot4MarkingDelegate slotPtr=%p, ObjPtr=%p, contiObj=%p\n", slotPtr, *slotPtr, data->fromObject);
 	data->markingDelegate->doStackSlot(data->env, data->fromObject, slotPtr);
 }
 
