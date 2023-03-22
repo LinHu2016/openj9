@@ -309,6 +309,15 @@ public:
 	 */
 	static bool needScanStacksForContinuationObject(J9VMThread *vmThread, j9object_t objectPtr, bool isConcurrentGC, bool isGlobalGC, bool beingMounted);
 
+	static void randomSleep()
+	{
+		UDATA count = rand() % 10;
+		for (UDATA cnt=0; cnt < count; cnt++) {
+			omrthread_nanosleep(10);
+		}
+	}
+
+
 #if defined(J9VM_OPT_CRIU_SUPPORT)
 	MMINLINE virtual bool reinitializationInProgress() { return (NULL != ((J9JavaVM*)_omrVM->_language_vm)->checkpointState.checkpointThread); }
 #endif /* defined(J9VM_OPT_CRIU_SUPPORT) */

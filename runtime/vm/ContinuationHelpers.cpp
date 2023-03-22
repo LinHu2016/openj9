@@ -133,6 +133,15 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 	return continuationObject;
 }
 
+void randomSleep()
+{
+	UDATA count = rand() % 10;
+	for (UDATA cnt=0; cnt < count; cnt++) {
+		omrthread_nanosleep(10);
+	}
+}
+
+
 BOOLEAN
 enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 {
@@ -151,11 +160,17 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	}
 	Assert_VM_notNull(continuation);
 
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "enterContinuation started=%zu, conObj=%p, continuation=%p, continuation->state=%p, currentThread=%p\n", 
+												started, continuationObject, continuation, continuation->state, currentThread);
 	/* let GC know we are mounting, so they don't need to scan us, or if there is already ongoing scan wait till it's complete. */
 	continuationObject = synchronizeWithConcurrentGCScan(currentThread, continuationObject, continuation);
+	j9tty_printf(PORTLIB, "after synchronizeWithConcurrentGCScan started=%zu, conObj=%p, continuation=%p, continuation->state=%p, currentThread=%p\n", 
+												started, continuationObject, continuation, continuation->state, currentThread);
 
 	if (started) {
 		/* Notify GC of Continuation stack swap */
+		j9tty_printf(PORTLIB, "preMountContinuation conObj=%p,continuation=%p, currentThread=%p, started=%zu\n", continuationObject, continuation, currentThread, started);
 		currentThread->javaVM->memoryManagerFunctions->preMountContinuation(currentThread, continuationObject);
 	}
 
@@ -173,6 +188,7 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 		VM_OutOfLineINL_Helpers::returnSingle(currentThread, JNI_TRUE, 0);
 		result = FALSE;
 	} else {
+//		randomSleep();
 		/* start new Continuation execution */
 		J9VMJDKINTERNALVMCONTINUATION_SET_STARTED(currentThread, continuationObject, JNI_TRUE);
 		VM_VMHelpers::setContinuationStarted(continuation);
@@ -228,6 +244,9 @@ yieldContinuation(J9VMThread *currentThread)
 	j9object_t continuationObject = J9VMJAVALANGTHREAD_CONT(currentThread, currentThread->carrierThreadObject);
 	/* Notify GC of Continuation stack swap */
 	jboolean finished = J9VMJDKINTERNALVMCONTINUATION_FINISHED(currentThread, continuationObject);
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "yieldContinuation continuationObject=%p, continuation=%p, continuation->state=%p, currentThread=%p\n", 
+											 continuationObject, continuation, continuation->state, currentThread);
 
 	if (finished) {
 		VM_VMHelpers::setContinuationFinished(continuation);

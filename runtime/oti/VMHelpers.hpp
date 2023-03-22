@@ -2243,6 +2243,8 @@ exit:
 		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObject);
 		/* clear CONCURRENTSCANNING flag bit0:LocalConcurrentScanning /bit1:GlobalConcurrentScanning */
 		volatile uintptr_t *localAddr = &continuation->state;
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "exitConcurrentGCScan continuation=%p, continuation->state=%p, isGlobalGC=%zu, vmThread=%p\n", continuation, *localAddr, isGlobalGC, vmThread);
 
 		uintptr_t oldContinuationState = *localAddr;
 		uintptr_t newContinuationState = resetConcurrentlyScannedToContinuationState(oldContinuationState, isGlobalGC);
@@ -2250,6 +2252,8 @@ exit:
 			oldContinuationState = *localAddr;
 			newContinuationState = resetConcurrentlyScannedToContinuationState(oldContinuationState, isGlobalGC);
 		}
+		j9tty_printf(PORTLIB, "exitConcurrentGCScan bitAnd continuationObject=%p, continuation=%p, continuation->state=%p, oldContinuationState=%p, isGlobalGC=%zu, vmThread=%p\n", 
+														continuationObject, continuation, *localAddr, oldContinuationState, isGlobalGC, vmThread);
 		if (!isConcurrentlyScannedFromContinuationState(*localAddr)) {
 			J9VMThread *carrierThread = getCarrierThreadFromContinuationState(oldContinuationState);
 			if (NULL != carrierThread) {
