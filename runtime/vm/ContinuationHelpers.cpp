@@ -95,9 +95,10 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 {
 
 	volatile uintptr_t *localAddr = &continuation->state;
+	uintptr_t oldContinuationState = 0;
 	uintptr_t returnContinuationState = 0;
-	do (
-		uintptr_t oldContinuationState = *localAddr;
+	do {
+		oldContinuationState = *localAddr;
 		uintptr_t newContinuationState = VM_VMHelpers::setCarrierAndPendingStateToContinuationState(oldContinuationState, currentThread);
 		returnContinuationState = VM_AtomicSupport::lockCompareExchange(localAddr, oldContinuationState, newContinuationState);
 	} while (returnContinuationState != oldContinuationState);
@@ -121,7 +122,7 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 			internalAcquireVMAccess(currentThread);
 			continuationObject = POP_OBJECT_IN_SPECIAL_FRAME(currentThread);
 		}
-		uintptr_t oldContinuationState = *localAddr;
+		oldContinuationState = *localAddr;
 		Assert_VM_true(VM_VMHelpers::isContinuationMountedWithCarrierThread(oldContinuationState, currentThread));
 		Assert_VM_true(VM_VMHelpers::isPendingToBeMountedFromContinuationState(oldContinuationState));
 		uintptr_t newContinuationState = VM_VMHelpers::resetPendingToContinuationState(oldContinuationState);

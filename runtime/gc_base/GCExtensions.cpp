@@ -349,6 +349,21 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 			Assert_MM_false(VM_VMHelpers::isConcurrentlyScannedFromContinuationState(continuationState));
 			needScan = VM_VMHelpers::isActiveFromContinuationState(continuationState) && !VM_VMHelpers::isContinuationFullyMountedFromContinuationState(continuationState);
 		}
+	} else {
+//		randomSleep();
+		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, objectPtr);
+		if (NULL != continuation) {
+			PORT_ACCESS_FROM_VMC(vmThread);
+			j9tty_printf(PORTLIB, "Warnning needScanStacksForContinuationObject needScan=%zu, continuationObject=%p, isConcurrentGC=%zu, isGlobalGC=%zu, beingMounted=%zu, continuation=%p, continuation->state=%p\n",
+															   needScan, objectPtr, isConcurrentGC, isGlobalGC, beingMounted, continuation, continuation->state);
+			
+		}
+	}
+	if (!needScan && (NULL != continuation)) {
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "needScanStacksForContinuationObject needScan=false, continuationObject=%p, isConcurrentGC=%zu, isGlobalGC=%zu, beingMounted=%zu, continuation=%p, continuation->state=%p\n",
+														   objectPtr, isConcurrentGC, isGlobalGC, beingMounted, continuation, continuation->state);
+
 	}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 	return needScan;

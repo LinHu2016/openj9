@@ -2223,6 +2223,14 @@ exit:
 		return false;
 	}
 
+	static void randomSleep()
+	{
+		UDATA count = rand() % 5;
+		for (UDATA cnt=0; cnt < count; cnt++) {
+			omrthread_nanosleep(5);
+		}
+	}
+
 	/**
 	 * clear CONCURRENTSCANNING flag bit3:for LocalConcurrentScanning /bit4:for GlobalConcurrentScanning base on checkConcurrentState,
 	 * if all CONCURRENTSCANNING bits(bit3 and bit4) are cleared and the continuation mounting is blocked by concurrent scanning, notify it.
@@ -2235,15 +2243,22 @@ exit:
 		/* clear CONCURRENTSCANNING flag bit0:LocalConcurrentScanning /bit1:GlobalConcurrentScanning */
 		volatile uintptr_t *localAddr = &continuation->state;
 
+		uintptr_t oldContinuationState = 0;
 		uintptr_t returnContinuationState = 0;
-		do (
-			uintptr_t oldContinuationState = *localAddr;
-			uintptr_t newContinuationState = resetConcurrentlyScannedToContinuationState(oldContinuationState, isGlobalGC);
+		uintptr_t newContinuationState = 0;
+		do {
+			oldContinuationState = *localAddr;
+			newContinuationState = resetConcurrentlyScannedToContinuationState(oldContinuationState, isGlobalGC);
 			returnContinuationState = VM_AtomicSupport::lockCompareExchange(localAddr, oldContinuationState, newContinuationState);
-		while (returnContinuationState != oldContinuationState);
-
+		} while (returnContinuationState != oldContinuationState);
+//		randomSleep();
+		if (newContinuationState != *localAddr) {
+			PORT_ACCESS_FROM_VMC(vmThread);
+			j9tty_printf(PORTLIB, "exitConcurrentGCScan bitAnd continuationObject=%p, continuation=%p, continuation->state=%p, newContinuationState=%p, isGlobalGC=%zu, vmThread=%p\n", 
+														continuationObject, continuation, *localAddr, newContinuationState, isGlobalGC, vmThread);
+		}
 		if (!isConcurrentlyScannedFromContinuationState(returnContinuationState, !isGlobalGC)) {
-			J9VMThread *carrierThread = getCarrierThreadFromContinuationState(oldContinuationState);
+			J9VMThread *carrierThread = getCarrierThreadFromContinuationState(returnContinuationState);
 			if (NULL != carrierThread) {
 				omrthread_monitor_enter(carrierThread->publicFlagsMutex);
 				/* notify the waiting carrierThread that we just finished scanning and we were the only/last GC to scan it, so that it can proceed with mounting. */
