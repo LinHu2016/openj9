@@ -31,6 +31,7 @@
 #include "ModronAssertions.h"
 #include "util_api.h"
 
+#include "AtomicSupport.hpp"
 #include "EnvironmentBase.hpp"
 #include "Forge.hpp"
 #if defined(OMR_GC_IDLE_HEAP_MANAGER)
@@ -43,7 +44,7 @@
 #include "ReferenceChainWalkerMarkMap.hpp"
 #include "SublistPool.hpp"
 #include "Wildcard.hpp"
-#include "VMHelpers.hpp"
+#include "ContinuationHelpers.hpp"
 
 MM_GCExtensions *
 MM_GCExtensions::newInstance(MM_EnvironmentBase *env)
@@ -341,15 +342,83 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 		 * does not exist.
 		 */
 		if (isConcurrentGC) {
-			needScan = VM_VMHelpers::tryWinningConcurrentGCScan(continuation, isGlobalGC, beingMounted);
+			needScan = MM_GCExtensions::tryWinningConcurrentGCScan(continuation, isGlobalGC, beingMounted);
 		} else {
 			/* for STW GCs */
 			uintptr_t continuationState = continuation->state;
 			Assert_MM_false(beingMounted);
-			Assert_MM_false(VM_VMHelpers::isConcurrentlyScanned(continuationState));
-			needScan = VM_VMHelpers::isActive(continuationState) && !VM_VMHelpers::isContinuationFullyMounted(continuationState);
+			Assert_MM_false(VM_ContinuationHelpers::isConcurrentlyScanned(continuationState));
+			needScan = VM_ContinuationHelpers::isActive(continuationState) && !VM_ContinuationHelpers::isContinuationFullyMounted(continuationState);
 		}
 	}
 #endif /* JAVA_SPEC_VERSION >= 19 */
 	return needScan;
+}
+
+#if JAVA_SPEC_VERSION >= 19
+bool
+MM_GCExtensions::tryWinningConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC, bool beingMounted)
+{
+	do {
+		uintptr_t oldContinuationState = continuation->state;
+		if (VM_ContinuationHelpers::isActive(oldContinuationState)) {
+
+			/* If it's being concurrently scanned within the same type of GC by another thread , it's unnecessary to do it again */
+			if (!VM_ContinuationHelpers::isConcurrentlyScanned(oldContinuationState, isGlobalGC)) {
+				/* If it's fully mounted, it's unnecessary to scan now, since it will be compensated by pre/post mount actions.
+				   If it's being mounted by this thread, we must be in pre/post mount (would be nice, but not trivial to assert it),
+				   therefore we must scan to aid concurrent GC.
+				 */
+				if (beingMounted || !VM_ContinuationHelpers::isContinuationFullyMounted(oldContinuationState)) {
+					/* Try to set scan bit for this GC type */
+					uintptr_t newContinuationState = oldContinuationState;
+					VM_ContinuationHelpers::setConcurrentlyScanned(&newContinuationState, isGlobalGC);
+					uintptr_t returnedState = VM_AtomicSupport::lockCompareExchange(&continuation->state, oldContinuationState, newContinuationState);
+					/* If no other thread changed anything (mounted or won scanning for any GC), we succeeded, otherwise retry */
+					if (oldContinuationState == returnedState) {
+						return true;
+					} else {
+						continue;
+					}
+				}
+			}
+		}
+	} while (false);
+	/* We did not even try to win, since it was either mounted or already being scanned */
+	return false;
+}
+
+void
+MM_GCExtensions::exitConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC)
+{
+	/* clear CONCURRENTSCANNING flag bit3:LocalConcurrentScanning /bit4:GlobalConcurrentScanning */
+	uintptr_t oldContinuationState = 0;
+	uintptr_t returnContinuationState = 0;
+	do {
+		oldContinuationState = continuation->state;
+		Assert_MM_true(VM_ContinuationHelpers::isConcurrentlyScanned(oldContinuationState, isGlobalGC));
+		uintptr_t newContinuationState = oldContinuationState;
+		VM_ContinuationHelpers::resetConcurrentlyScanned(&newContinuationState, isGlobalGC);
+		returnContinuationState = VM_AtomicSupport::lockCompareExchange(&continuation->state, oldContinuationState, newContinuationState);
+	} while (returnContinuationState != oldContinuationState);
+
+	if (!VM_ContinuationHelpers::isConcurrentlyScanned(returnContinuationState, !isGlobalGC)) {
+		J9VMThread *carrierThread = VM_ContinuationHelpers::getCarrierThread(returnContinuationState);
+		if (NULL != carrierThread) {
+			omrthread_monitor_enter(carrierThread->publicFlagsMutex);
+			/* notify the waiting carrierThread that we just finished scanning and we were the only/last GC to scan it, so that it can proceed with mounting. */
+			omrthread_monitor_notify_all(carrierThread->publicFlagsMutex);
+			omrthread_monitor_exit(carrierThread->publicFlagsMutex);
+		}
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
+void
+MM_GCExtensions::exitConcurrentGCScan(J9VMThread *vmThread, j9object_t continuationObject, bool isGlobalGC)
+{
+#if JAVA_SPEC_VERSION >= 19
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObject);
+	MM_GCExtensions::exitConcurrentGCScan(continuation, isGlobalGC);
+#endif /* JAVA_SPEC_VERSION >= 19 */
 }

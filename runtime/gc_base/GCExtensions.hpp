@@ -308,6 +308,30 @@ public:
 	 * @return true if we need to scan the java stack
 	 */
 	static bool needScanStacksForContinuationObject(J9VMThread *vmThread, j9object_t objectPtr, bool isConcurrentGC, bool isGlobalGC, bool beingMounted);
+#if JAVA_SPEC_VERSION >= 19
+	/*
+	 *
+	 * param[in] checkConcurrentState can be J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_LOCAL or J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_GLOBAL
+	 *
+	 *  There is no need scanning before continuation is started or after continuation is finished.
+	 *  If WinningConcurrentGCScan set J9_GC_CONTINUATION_bit3:STATE_CONCURRENT_SCAN_LOCAL or bit4:J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_GLOBAL in the state base on checkConcurrentState
+	 *	If low tagging(bit3 or bit4) failed due to either
+	 *
+	 *   a carrier thread winning to mount, we don't need to do anything, since it will be compensated by pre/post mount actions
+	 *   if it is pending to be mounted case(another concurrent scanning block the mounting),
+	 *   another GC thread winning to scan(bit3/bit4,bit3 and bit4 is irrelevant and independent), again don't do anything, and let the winning thread do the work, instead
+	 */
+	static bool tryWinningConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC, bool beingMounted);
+
+	/**
+	 * clear CONCURRENTSCANNING flag bit3:for LocalConcurrentScanning /bit4:for GlobalConcurrentScanning base on checkConcurrentState,
+	 * if all CONCURRENTSCANNING bits(bit3 and bit4) are cleared and the continuation mounting is blocked by concurrent scanning, notify it.
+	 * @param [in] checkConcurrentState can be J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_LOCAL or J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_GLOBAL
+	 */
+	static void exitConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+
+	static void exitConcurrentGCScan(J9VMThread *vmThread, j9object_t continuationObject, bool isGlobalGC);
 
 #if defined(J9VM_OPT_CRIU_SUPPORT)
 	MMINLINE virtual bool reinitializationInProgress() { return (NULL != ((J9JavaVM*)_omrVM->_language_vm)->checkpointState.checkpointThread); }
