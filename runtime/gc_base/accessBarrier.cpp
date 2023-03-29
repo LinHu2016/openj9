@@ -357,7 +357,6 @@ j9gc_objaccess_indexableDataDisplacement(J9VMThread *vmThread, J9IndexableObject
 {
 	MM_ObjectAccessBarrier *barrier = MM_GCExtensions::getExtensions(vmThread)->accessBarrier;
 	return barrier->indexableDataDisplacement(vmThread, src, dst);
-
 }
 
 /* TODO: After all array accesses in the VM have been made arraylet safe, 

@@ -283,8 +283,8 @@ MM_RealtimeAccessBarrier::validateWriteBarrier(J9VMThread *vmThread, J9Object *d
 			case GC_ArrayletObjectModel::InlineContiguous: {
 				UDATA** arrayletPtr = (UDATA **)(((J9IndexableObject *)dstObject) + 1);
 				UDATA* dataStart = *arrayletPtr;
-				UDATA* dataEnd = dataStart + _extensions->indexableObjectModel.getSizeInElements((J9IndexableObject*)dstObject);
-				if ((UDATA*)dstAddress < dataStart || (UDATA*)dstAddress >= dataEnd) {
+				UDATA* dataEnd = dataStart + _extensions->indexableObjectModel.getSizeInElements((J9IndexableObject *)dstObject);
+				if ((UDATA *)dstAddress < dataStart || (UDATA *)dstAddress >= dataEnd) {
 					j9tty_printf(PORTLIB, "validateWriteBarrier: IC: store to %p not in data section of array %p to %p", dstAddress, dataStart, dataEnd);
 					printClass(javaVM, J9GC_J9OBJECT_CLAZZ_VM(dstObject, javaVM));
 					j9tty_printf(PORTLIB, "\n");
@@ -299,8 +299,8 @@ MM_RealtimeAccessBarrier::validateWriteBarrier(J9VMThread *vmThread, J9Object *d
 					j9tty_printf(PORTLIB, "\n");
 				}
 				else {
-					UDATA* arrayletParent = region->getArrayletParent(region->whichArraylet((UDATA*)dstAddress, javaVM->arrayletLeafLogSize));
-					if (arrayletParent != (UDATA*)dstObject) {
+					UDATA *arrayletParent = region->getArrayletParent(region->whichArraylet((UDATA *)dstAddress, javaVM->arrayletLeafLogSize));
+					if (arrayletParent != (UDATA *)dstObject) {
 						j9tty_printf(PORTLIB, "validateWriteBarrier: D: parent of arraylet (%p) is not destObject (%p)", arrayletParent, dstObject);
 						printClass(javaVM, J9GC_J9OBJECT_CLAZZ_VM(dstObject, javaVM));
 						j9tty_printf(PORTLIB, "\n");
@@ -310,12 +310,12 @@ MM_RealtimeAccessBarrier::validateWriteBarrier(J9VMThread *vmThread, J9Object *d
 			}
 			case GC_ArrayletObjectModel::Hybrid: {
 				/* First check to see if it is in the last arraylet which is contiguous with the array spine. */
-				UDATA numberArraylets = _extensions->indexableObjectModel.numArraylets((J9IndexableObject*)dstObject);
-				UDATA** arrayletPtr = (UDATA**)(((J9IndexableObject*)dstObject)+1) + numberArraylets - 1;
+				UDATA numberArraylets = _extensions->indexableObjectModel.numArraylets((J9IndexableObject *)dstObject);
+				UDATA** arrayletPtr = (UDATA **)(((J9IndexableObject *)dstObject)+1) + numberArraylets - 1;
 				UDATA* dataStart = *arrayletPtr;
-				UDATA spineSize = _extensions->indexableObjectModel.getSpineSize((J9IndexableObject*)dstObject);
-				UDATA* dataEnd = (UDATA*)(((U_8*)dstObject) + spineSize);
-				if ((UDATA*)dstAddress < dataStart || (UDATA*)dstAddress >= dataEnd) {
+				UDATA spineSize = _extensions->indexableObjectModel.getSpineSize((J9IndexableObject *)dstObject);
+				UDATA* dataEnd = (UDATA *)(((U_8 *)dstObject) + spineSize);
+				if ((UDATA *)dstAddress < dataStart || (UDATA *)dstAddress >= dataEnd) {
 					/* store was _not_ to last arraylet; attempt to validate that
 					 * it was to one of the other arraylets of this array.
 					 */
@@ -325,8 +325,8 @@ MM_RealtimeAccessBarrier::validateWriteBarrier(J9VMThread *vmThread, J9Object *d
 						printClass(javaVM, J9GC_J9OBJECT_CLAZZ_VM(dstObject, javaVM));
 					}
 					else {
-						UDATA* arrayletParent = region->getArrayletParent(region->whichArraylet((UDATA*)dstAddress, javaVM->arrayletLeafLogSize));
-						if (arrayletParent != (UDATA*)dstObject) {
+						UDATA* arrayletParent = region->getArrayletParent(region->whichArraylet((UDATA *)dstAddress, javaVM->arrayletLeafLogSize));
+						if (arrayletParent != (UDATA *)dstObject) {
 							j9tty_printf(PORTLIB, "validateWriteBarrier: H: parent of arraylet (%p) is not destObject (%p)", arrayletParent, dstObject);
 							printClass(javaVM, J9GC_J9OBJECT_CLAZZ_VM(dstObject, javaVM));
 							j9tty_printf(PORTLIB, "\n");
@@ -364,8 +364,8 @@ MM_RealtimeAccessBarrier::printClass(J9JavaVM *javaVM, J9Class* clazz)
 
 	/* TODO: In Sov, if the class is char[], the string is printed instead of the class name */
 	romClass = clazz->romClass;
-	if(romClass->modifiers & J9AccClassArray) {
-		J9ArrayClass* arrayClass = (J9ArrayClass*) clazz;
+	if (romClass->modifiers & J9AccClassArray) {
+		J9ArrayClass* arrayClass = (J9ArrayClass *)clazz;
 		UDATA arity = arrayClass->arity;
 		utf = J9ROMCLASS_CLASSNAME(arrayClass->leafComponentType->romClass);
 		j9tty_printf(PORTLIB, "%.*s", (UDATA)J9UTF8_LENGTH(utf), J9UTF8_DATA(utf));
@@ -787,13 +787,13 @@ MM_RealtimeAccessBarrier::scanContiguousArray(MM_EnvironmentRealtime *env, J9Ind
 	bool const compressed = env->compressObjectReferences();
 	J9JavaVM *vm = (J9JavaVM *)env->getLanguageVM();
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
-	if(_realtimeGC->getRealtimeDelegate()->isDynamicClassUnloadingEnabled()) {
+	if (_realtimeGC->getRealtimeDelegate()->isDynamicClassUnloadingEnabled()) {
 		rememberObject(env, (J9Object *)objectPtr);
 	}
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */		
 
 	/* if NUA is enabled, separate path for contiguous arrays */
-	fj9object_t *scanPtr = (fj9object_t*) _extensions->indexableObjectModel.getDataPointerForContiguous(objectPtr);
+	fj9object_t *scanPtr = (fj9object_t *)_extensions->indexableObjectModel.getDataPointerForContiguous(objectPtr);
 	fj9object_t *endScanPtr = GC_SlotObject::addToSlotAddress(scanPtr, _extensions->indexableObjectModel.getSizeInElements(objectPtr), compressed);
 
 	while(scanPtr < endScanPtr) {
