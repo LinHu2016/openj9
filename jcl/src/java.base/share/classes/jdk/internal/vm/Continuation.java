@@ -39,8 +39,13 @@ public class Continuation {
 	private final ContinuationScope scope;
 	private final Runnable runnable;
 	private Continuation parent;
-	private boolean started;
-	private boolean finished;
+	public static final long CONTINUATION_STARTED = 1;
+	public static final long CONTINUATION_FINISHED = 2;
+	/* it's a bit-wise struct of CarrierThread ID and continuation flags(includes started and finished flag)
+	 * low 8 bits are reserved for flags and the rest are the carrier thread ID.
+	 * the state should not be directly accessed from Java, instead using get/set methods(such as isFinished() and setFinished().
+	 */
+	private volatile long state;
 
 	private static JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
@@ -171,7 +176,7 @@ public class Continuation {
 		try {
 			cont.runnable.run();
 		} finally {
-			cont.finished = true;
+			cont.setFinished(true);
 			yieldImpl();
 		}
 	}
@@ -180,7 +185,7 @@ public class Continuation {
 		if (!trylockAccess()) {
 			throw new IllegalStateException("Continuation inaccessible: mounted or being inspected.");
 		}
-		if (finished) {
+		if (isFinished()) {
 			throw new IllegalStateException("Continuation has already finished.");
 		}
 
@@ -251,7 +256,19 @@ public class Continuation {
 	}
 
 	public boolean isDone() {
-		return finished;
+		return isFinished();
+	}
+
+	public boolean isFinished() {
+		return 0 != (state & CONTINUATION_FINISHED);
+	}
+
+	public void setFinished(boolean bFinished) {
+		if (bFinished) {
+			state |= CONTINUATION_FINISHED;
+		} else {
+			state &= ~CONTINUATION_FINISHED;
+		}
 	}
 
 	public boolean isPreempted() {
