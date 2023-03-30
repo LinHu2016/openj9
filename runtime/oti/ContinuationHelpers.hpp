@@ -85,6 +85,12 @@ public:
 		SWAP_MEMBER(oldEntryLocalStorage, J9VMEntryLocalStorage*, threadELS, continuation);
 	}
 
+	static VMINLINE ContinuationState *
+	getContinuationStateAddress(J9VMThread *vmThread , j9object_t object)
+	{
+		return (ContinuationState *) ((uintptr_t) object + J9VMJDKINTERNALVMCONTINUATION_STATE_OFFSET(vmThread));
+	}
+
 	static VMINLINE bool
 	isStarted(ContinuationState continuationState)
 	{
@@ -92,9 +98,9 @@ public:
 	}
 
 	static VMINLINE void
-	setContinuationStarted(J9VMContinuation *continuation)
+	setContinuationStarted(ContinuationState *continuationStatePtr)
 	{
-		continuation->state |= J9_GC_CONTINUATION_STATE_STARTED;
+		*continuationStatePtr |= J9_GC_CONTINUATION_STATE_STARTED;
 	}
 
 	static VMINLINE bool
@@ -104,9 +110,9 @@ public:
 	}
 
 	static VMINLINE void
-	setContinuationFinished(J9VMContinuation *continuation)
+	setContinuationFinished(ContinuationState *continuationStatePtr)
 	{
-		continuation->state |= J9_GC_CONTINUATION_STATE_FINISHED;
+		*continuationStatePtr |= J9_GC_CONTINUATION_STATE_FINISHED;
 	}
 
 	static VMINLINE bool
@@ -146,15 +152,15 @@ public:
 	}
 
 	static VMINLINE void
-	setConcurrentlyScanned(ContinuationState *continuationState, bool isGlobalGC)
+	setConcurrentlyScanned(ContinuationState *continuationStatePtr, bool isGlobalGC)
 	{
-		*continuationState |= getConcurrentGCMask(isGlobalGC);
+		*continuationStatePtr |= getConcurrentGCMask(isGlobalGC);
 	}
 
 	static VMINLINE void
-	resetConcurrentlyScanned(ContinuationState *continuationState, bool isGlobalGC)
+	resetConcurrentlyScanned(ContinuationState *continuationStatePtr, bool isGlobalGC)
 	{
-		*continuationState &= ~getConcurrentGCMask(isGlobalGC);
+		*continuationStatePtr &= ~getConcurrentGCMask(isGlobalGC);
 	}
 
 	static VMINLINE bool
@@ -164,9 +170,9 @@ public:
 	}
 
 	static VMINLINE void
-	resetPendingState(ContinuationState *continuationState)
+	resetPendingState(ContinuationState *continuationStatePtr)
 	{
-		*continuationState &= ~J9_GC_CONTINUATION_STATE_PENDING_TO_BE_MOUNTED;
+		*continuationStatePtr &= ~J9_GC_CONTINUATION_STATE_PENDING_TO_BE_MOUNTED;
 	}
 
 	/**
@@ -201,16 +207,16 @@ public:
 	}
 
 	static VMINLINE void
-	settingCarrierAndPendingState(ContinuationState *continuationState, J9VMThread *carrierThread)
+	settingCarrierAndPendingState(ContinuationState *continuationStatePtr, J9VMThread *carrierThread)
 	{
 		/* also set PendingToBeMounted */
-		*continuationState |= (uintptr_t)carrierThread | J9_GC_CONTINUATION_STATE_PENDING_TO_BE_MOUNTED;
+		*continuationStatePtr |= (uintptr_t)carrierThread | J9_GC_CONTINUATION_STATE_PENDING_TO_BE_MOUNTED;
 	}
 
 	static VMINLINE void
-	resetContinuationCarrierID(J9VMContinuation *continuation)
+	resetContinuationCarrierID(ContinuationState *continuationStatePtr)
 	{
-		continuation->state &= ~J9_GC_CONTINUATION_STATE_CARRIERID_MASK;
+		*continuationStatePtr &= ~J9_GC_CONTINUATION_STATE_CARRIERID_MASK;
 	}
 };
 

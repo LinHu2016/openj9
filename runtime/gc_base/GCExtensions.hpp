@@ -321,14 +321,14 @@ public:
 	 *   if it is pending to be mounted case(another concurrent scanning block the mounting),
 	 *   another GC thread winning to scan(bit3/bit4,bit3 and bit4 is irrelevant and independent), again don't do anything, and let the winning thread do the work, instead
 	 */
-	static bool tryWinningConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC, bool beingMounted);
+	static bool tryWinningConcurrentGCScan(volatile ContinuationState *continuationStatePtr, bool isGlobalGC, bool beingMounted);
 
 	/**
 	 * clear CONCURRENTSCANNING flag bit3:for LocalConcurrentScanning /bit4:for GlobalConcurrentScanning base on checkConcurrentState,
 	 * if all CONCURRENTSCANNING bits(bit3 and bit4) are cleared and the continuation mounting is blocked by concurrent scanning, notify it.
 	 * @param [in] checkConcurrentState can be J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_LOCAL or J9_GC_CONTINUATION_STATE_CONCURRENT_SCAN_GLOBAL
 	 */
-	static void exitConcurrentGCScan(J9VMContinuation *continuation, bool isGlobalGC);
+	static void exitConcurrentGCScan(volatile ContinuationState *continuationStatePtr, bool isGlobalGC);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 	static void exitConcurrentGCScan(J9VMThread *vmThread, j9object_t continuationObject, bool isGlobalGC);

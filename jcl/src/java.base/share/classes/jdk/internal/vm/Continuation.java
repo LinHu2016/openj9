@@ -40,6 +40,7 @@ public class Continuation {
 	private Continuation parent;
 	private boolean started;
 	private boolean finished;
+	private long state;
 
 	private static JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 

@@ -92,15 +92,15 @@ end:
 }
 
 j9object_t
-synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuationObject, J9VMContinuation *continuation)
+synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuationObject, volatile ContinuationState *continuationStatePtr)
 {
 	uintptr_t oldContinuationState = 0;
 	uintptr_t returnContinuationState = 0;
 	do {
-		oldContinuationState = continuation->state;
+		oldContinuationState = *continuationStatePtr;
 		uintptr_t newContinuationState = oldContinuationState;
 		VM_ContinuationHelpers::settingCarrierAndPendingState(&newContinuationState, currentThread);
-		returnContinuationState = VM_AtomicSupport::lockCompareExchange(&continuation->state, oldContinuationState, newContinuationState);
+		returnContinuationState = VM_AtomicSupport::lockCompareExchange(continuationStatePtr, oldContinuationState, newContinuationState);
 	} while (returnContinuationState != oldContinuationState);
 	Assert_VM_false(VM_ContinuationHelpers::isPendingToBeMounted(returnContinuationState));
 	Assert_VM_Null(VM_ContinuationHelpers::getCarrierThread(returnContinuationState));
@@ -113,7 +113,7 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 			internalReleaseVMAccess(currentThread);
 
 			omrthread_monitor_enter(currentThread->publicFlagsMutex);
-			while (VM_ContinuationHelpers::isConcurrentlyScanned(continuation->state)) {
+			while (VM_ContinuationHelpers::isConcurrentlyScanned(*continuationStatePtr)) {
 				/* GC is still concurrently scanning the continuation(currentThread was still low tagged), wait for GC thread to notify us when it's done. */
 				omrthread_monitor_wait(currentThread->publicFlagsMutex);
 			}
@@ -122,12 +122,12 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 			internalAcquireVMAccess(currentThread);
 			continuationObject = POP_OBJECT_IN_SPECIAL_FRAME(currentThread);
 		}
-		oldContinuationState = continuation->state;
+		oldContinuationState = *continuationStatePtr;
 		Assert_VM_true(VM_ContinuationHelpers::isContinuationMountedWithCarrierThread(oldContinuationState, currentThread));
 		Assert_VM_true(VM_ContinuationHelpers::isPendingToBeMounted(oldContinuationState));
 		uintptr_t newContinuationState = oldContinuationState;
 		VM_ContinuationHelpers::resetPendingState(&newContinuationState);
-		returnContinuationState = VM_AtomicSupport::lockCompareExchange(&continuation->state, oldContinuationState, newContinuationState);
+		returnContinuationState = VM_AtomicSupport::lockCompareExchange(continuationStatePtr, oldContinuationState, newContinuationState);
 	} while (oldContinuationState != returnContinuationState);
 
 	return continuationObject;
@@ -139,6 +139,8 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	BOOLEAN result = TRUE;
 	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, continuationObject);
 	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, continuationObject);
+	ContinuationState *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(currentThread, continuationObject);
+
 	Assert_VM_Null(currentThread->currentContinuation);
 
 	if ((!started) && (NULL == continuation)) {
@@ -152,7 +154,7 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	Assert_VM_notNull(continuation);
 
 	/* let GC know we are mounting, so they don't need to scan us, or if there is already ongoing scan wait till it's complete. */
-	continuationObject = synchronizeWithConcurrentGCScan(currentThread, continuationObject, continuation);
+	continuationObject = synchronizeWithConcurrentGCScan(currentThread, continuationObject, continuationStatePtr);
 
 	/* defer preMountContinuation() after synchronizeWithConcurrentGCScan() to compensate potential missing concurrent scan
 	 * between synchronizeWithConcurrentGCScan() to swapFieldsWithContinuation().
@@ -178,7 +180,7 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 	} else {
 		/* start new Continuation execution */
 		J9VMJDKINTERNALVMCONTINUATION_SET_STARTED(currentThread, continuationObject, JNI_TRUE);
-		VM_ContinuationHelpers::setContinuationStarted(continuation);
+		VM_ContinuationHelpers::setContinuationStarted(continuationStatePtr);
 
 		/* prepare callin frame, send method will be set by interpreter */
 		J9SFJNICallInFrame *frame = ((J9SFJNICallInFrame*)currentThread->sp) - 1;
@@ -205,6 +207,8 @@ yieldContinuation(J9VMThread *currentThread)
 {
 	BOOLEAN result = TRUE;
 	J9VMContinuation *continuation = currentThread->currentContinuation;
+	j9object_t continuationObject = J9VMJAVALANGTHREAD_CONT(currentThread, currentThread->carrierThreadObject);
+	ContinuationState *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(currentThread, continuationObject);
 	Assert_VM_notNull(currentThread->currentContinuation);
 
 	currentThread->currentContinuation = NULL;
@@ -226,15 +230,14 @@ yieldContinuation(J9VMThread *currentThread)
 	 *
 	 * must be maintained for weakly ordered CPUs, to unsure that once the continuation is again available for GC scan (on potentially remote CPUs), all CPUs see up-to-date stack .
 	 */
-	j9object_t continuationObject = J9VMJAVALANGTHREAD_CONT(currentThread, currentThread->carrierThreadObject);
 	/* Notify GC of Continuation stack swap */
 	jboolean finished = J9VMJDKINTERNALVMCONTINUATION_FINISHED(currentThread, continuationObject);
 
 	if (finished) {
-		VM_ContinuationHelpers::setContinuationFinished(continuation);
+		VM_ContinuationHelpers::setContinuationFinished(continuationStatePtr);
 	}
-	Assert_VM_true(VM_ContinuationHelpers::isContinuationMountedWithCarrierThread(continuation->state, currentThread));
-	VM_ContinuationHelpers::resetContinuationCarrierID(continuation);
+	Assert_VM_true(VM_ContinuationHelpers::isContinuationMountedWithCarrierThread(*continuationStatePtr, currentThread));
+	VM_ContinuationHelpers::resetContinuationCarrierID(continuationStatePtr);
 	/* Logically postUnmountContinuation(), which add the related continuation Object to the rememberedSet or dirty the Card for concurrent marking for future scanning, should be called
 	 * before resetContinuationCarrierID(), but the scan might happened before resetContinuationCarrierID() if concurrent card clean happens, then the related compensating scan might be
 	 * missed due to the continuation still is stated as mounted(we don't scan any mounted continuation, it should be scanned during root scanning via J9VMThread->currentContinuation).
@@ -262,7 +265,8 @@ freeContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 			currentStack = previous;
 		} while (NULL != currentStack);
 
-		Assert_VM_true(VM_ContinuationHelpers::isFinished(continuation->state));
+		ContinuationState *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(currentThread, continuationObject);
+		Assert_VM_true(!VM_ContinuationHelpers::isConcurrentlyScanned(*continuationStatePtr) && (NULL == VM_ContinuationHelpers::getCarrierThread(*continuationStatePtr)));
 
 		/* Free the J9VMContinuation struct */
 		j9mem_free_memory(continuation);
