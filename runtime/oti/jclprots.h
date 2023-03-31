@@ -1305,10 +1305,6 @@ Java_jdk_internal_vm_Continuation_pin(JNIEnv *env, jclass unused);
 
 void JNICALL
 Java_jdk_internal_vm_Continuation_unpin(JNIEnv *env, jclass unused);
-void JNICALL
-Java_jdk_internal_vm_Continuation_setFinishedImpl(JNIEnv *env, jobject recv);
-jboolean JNICALL
-Java_jdk_internal_vm_Continuation_isFinishedImpl(JNIEnv *env, jobject recv);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 
 #ifdef __cplusplus

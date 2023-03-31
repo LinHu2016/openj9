@@ -24,8 +24,6 @@
 #include "jcl.h"
 #include "jclprots.h"
 #include "ut_j9jcl.h"
-#include "j9vmconstantpool.h"
-#include "VMHelpers.hpp"
 
 extern "C" {
 
@@ -65,30 +63,6 @@ Java_jdk_internal_vm_Continuation_unpin(JNIEnv *env, jclass unused)
 	} else {
 		currentThread->continuationPinCount -= 1;
 	}
-}
-
-void JNICALL
-Java_jdk_internal_vm_Continuation_setFinishedImpl(JNIEnv *env, jobject recv)
-{
-	J9VMThread *vmThread = (J9VMThread *) env;
-//	enterVMFromJNI(vmThread);
-	j9object_t object = J9_JNI_UNWRAP_REFERENCE(recv);
-	ContinuationState *continuationStatePtr = VM_VMHelpers::getContinuationStateAddress(vmThread, object);
-	VM_VMHelpers::setContinuationFinished(continuationStatePtr);
-//	exitVMToJNI(vmThread);
-}
-
-jboolean JNICALL
-Java_jdk_internal_vm_Continuation_isFinishedImpl(JNIEnv *env, jobject recv)
-{
-	jboolean result = JNI_FALSE;
-	J9VMThread *vmThread = (J9VMThread *) env;
-	j9object_t object = J9_JNI_UNWRAP_REFERENCE(recv);
-	ContinuationState *continuationStatePtr = VM_VMHelpers::getContinuationStateAddress(vmThread, object);
-	if (VM_VMHelpers::isFinished(*continuationStatePtr)) {
-		result = JNI_TRUE;
-	}
-	return result;
 }
 
 } /* extern "C" */

@@ -101,10 +101,6 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 		VM_VMHelpers::settingCarrierAndPendingState(&newContinuationState, currentThread);
 		returnContinuationState = VM_AtomicSupport::lockCompareExchange(continuationStatePtr, oldContinuationState, newContinuationState);
 	} while (returnContinuationState != oldContinuationState);
-//	if (VM_VMHelpers::isPendingToBeMounted(returnContinuationState)) {
-//		PORT_ACCESS_FROM_VMC(currentThread);
-//		j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan continuationState=%p, continuationObject=%p, returnContinuationState=%p, oldContinuationState=%p, currentThread=%p\n", *continuationStatePtr, continuationObject, returnContinuationState, oldContinuationState, currentThread);
-//	}
 	Assert_VM_false(VM_VMHelpers::isPendingToBeMounted(returnContinuationState));
 	Assert_VM_Null(VM_VMHelpers::getCarrierThread(returnContinuationState));
 
@@ -141,9 +137,10 @@ BOOLEAN
 enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 {
 	BOOLEAN result = TRUE;
+	jboolean started = J9VMJDKINTERNALVMCONTINUATION_STARTED(currentThread, continuationObject);
 	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, continuationObject);
 	ContinuationState *continuationStatePtr = VM_VMHelpers::getContinuationStateAddress(currentThread, continuationObject);
-	bool started = VM_VMHelpers::isStarted(*continuationStatePtr);
+
 	Assert_VM_Null(currentThread->currentContinuation);
 
 	if ((!started) && (NULL == continuation)) {
@@ -182,7 +179,7 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 		result = FALSE;
 	} else {
 		/* start new Continuation execution */
-//		J9VMJDKINTERNALVMCONTINUATION_SET_STARTED(currentThread, continuationObject, JNI_TRUE);
+		J9VMJDKINTERNALVMCONTINUATION_SET_STARTED(currentThread, continuationObject, JNI_TRUE);
 		VM_VMHelpers::setContinuationStarted(continuationStatePtr);
 
 		/* prepare callin frame, send method will be set by interpreter */
@@ -236,6 +233,11 @@ yieldContinuation(J9VMThread *currentThread)
 	 * must be maintained for weakly ordered CPUs, to unsure that once the continuation is again available for GC scan (on potentially remote CPUs), all CPUs see up-to-date stack .
 	 */
 	/* Notify GC of Continuation stack swap */
+	jboolean finished = J9VMJDKINTERNALVMCONTINUATION_FINISHED(currentThread, continuationObject);
+
+	if (finished) {
+		VM_VMHelpers::setContinuationFinished(continuationStatePtr);
+	}
 	Assert_VM_true(VM_VMHelpers::isContinuationMountedWithCarrierThread(*continuationStatePtr, currentThread));
 	VM_VMHelpers::resetContinuationCarrierID(continuationStatePtr);
 	/* Logically postUnmountContinuation(), which add the related continuation Object to the rememberedSet or dirty the Card for concurrent marking for future scanning, should be called
@@ -243,7 +245,7 @@ yieldContinuation(J9VMThread *currentThread)
 	 * missed due to the continuation still is stated as mounted(we don't scan any mounted continuation, it should be scanned during root scanning via J9VMThread->currentContinuation).
 	 * so calling postUnmountContinuation() after resetContinuationCarrierID() to avoid the missing scan case.
 	 */
-	if (!VM_VMHelpers::isFinished(*continuationStatePtr)) {
+	if (!finished) {
 		currentThread->javaVM->memoryManagerFunctions->postUnmountContinuation(currentThread, continuationObject);
 	}
 

@@ -692,8 +692,6 @@ if(NOT JAVA_SPEC_VERSION LESS 19)
 		Java_java_lang_Thread_registerNatives
 		Java_jdk_internal_vm_Continuation_pin
 		Java_jdk_internal_vm_Continuation_unpin
-		Java_jdk_internal_vm_Continuation_setFinishedImpl
-		Java_jdk_internal_vm_Continuation_isFinishedImpl
 	)
 endif()
 
