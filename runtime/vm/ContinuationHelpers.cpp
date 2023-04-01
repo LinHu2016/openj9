@@ -90,6 +90,14 @@ end:
 	return result;
 }
 
+void randomSleep()
+{
+	UDATA count = rand() % 10;
+	for (UDATA cnt=0; cnt < count; cnt++) {
+		omrthread_nanosleep(1000);
+	}
+}
+
 j9object_t
 synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuationObject, ContinuationState volatile *continuationStatePtr)
 {
@@ -104,6 +112,7 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 	Assert_VM_false(VM_VMHelpers::isPendingToBeMounted(returnContinuationState));
 	Assert_VM_Null(VM_VMHelpers::getCarrierThread(returnContinuationState));
 
+	j9object_t oldContinuationObject = continuationObject;
 	do {
 		if (VM_VMHelpers::isConcurrentlyScanned(returnContinuationState)) {
 			/* currentThread was low tagged (GC was already in progress), but by 'or'-ing our ID, we let GC know there is a pending mount */
@@ -111,15 +120,40 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 			PUSH_OBJECT_IN_SPECIAL_FRAME(currentThread, continuationObject);
 			internalReleaseVMAccess(currentThread);
 
+			randomSleep();
 			omrthread_monitor_enter(currentThread->publicFlagsMutex);
+			continuationObject = PEEK_OBJECT_IN_SPECIAL_FRAME(currentThread, 0);
+			if (oldContinuationObject != continuationObject) {
+				PORT_ACCESS_FROM_VMC(currentThread);
+				j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan1 oldContinuationObject=%p, continuationObject=%p, returnContinuationState=%p, currentThread=%p\n", oldContinuationObject, continuationObject, returnContinuationState, currentThread);
+				Assert_VM_true(oldContinuationObject == continuationObject);
+//				continuationStatePtr = VM_VMHelpers::getContinuationStateAddress(currentThread, continuationObject);
+//				oldContinuationObject = continuationObject;
+			}
 			while (VM_VMHelpers::isConcurrentlyScanned(*continuationStatePtr)) {
 				/* GC is still concurrently scanning the continuation(currentThread was still low tagged), wait for GC thread to notify us when it's done. */
 				omrthread_monitor_wait(currentThread->publicFlagsMutex);
+				randomSleep();
+				continuationObject = PEEK_OBJECT_IN_SPECIAL_FRAME(currentThread, 0);
+				if (oldContinuationObject != continuationObject) {
+					PORT_ACCESS_FROM_VMC(currentThread);
+					j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan2 oldContinuationObject=%p, continuationObject=%p, returnContinuationState=%p, currentThread=%p\n", oldContinuationObject, continuationObject, returnContinuationState, currentThread);
+					Assert_VM_true(oldContinuationObject == continuationObject);
+//					continuationStatePtr = VM_VMHelpers::getContinuationStateAddress(currentThread, continuationObject);
+//					oldContinuationObject = continuationObject;
+				}
 			}
 			omrthread_monitor_exit(currentThread->publicFlagsMutex);
 
 			internalAcquireVMAccess(currentThread);
 			continuationObject = POP_OBJECT_IN_SPECIAL_FRAME(currentThread);
+			if (oldContinuationObject != continuationObject) {
+				continuationStatePtr = VM_VMHelpers::getContinuationStateAddress(currentThread, continuationObject);
+//				PORT_ACCESS_FROM_VMC(currentThread);
+//				j9tty_printf(PORTLIB, "synchronizeWithConcurrentGCScan oldContinuationObject=%p, continuationObject=%p, returnContinuationState=%p, currentThread=%p\n", oldContinuationObject, continuationObject, returnContinuationState, currentThread);
+
+				Assert_VM_true(oldContinuationObject == continuationObject);
+			}
 		}
 		oldContinuationState = *continuationStatePtr;
 		Assert_VM_true(VM_VMHelpers::isContinuationMountedWithCarrierThread(oldContinuationState, currentThread));
@@ -129,7 +163,6 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 		returnContinuationState = VM_AtomicSupport::lockCompareExchange(continuationStatePtr, oldContinuationState, newContinuationState);
 	} while (oldContinuationState != returnContinuationState);
 	Assert_VM_false(VM_VMHelpers::isPendingToBeMounted(*continuationStatePtr));
-
 	return continuationObject;
 }
 
