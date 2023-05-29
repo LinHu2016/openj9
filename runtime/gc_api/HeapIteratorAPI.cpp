@@ -546,6 +546,11 @@ j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portL
 	J9MM_IterateRegionDescriptor regionDesc;
 	jvmtiIterationControl returnCode = JVMTI_ITERATION_CONTINUE;
 
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	U_64 startTime = j9time_hires_clock();
+	UDATA count = 0;
+
 	while (NULL != continuationObjectList) {
 		J9Object *objectPtr = continuationObjectList->getHeadOfList();
 		while (NULL != objectPtr) {
@@ -553,6 +558,7 @@ j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portL
 			if (0 != regionFound) {
 				initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
 				returnCode = func(vmThread, &objectDescriptor, userData);
+				count++;
 				if (JVMTI_ITERATION_ABORT == returnCode) {
 					return returnCode;
 				}
@@ -563,6 +569,7 @@ j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portL
 		}
 		continuationObjectList = continuationObjectList->getNextList();
 	}
+	j9tty_printf(PORTLIB, "j9mm_iterate_all_continuation_objects count=%zu, time=%zu ms\n", count, j9time_hires_delta(startTime, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS));
 	return returnCode;
 }
 

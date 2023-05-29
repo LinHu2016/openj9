@@ -434,7 +434,16 @@ public:
 	 * which modifies elements within the list.
 	 */
 	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env);
+	/**
+	 * scanContinuationObjects() is for removing continuation objects, which are dead or last unmounted,
+	 * from the continuation lists within a scope of current GC(for example just for Nursery in Scavenge).
+	 */
 	virtual void scanContinuationObjects(MM_EnvironmentBase *env);
+	/**
+	 * iterateAllContinuationObjects() is for iterating all live continuation objects in the heap and doing any processing
+	 * that other parties may register through a hook [J9HOOK_MM_WALKCONTINUATION].
+	 */
+	virtual void iterateAllContinuationObjects(MM_EnvironmentBase *env);
 
 	virtual void scanStringTable(MM_EnvironmentBase *env);
 	void scanJNIGlobalReferences(MM_EnvironmentBase *env);

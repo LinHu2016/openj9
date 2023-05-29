@@ -784,6 +784,12 @@ MM_RootScanner::scanContinuationObjects(MM_EnvironmentBase *env)
 	reportScanningEnded(RootScannerEntity_ContinuationObjects);
 }
 
+
+void
+MM_RootScanner::iterateAllContinuationObjects(MM_EnvironmentBase *env)
+{
+}
+
 /**
  * Scan the per-thread object monitor lookup caches.
  * Note that this is not a root since the cache contains monitors from the global monitor table
@@ -1043,6 +1049,12 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 
 	scanOwnableSynchronizerObjects(env);
 	scanContinuationObjects(env);
+
+	J9JavaVM *vm = (J9JavaVM*)env->getOmrVM()->_language_vm;
+	J9JITConfig *jitConfig = vm->jitConfig;
+	if ((NULL != jitConfig) && (NULL != jitConfig->methodsToDelete)) {
+		iterateAllContinuationObjects(env);
+	}
 
 #if defined(J9VM_GC_MODRON_SCAVENGER)
 	/* Remembered set is clearable in a generational system -- if an object in old
