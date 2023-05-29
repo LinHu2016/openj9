@@ -209,6 +209,7 @@ public:
 		onStarted = 1,
 	};
 	TimingAddContinuationInList timingAddContinuationInList;
+	bool didIterateContinuationListForJIT;
 protected:
 private:
 protected:
@@ -387,6 +388,7 @@ public:
 		, recycleRemainders(true)
 		, continuationListOption(enable_continuation_list)
 		, timingAddContinuationInList(onStarted)
+		, didIterateContinuationListForJIT(false)
 	{
 		_typeId = __FUNCTION__;
 	}

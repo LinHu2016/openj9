@@ -28,6 +28,7 @@
 #include "ModronAssertions.h"
 
 #include "ArrayletLeafIterator.hpp"
+#include "EnvironmentBase.hpp"
 #include "GCExtensionsBase.hpp"
 #include "HeapIteratorAPIRootIterator.hpp"
 #include "HeapIteratorAPIBufferedIterator.hpp"
@@ -545,6 +546,17 @@ j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portL
 	J9MM_IterateObjectDescriptor objectDescriptor;
 	J9MM_IterateRegionDescriptor regionDesc;
 	jvmtiIterationControl returnCode = JVMTI_ITERATION_CONTINUE;
+
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+	UDATA cycle_type = env->_cycleState->_type;
+
+	if ((OMR_GC_CYCLE_TYPE_SCAVENGE == cycle_type) || (OMR_GC_CYCLE_TYPE_VLHGC_PARTIAL_GARBAGE_COLLECT == cycle_type) ||
+		(OMR_GC_CYCLE_TYPE_GLOBAL   == cycle_type) || (OMR_GC_CYCLE_TYPE_VLHGC_GLOBAL_GARBAGE_COLLECT  == cycle_type)) {
+		if (extensions->didIterateContinuationListForJIT) {
+			extensions->didIterateContinuationListForJIT = false;
+			return returnCode;
+		}
+	}
 
 	while (NULL != continuationObjectList) {
 		J9Object *objectPtr = continuationObjectList->getHeadOfList();

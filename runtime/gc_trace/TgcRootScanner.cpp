@@ -70,7 +70,7 @@ const static char *attributeNames[] = {
 	"phantomrefscomplete", /* RootScannerEntity_PhantomReferenceObjectsComplete */
 	"unfinalizedobjectscomplete", /* RootScannerEntity_UnfinalizedObjectsComplete */
 	"ownablesynchronizerobjectscomplete", /* RootScannerEntity_OwnableSynchronizerObjectsComplete */
-	"continuationobjectscomplete", /* RootScannerEntity_ContinuationObjectsComplete */
+	"iteratingcontinuationobjects", /* RootScannerEntity_ContinuationObjectsComplete */
 	"monitorlookupcaches", /* RootScannerEntity_MonitorLookupCaches */
 	"monitorlookupcachescomplete", /* RootScannerEntity_MonitorLookupCachesComplete */
 	"monitorreferenceobjectscomplete", /* RootScannerEntity_MonitorReferenceObjectsComplete */

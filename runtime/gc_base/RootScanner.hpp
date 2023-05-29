@@ -435,6 +435,7 @@ public:
 	 */
 	virtual void scanOwnableSynchronizerObjects(MM_EnvironmentBase *env);
 	virtual void scanContinuationObjects(MM_EnvironmentBase *env);
+	virtual void iterateAllContinuationObjects(MM_EnvironmentBase *env);
 
 	virtual void scanStringTable(MM_EnvironmentBase *env);
 	void scanJNIGlobalReferences(MM_EnvironmentBase *env);
