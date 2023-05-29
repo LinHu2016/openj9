@@ -88,6 +88,7 @@
 #include "WorkPacketsIterator.hpp"
 #include "WorkPacketsVLHGC.hpp"
 #include "WorkStack.hpp"
+#include "VMHelpers.hpp"
 
 void
 MM_ParallelGlobalMarkTask::mainSetup(MM_EnvironmentBase *env)
@@ -1112,7 +1113,7 @@ MM_GlobalMarkingScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
 
 						/* read the next link before we add it to the buffer */
 						J9Object* next = _extensions->accessBarrier->getContinuationLink(object);
-						if (isMarked(object)) {
+						if (isMarked(object) && !VM_VMHelpers::isContinuationFinished((J9VMThread *)env->getLanguageVMThread(), object)) {
 							env->getGCEnvironment()->_continuationObjectBuffer->add(env, object);
 						} else {
 							env->_markVLHGCStats._continuationCleared += 1;
@@ -1126,6 +1127,41 @@ MM_GlobalMarkingScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
 	}
 	/* restore everything to a flushed state before exiting */
 	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
+}
+
+void
+MM_GlobalMarkingScheme::iterateContinuationObjects(MM_EnvironmentVLHGC *env)
+{
+	J9JavaVM *vm = (J9JavaVM*)env->getOmrVM()->_language_vm;
+	J9JITConfig *jitConfig = vm->jitConfig;
+//	if (NULL == jitConfig->methodsToDelete) {
+	if (!_extensions->parallelReclaimJITCodeCache4GlobalGC || (NULL == jitConfig->methodsToDelete)) {
+		return;
+	}
+
+	if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
+		vm->memoryManagerFunctions->j9gc_flush_nonAllocationCaches_for_walk(vm);
+		env->_currentTask->releaseSynchronizedGCThreads(env);
+	}
+
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
+	while (NULL != (region = regionIterator.nextRegion())) {
+		if (region->containsObjects()) {
+			if (NULL != region->getContinuationObjectList()->getHeadOfList()) {
+				if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+					J9Object *object = region->getContinuationObjectList()->getHeadOfList();
+					while (NULL != object) {
+						Assert_MM_true(region->isAddressInRegion(object));
+						J9Object* next = _extensions->accessBarrier->getContinuationLink(object);
+						TRIGGER_J9HOOK_MM_WALKCONTINUATION(_extensions->hookInterface, (J9VMThread *)env->getLanguageVMThread(), object);
+						object = next;
+					}
+				}
+			}
+		}
+	}
+	_extensions->didIteratContinuationListForJIT = true;
 }
 
 /**
@@ -1309,6 +1345,10 @@ private:
 		reportScanningStarted(RootScannerEntity_ContinuationObjects);
 		_markingScheme->scanContinuationObjects(MM_EnvironmentVLHGC::getEnvironment(env));
 		reportScanningEnded(RootScannerEntity_ContinuationObjects);
+	}
+
+	virtual void iterateContinuationObjects(MM_EnvironmentBase *env) {
+		_markingScheme->iterateContinuationObjects(MM_EnvironmentVLHGC::getEnvironment(env));
 	}
 
 	virtual void doMonitorReference(J9ObjectMonitor *objectMonitor, GC_HashTableIterator *monitorReferenceIterator) {
@@ -1540,6 +1580,7 @@ MM_GlobalMarkingScheme::markLiveObjectsComplete(MM_EnvironmentVLHGC *env)
 		/* weak and soft references resurrected by finalization need to be cleared immediately since weak and soft processing has already completed */
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_soft;
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_weak;
+
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
 		GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
 		while(NULL != (region = regionIterator.nextRegion())) {

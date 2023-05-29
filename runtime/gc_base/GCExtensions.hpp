@@ -203,6 +203,15 @@ public:
 		verify_continuation_list = 2,
 	};
 	ContinuationListOption continuationListOption;
+	bool parallelReclaimJITCodeCache4LocalGC;
+	bool parallelReclaimJITCodeCache4GlobalGC;
+	bool didIteratContinuationListForJIT;
+
+	enum TimingAddContinuationInList {
+		onCreated = 0,
+		onFirstMount = 1,
+	};
+	TimingAddContinuationInList timingAddContinuationInList;
 
 protected:
 private:
@@ -381,6 +390,10 @@ public:
 		, freeSizeThresholdForSurvivor(DEFAULT_SURVIVOR_THRESHOLD)
 		, recycleRemainders(true)
 		, continuationListOption(enable_continuation_list)
+		, parallelReclaimJITCodeCache4LocalGC(false)
+		, parallelReclaimJITCodeCache4GlobalGC(false)
+		, didIteratContinuationListForJIT(false)
+		, timingAddContinuationInList(onFirstMount)
 	{
 		_typeId = __FUNCTION__;
 	}

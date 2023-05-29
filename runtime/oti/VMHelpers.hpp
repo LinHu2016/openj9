@@ -43,6 +43,9 @@
 #include "ute.h"
 #include "AtomicSupport.hpp"
 #include "ObjectAllocationAPI.hpp"
+#if JAVA_SPEC_VERSION >= 19
+#include "ContinuationHelpers.hpp"
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 typedef enum {
 	J9_BCLOOP_SEND_TARGET_INITIAL_STATIC = 0,
@@ -2052,6 +2055,16 @@ exit:
 			J9VMJAVALANGTHREAD_SET_DEADINTERRUPT(currentThread, targetObject, JNI_TRUE);
 		}
 #endif /* JAVA_SPEC_VERSION > 11 */
+	}
+
+	static VMINLINE bool isContinuationFinished(J9VMThread *vmThread , j9object_t object)
+	{
+		bool ret = false;
+#if JAVA_SPEC_VERSION >= 19
+		ContinuationState continuationState = *VM_ContinuationHelpers::getContinuationStateAddress(vmThread , object);
+		ret = VM_ContinuationHelpers::isFinished(continuationState);
+#endif /* JAVA_SPEC_VERSION >= 19 */
+		return ret;
 	}
 
 	static VMINLINE UDATA

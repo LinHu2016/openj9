@@ -154,6 +154,7 @@ MM_MarkingDelegate::workerCompleteGC(MM_EnvironmentBase *env)
 	if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_soft;
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_weak;
+
 		env->_currentTask->releaseSynchronizedGCThreads(env);
 	}
 	MM_MarkingSchemeRootClearer rootClearer(env, _markingScheme, this);

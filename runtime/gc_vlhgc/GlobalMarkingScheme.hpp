@@ -278,6 +278,7 @@ private:
 	 * @param env[in] the current thread
 	 */
 	void scanContinuationObjects(MM_EnvironmentVLHGC *env);
+	void iterateContinuationObjects(MM_EnvironmentVLHGC *env);
 
 	bool isMarked(J9Object *objectPtr);
 

@@ -102,6 +102,7 @@
 #include "SurvivorMemoryIterator.hpp"
 #include "WorkPacketsIterator.hpp"
 #include "WorkPacketsVLHGC.hpp"
+#include "VMHelpers.hpp"
 
 #define INITIAL_FREE_HISTORY_WEIGHT ((float)0.8)
 #define TENURE_BYTES_HISTORY_WEIGHT ((float)0.8)
@@ -3550,7 +3551,7 @@ MM_CopyForwardScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
 					}
 
 					J9Object* next = _extensions->accessBarrier->getContinuationLink(pointer);
-					if (NULL == forwardedPtr) {
+					if ((NULL == forwardedPtr) || VM_VMHelpers::isContinuationFinished((J9VMThread *)env->getLanguageVMThread(), forwardedPtr)) {
 						/* object was not previously marked, clean up */
 						env->_copyForwardStats._continuationCleared += 1;
 						_extensions->releaseNativesForContinuationObject(env, pointer);
@@ -3565,6 +3566,39 @@ MM_CopyForwardScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
 
 	/* restore everything to a flushed state before exiting */
 	env->getGCEnvironment()->_continuationObjectBuffer->flush(env);
+}
+
+void
+MM_CopyForwardScheme::iterateContinuationObjects(MM_EnvironmentVLHGC *env)
+{
+	J9JavaVM *vm = (J9JavaVM*)env->getOmrVM()->_language_vm;
+	J9JITConfig *jitConfig = vm->jitConfig;
+//	if (NULL == jitConfig->methodsToDelete) {
+	if (!_extensions->parallelReclaimJITCodeCache4LocalGC || (NULL == jitConfig->methodsToDelete)) {
+		return;
+	}
+	if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
+		vm->memoryManagerFunctions->j9gc_flush_nonAllocationCaches_for_walk(vm);
+		env->_currentTask->releaseSynchronizedGCThreads(env);
+	}
+
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
+	while (NULL != (region = regionIterator.nextRegion())) {
+		if (NULL != region->getContinuationObjectList()->getHeadOfList()) {
+			if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+				J9Object *pointer = region->getContinuationObjectList()->getHeadOfList();
+
+				while (NULL != pointer) {
+					Assert_MM_true(region->isAddressInRegion(pointer));
+					J9Object* next = _extensions->accessBarrier->getContinuationLink(pointer);
+					TRIGGER_J9HOOK_MM_WALKCONTINUATION(_extensions->hookInterface, (J9VMThread *)env->getLanguageVMThread(), pointer);
+					pointer = next;
+				}
+			}
+		}
+	}
+	_extensions->didIteratContinuationListForJIT = true;
 }
 
 void
@@ -3984,6 +4018,10 @@ private:
 		reportScanningEnded(RootScannerEntity_ContinuationObjects);
 	}
 
+	virtual void iterateContinuationObjects(MM_EnvironmentBase *env) {
+		_copyForwardScheme->iterateContinuationObjects(MM_EnvironmentVLHGC::getEnvironment(env));
+	}
+
 	virtual void scanPhantomReferenceObjects(MM_EnvironmentBase *env) {
 		reportScanningStarted(RootScannerEntity_PhantomReferenceObjects);
 		_copyForwardScheme->scanPhantomReferenceObjects(MM_EnvironmentVLHGC::getEnvironment(env));
@@ -4296,6 +4334,7 @@ MM_CopyForwardScheme::workThreadGarbageCollect(MM_EnvironmentVLHGC *env)
 		 */
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_soft;
 		env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_weak;
+
 		/* since we need a sync point here anyway, use this opportunity to determine which regions contain weak and soft references or unfinalized objects */
 		/* (we can't do phantom references yet because unfinalized processing may find more of them) */
 		MM_HeapRegionDescriptorVLHGC *region = NULL;

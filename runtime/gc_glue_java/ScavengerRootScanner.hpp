@@ -172,6 +172,7 @@ public:
 			 */
 			env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_soft;
 			env->_cycleState->_referenceObjectOptions |= MM_CycleState::references_clear_weak;
+
 			env->_currentTask->releaseSynchronizedGCThreads(env);
 		}
 		Assert_GC_true_with_message(env, env->getGCEnvironment()->_referenceObjectBuffer->isEmpty(), "Non-empty reference buffer in MM_EnvironmentBase* env=%p before scanClearable\n", env);

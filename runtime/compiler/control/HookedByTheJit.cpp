@@ -6601,6 +6601,22 @@ static UDATA jitReleaseCodeStackWalkFrame(J9VMThread *vmThread, J9StackWalkState
    }
 
 #if JAVA_SPEC_VERSION >= 19
+static void jitWalkContinuationStackFrames(J9HookInterface **hookInterface, UDATA eventNum, void *eventData, void *userData)
+{
+	MM_ContinuationIteratingEvent *continuationIteratingEvent = (MM_ContinuationIteratingEvent *)eventData;
+	J9VMThread * vmThread = continuationIteratingEvent->vmThread;
+	J9InternalVMFunctions *vmFuncs = vmThread->javaVM->internalVMFunctions;
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationIteratingEvent->object);
+	if (NULL != continuation) {
+		J9StackWalkState walkState;
+		walkState.flags     = J9_STACKWALK_ITERATE_HIDDEN_JIT_FRAMES | J9_STACKWALK_ITERATE_FRAMES | J9_STACKWALK_SKIP_INLINES;
+		walkState.skipCount = 0;
+		walkState.frameWalkFunction = jitReleaseCodeStackWalkFrame;
+
+		vmFuncs->walkContinuationStackFrames(vmThread, continuation, &walkState);
+	}
+}
+
 static jvmtiIterationControl jitWalkContinuationCallBack(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData)
    {
    J9InternalVMFunctions *vmFuncs = vmThread->javaVM->internalVMFunctions;
@@ -6645,6 +6661,7 @@ static void jitReleaseCodeStackWalk(OMR_VMThread *omrVMThread, condYieldFromGCFu
    {
    J9VMThread *vmThread = (J9VMThread *)omrVMThread->_language_vmthread;
    J9JITConfig *jitConfig = vmThread->javaVM->jitConfig;
+
    if (!jitConfig)
       return; // not much we can do if the hook is called after freeJitConfig
 
@@ -6703,7 +6720,7 @@ static void jitReleaseCodeStackWalk(OMR_VMThread *omrVMThread, condYieldFromGCFu
          jvmtiIterationControl rc = vm->memoryManagerFunctions->j9mm_iterate_all_continuation_objects(vmThread, PORTLIB, 0, jitWalkContinuationCallBack, (void*)condYield);
          if (JVMTI_ITERATION_ABORT == rc)
             yieldHappened = true;
-         }
+        }
       while (yieldHappened);
    } else {
       J9StackWalkState walkState;
@@ -7110,6 +7127,9 @@ int32_t setUpHooks(J9JavaVM * javaVM, J9JITConfig * jitConfig, TR_FrontEnd * vm)
            (*vmHooks)->J9HookRegisterWithCallSite(vmHooks, J9HOOK_VM_CLASS_LOADERS_UNLOAD, jitHookClassLoadersUnload, OMR_GET_CALLSITE(), NULL) ||
 #endif
            (*gcHooks)->J9HookRegisterWithCallSite(gcHooks, J9HOOK_MM_INTERRUPT_COMPILATION, jitHookInterruptCompilation, OMR_GET_CALLSITE(), NULL) ||
+#if JAVA_SPEC_VERSION >= 19
+           (*gcHooks)->J9HookRegisterWithCallSite(gcHooks, J9HOOK_MM_WALKCONTINUATION, jitWalkContinuationStackFrames, OMR_GET_CALLSITE(), NULL) ||
+#endif /* JAVA_SPEC_VERSION >= 19 */
            (*gcHooks)->J9HookRegisterWithCallSite(gcHooks, J9HOOK_MM_CLASS_UNLOADING_END, jitHookClassesUnloadEnd, OMR_GET_CALLSITE(), NULL))
          {
          j9tty_printf(PORTLIB, "Error: Unable to register class event hook\n");

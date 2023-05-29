@@ -784,6 +784,13 @@ MM_RootScanner::scanContinuationObjects(MM_EnvironmentBase *env)
 	reportScanningEnded(RootScannerEntity_ContinuationObjects);
 }
 
+
+void
+MM_RootScanner::iterateContinuationObjects(MM_EnvironmentBase *env)
+{
+
+}
+
 /**
  * Scan the per-thread object monitor lookup caches.
  * Note that this is not a root since the cache contains monitors from the global monitor table
@@ -1043,7 +1050,6 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 
 	scanOwnableSynchronizerObjects(env);
 	scanContinuationObjects(env);
-
 #if defined(J9VM_GC_MODRON_SCAVENGER)
 	/* Remembered set is clearable in a generational system -- if an object in old
 	 * space dies, and it pointed to an object in new space, it needs to be removed
@@ -1066,6 +1072,7 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 		scanDoubleMappedObjects(env);
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+	iterateContinuationObjects(env);
 }
 
 /**

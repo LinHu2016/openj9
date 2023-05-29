@@ -28,6 +28,7 @@
 #include "ModronAssertions.h"
 
 #include "ArrayletLeafIterator.hpp"
+#include "EnvironmentBase.hpp"
 #include "GCExtensionsBase.hpp"
 #include "HeapIteratorAPIRootIterator.hpp"
 #include "HeapIteratorAPIBufferedIterator.hpp"
@@ -546,13 +547,41 @@ j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portL
 	J9MM_IterateRegionDescriptor regionDesc;
 	jvmtiIterationControl returnCode = JVMTI_ITERATION_CONTINUE;
 
+
+	MM_EnvironmentBase *env = MM_EnvironmentBase::getEnvironment(vmThread->omrVMThread);
+//	UDATA cycle_type = env->_cycleState->_type;
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//	j9tty_printf(PORTLIB, "j9mm_iterate_all_continuation_objects parallelReclaimJITCodeCache4LocalGC=%zu, parallelReclaimJITCodeCache4GlobalGC=%zu, cycle_type=%zu, extensions->didIteratContinuationListForJIT=%zu\n",
+//			extensions->parallelReclaimJITCodeCache4LocalGC, extensions->parallelReclaimJITCodeCache4GlobalGC, cycle_type, extensions->didIteratContinuationListForJIT);
+
+	//Debug
+//	if ((extensions->parallelReclaimJITCodeCache4LocalGC && ((OMR_GC_CYCLE_TYPE_SCAVENGE == cycle_type) ||(OMR_GC_CYCLE_TYPE_VLHGC_PARTIAL_GARBAGE_COLLECT == cycle_type))) ||
+//		(extensions->parallelReclaimJITCodeCache4GlobalGC && ((OMR_GC_CYCLE_TYPE_GLOBAL == cycle_type) || (OMR_GC_CYCLE_TYPE_VLHGC_GLOBAL_GARBAGE_COLLECT == cycle_type)))) {
+//		if (extensions->didIteratContinuationListForJIT) {
+//			extensions->didIteratContinuationListForJIT = false;
+//			return returnCode;
+//		}
+//	}
+//	j9tty_printf(PORTLIB, "j9mm_iterate_all_continuation_objects \n");
+
+//	if ((OMR_GC_CYCLE_TYPE_SCAVENGE == cycle_type) || (OMR_GC_CYCLE_TYPE_VLHGC_PARTIAL_GARBAGE_COLLECT == cycle_type) ||
+//		(OMR_GC_CYCLE_TYPE_GLOBAL   == cycle_type) || (OMR_GC_CYCLE_TYPE_VLHGC_GLOBAL_GARBAGE_COLLECT  == cycle_type)) {
+//		return returnCode;
+//	}
+
+	U_64 startTime = j9time_hires_clock();
+	UDATA count = 0;
 	while (NULL != continuationObjectList) {
 		J9Object *objectPtr = continuationObjectList->getHeadOfList();
 		while (NULL != objectPtr) {
 			UDATA regionFound = j9mm_find_region_for_pointer(javaVM, objectPtr, &regionDesc);
 			if (0 != regionFound) {
 				initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
-				returnCode = func(vmThread, &objectDescriptor, userData);
+//				if ( !extensions->didIteratContinuationListForJIT || !((extensions->parallelReclaimJITCodeCache4LocalGC && ((OMR_GC_CYCLE_TYPE_SCAVENGE == cycle_type) ||(OMR_GC_CYCLE_TYPE_VLHGC_PARTIAL_GARBAGE_COLLECT == cycle_type))) ||
+//					(extensions->parallelReclaimJITCodeCache4GlobalGC && ((OMR_GC_CYCLE_TYPE_GLOBAL == cycle_type) || (OMR_GC_CYCLE_TYPE_VLHGC_GLOBAL_GARBAGE_COLLECT == cycle_type))))) {
+					returnCode = func(vmThread, &objectDescriptor, userData);
+//				}
+				count++;
 				if (JVMTI_ITERATION_ABORT == returnCode) {
 					return returnCode;
 				}
@@ -563,6 +592,8 @@ j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portL
 		}
 		continuationObjectList = continuationObjectList->getNextList();
 	}
+	extensions->didIteratContinuationListForJIT = false;
+	j9tty_printf(PORTLIB, "j9mm_iterate_all_continuation_objects count=%zu, time=%zu ms\n", count, j9time_hires_delta(startTime, j9time_hires_clock(), J9PORT_TIME_DELTA_IN_MICROSECONDS));
 	return returnCode;
 }
 

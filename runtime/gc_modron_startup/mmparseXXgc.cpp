@@ -1542,6 +1542,24 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			continue;
 		}
 
+		if (try_scan(&scan_start, "parallelReclaimJITCodeCache4LocalGC")) {
+			extensions->parallelReclaimJITCodeCache4LocalGC = true;
+			continue;
+		}
+		if (try_scan(&scan_start, "parallelReclaimJITCodeCache4GlobalGC")) {
+			extensions->parallelReclaimJITCodeCache4GlobalGC = true;
+			continue;
+		}
+
+		if (try_scan(&scan_start, "AddContinuationInListOnFirstMount")) {
+			extensions->timingAddContinuationInList = MM_GCExtensions::onFirstMount;
+			continue;
+		}
+
+		if (try_scan(&scan_start, "AddContinuationInListOnCreated")) {
+			extensions->timingAddContinuationInList = MM_GCExtensions::onCreated;
+			continue;
+		}
 		/* Couldn't find a match for arguments */
 		j9nls_printf(PORTLIB, J9NLS_ERROR, J9NLS_GC_OPTION_UNKNOWN, error_scan);
 		returnValue = JNI_EINVAL;

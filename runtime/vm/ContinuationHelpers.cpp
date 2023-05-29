@@ -184,6 +184,8 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 			/* Directly return result if the create code failed, exception is already set. */
 			return result;
 		}
+		currentThread->javaVM->memoryManagerFunctions->continuationObjectStarted(currentThread, continuationObject);
+
 		continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, continuationObject);
 	}
 	Assert_VM_notNull(continuation);
@@ -457,6 +459,8 @@ walkAllStackFrames(J9VMThread *currentThread, J9StackWalkState *walkState)
 
 	/* Walk all live continuation stacks using the GC Continuation object iterator */
 	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "walkAllStackFrames\n");
+
 	vm->memoryManagerFunctions->j9gc_flush_nonAllocationCaches_for_walk(vm);
 	vm->memoryManagerFunctions->j9mm_iterate_all_continuation_objects(
 									currentThread,
