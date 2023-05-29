@@ -28,8 +28,11 @@
 #include "ConfigurationDelegate.hpp"
 #include "EnvironmentBase.hpp"
 #include "HeapRegionDescriptorStandard.hpp"
+#include "HeapRegionIteratorStandard.hpp"
+
 #include "ContinuationObjectBufferStandard.hpp"
 #include "ContinuationObjectList.hpp"
+#include "ParallelTask.hpp"
 
 MM_ContinuationObjectBufferStandard::MM_ContinuationObjectBufferStandard(MM_GCExtensions *extensions, uintptr_t maxObjectCount)
 	: MM_ContinuationObjectBuffer(extensions, maxObjectCount)
@@ -102,3 +105,45 @@ MM_ContinuationObjectBufferStandard::reinitializeForRestore(MM_EnvironmentBase *
 	return true;
 }
 #endif /* defined(J9VM_OPT_CRIU_SUPPORT) */
+
+void
+MM_ContinuationObjectBufferStandard::iterateAllContinuationObjects(MM_EnvironmentBase *env)
+{
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+	MM_HeapRegionDescriptorStandard *region = NULL;
+	GC_HeapRegionIteratorStandard regionIterator(extensions->heapRegionManager);
+
+	UDATA count = 0;
+	UDATA count2 = 0;
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+			MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+			if (NULL != list->getHeadOfList()) {
+				if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+
+					omrobjectptr_t object = list->getHeadOfList();
+					while (NULL != object) {
+
+						count++;
+
+						omrobjectptr_t next = extensions->accessBarrier->getContinuationLink(object);
+						J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF((J9VMThread *)env->getLanguageVMThread(), object);
+						if (NULL != continuation) {
+
+							count2++;
+
+							TRIGGER_J9HOOK_MM_WALKCONTINUATION(extensions->hookInterface, (J9VMThread *)env->getLanguageVMThread(), object);
+						}
+						object = next;
+					}
+				}
+			}
+		}
+	}
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_ContinuationObjectBufferStandard::iterateAllContinuationObjects count=%zu, count2=%zu\n", count, count2);
+
+}

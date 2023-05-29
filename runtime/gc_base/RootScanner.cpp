@@ -784,6 +784,19 @@ MM_RootScanner::scanContinuationObjects(MM_EnvironmentBase *env)
 	reportScanningEnded(RootScannerEntity_ContinuationObjects);
 }
 
+bool
+MM_RootScanner::isContinuationListEmpty(MM_EnvironmentBase *env)
+{
+	bool ret = true;
+	MM_ContinuationObjectList *continuationObjectList = _extensions->getContinuationObjectLists();
+	while (ret && (NULL != continuationObjectList)) {
+		ret = continuationObjectList->isEmpty();
+		continuationObjectList = continuationObjectList->getNextList();
+	}
+
+	return ret;
+}
+
 /**
  * Scan the per-thread object monitor lookup caches.
  * Note that this is not a root since the cache contains monitors from the global monitor table
@@ -1043,6 +1056,24 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 
 	scanOwnableSynchronizerObjects(env);
 	scanContinuationObjects(env);
+#if JAVA_SPEC_VERSION >= 19
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//    j9tty_printf(PORTLIB, "scanClearable iterateAllContinuationObjects\n");
+	J9JavaVM *vm = (J9JavaVM*)env->getOmrVM()->_language_vm;
+	J9JITConfig *jitConfig = vm->jitConfig;
+	if ((NULL != jitConfig) && (NULL != jitConfig->methodsToDelete)) {
+		/* to make sure that previous pruning phase of continuation list(scanContinuationObjects()) is complete */
+		if (env->_currentTask->synchronizeGCThreadsAndReleaseSingleThread(env, UNIQUE_ID)) {
+//			vm->memoryManagerFunctions->j9gc_flush_nonAllocationCaches_for_walk(vm);
+			_isContinuationListEmpty = isContinuationListEmpty(env);
+//		    j9tty_printf(PORTLIB, "iterateAllContinuationObjects _isContinuationListEmpty=%zu\n", _isContinuationListEmpty);
+			env->_currentTask->releaseSynchronizedGCThreads(env);
+		}
+		if (!_isContinuationListEmpty) {
+			iterateAllContinuationObjects(env);
+		}
+	}
+#endif /* JAVA_SPEC_VERSION >= 19 */
 
 #if defined(J9VM_GC_MODRON_SCAVENGER)
 	/* Remembered set is clearable in a generational system -- if an object in old

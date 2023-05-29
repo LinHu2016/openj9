@@ -508,15 +508,16 @@ walkAllStackFrames(J9VMThread *currentThread, J9StackWalkState *walkState)
 		targetThread = targetThread->linkNext;
 	} while (targetThread != vm->mainThread);
 
+	/* for non realtime GC case j9mm_iterate_all_continuation_objects has been done by pallells GC threads during GC clearable phase */
 	/* Walk all live continuation stacks using the GC Continuation object iterator */
-	PORT_ACCESS_FROM_VMC(currentThread);
-	vm->memoryManagerFunctions->j9gc_flush_nonAllocationCaches_for_walk(vm);
-	vm->memoryManagerFunctions->j9mm_iterate_all_continuation_objects(
-									currentThread,
-									PORTLIB,
-									0,
-									walkContinuationCallBack,
-									(void*)walkState);
+//	PORT_ACCESS_FROM_VMC(currentThread);
+//	vm->memoryManagerFunctions->j9gc_flush_nonAllocationCaches_for_walk(vm);
+//	vm->memoryManagerFunctions->j9mm_iterate_all_continuation_objects(
+//									currentThread,
+//									PORTLIB,
+//									0,
+//									walkContinuationCallBack,
+//									(void*)walkState);
 	return rc;
 }
 
