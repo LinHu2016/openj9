@@ -210,6 +210,7 @@ public:
 	};
 	TimingAddContinuationInList timingAddContinuationInList;
 	bool didIterateContinuationListForJIT;
+	bool disableRecliamCodeCacheOnLocalGC;
 protected:
 private:
 protected:
@@ -389,6 +390,7 @@ public:
 		, continuationListOption(enable_continuation_list)
 		, timingAddContinuationInList(onStarted)
 		, didIterateContinuationListForJIT(false)
+		, disableRecliamCodeCacheOnLocalGC(false)
 	{
 		_typeId = __FUNCTION__;
 	}

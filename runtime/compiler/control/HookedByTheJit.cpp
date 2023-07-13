@@ -7090,9 +7090,10 @@ int32_t setUpHooks(J9JavaVM * javaVM, J9JITConfig * jitConfig, TR_FrontEnd * vm)
          }
       else
          {
-         unableToRegisterHooks =
-             ((*gcOmrHooks)->J9HookRegisterWithCallSite(gcOmrHooks, J9HOOK_MM_OMR_GLOBAL_GC_END, jitHookReleaseCodeGlobalGCEnd, OMR_GET_CALLSITE(), NULL) ||
-             (*gcOmrHooks)->J9HookRegisterWithCallSite(gcOmrHooks, J9HOOK_MM_OMR_LOCAL_GC_END, jitHookReleaseCodeLocalGCEnd, OMR_GET_CALLSITE(), NULL));
+          unableToRegisterHooks = (*gcOmrHooks)->J9HookRegisterWithCallSite(gcOmrHooks, J9HOOK_MM_OMR_GLOBAL_GC_END, jitHookReleaseCodeGlobalGCEnd, OMR_GET_CALLSITE(), NULL);
+          if (!(javaVM->runtimeFlags & J9_RUNTIME_NORECLIAMCODECACHEONLOCALGC) && !unableToRegisterHooks) {
+        	  unableToRegisterHooks = (*gcOmrHooks)->J9HookRegisterWithCallSite(gcOmrHooks, J9HOOK_MM_OMR_LOCAL_GC_END, jitHookReleaseCodeLocalGCEnd, OMR_GET_CALLSITE(), NULL);
+          }
          }
 
       if (unableToRegisterHooks)
