@@ -795,11 +795,11 @@ J9::ObjectModel::isIndexableDataAddrPresent()
       return vmInfo->_isIndexableDataAddrPresent;
       }
 #endif /* defined(J9VM_OPT_JITSERVER) */
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
    return FALSE != TR::Compiler->javaVM->isIndexableDataAddrPresent;
 #else
    return false;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
    }
 
 MM_GCReadBarrierType

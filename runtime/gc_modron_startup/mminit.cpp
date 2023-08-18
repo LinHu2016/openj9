@@ -2959,9 +2959,9 @@ gcInitializeDefaults(J9JavaVM* vm)
 
 	initializeIndexableObjectHeaderSizes(vm);
 	extensions->indexableObjectModel.setHeaderSizes(vm);
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	extensions->indexableObjectModel.setIsIndexableDataAddrPresent(vm);
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	if (NULL == extensions->configuration) {
 		loadInfo->fatalErrorStr = (char *)j9nls_lookup_message(J9NLS_DO_NOT_PRINT_MESSAGE_TAG | J9NLS_DO_NOT_APPEND_NEWLINE, J9NLS_GC_FAILED_TO_INITIALIZE, "Failed to initialize.");
 		goto error;
@@ -3075,16 +3075,16 @@ gcReinitializeDefaultsForRestore(J9VMThread* vmThread)
 void
 initializeIndexableObjectHeaderSizes(J9JavaVM* vm)
 {
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	if (vm->isIndexableDualHeaderShapeEnabled && (J9_GC_POLICY_BALANCED != ((OMR_VM *)vm->omrVM)->gcPolicy)) {
 		setIndexableObjectHeaderSizeWithoutDataAddress(vm);
 	} else {
 		vm->isIndexableDataAddrPresent = TRUE;
 		setIndexableObjectHeaderSizeWithDataAddress(vm);
 	}
-#else /* defined(J9VM_ENV_DATA64) */
+#else /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	setIndexableObjectHeaderSizeWithoutDataAddress(vm);
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 }
 
 #if defined(J9VM_ENV_DATA64)

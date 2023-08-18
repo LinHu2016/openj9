@@ -859,7 +859,7 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 #endif /* defined(J9VM_GC_MODRON_SCAVENGER) || defined (J9VM_GC_VLHGC) */
 /* End of options relating to dynamicBreadthFirstScanOrdering */
 
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		if (try_scan(&scan_start, "enableIndexableDualHeaderShape")) {
 			vm->isIndexableDualHeaderShapeEnabled = TRUE;
 			continue;
@@ -869,7 +869,7 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			vm->isIndexableDualHeaderShapeEnabled = FALSE;
 			continue;
 		}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 #if defined(J9VM_GC_MODRON_SCAVENGER)	
 		if (try_scan(&scan_start, "scanCacheMinimumSize=")) {

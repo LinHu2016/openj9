@@ -194,9 +194,9 @@ allocateVMThread(J9JavaVM * vm, omrthread_t osThread, UDATA privateFlags, void *
 
 	newThread->contiguousIndexableHeaderSize = vm->contiguousIndexableHeaderSize;
 	newThread->discontiguousIndexableHeaderSize = vm->discontiguousIndexableHeaderSize;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	newThread->isIndexableDataAddrPresent = vm->isIndexableDataAddrPresent;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 	newThread->privateFlags = privateFlags;
 	if (vm->extendedRuntimeFlags & J9_EXTENDED_RUNTIME_DEBUG_VM_ACCESS) {

@@ -429,7 +429,9 @@ MM_IndexableObjectAllocationModel::reserveLeavesForContiguousArraylet(MM_Environ
 
 		void *contiguousAddress = doubleMapArraylets(env, (J9Object *)spine, arrayletLeaveAddrs, firstLeafRegionDescriptor, NULL);
 		if (NULL != contiguousAddress) {
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			indexableObjectModel->setDataAddrForContiguous((J9IndexableObject *)spine, contiguousAddress);
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		}
 
 		/* Free arraylet leaf addresses if dynamically allocated */

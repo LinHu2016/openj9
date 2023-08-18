@@ -231,7 +231,7 @@ public:
 		}
 
 		if (objectModel->isIndexable(destinationObjectPtr)) {
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			if (_gcEnv.shouldFixupDataAddrForContiguous) {
 				/**
 				 * Update the dataAddr internal field of the indexable object. The field being updated
@@ -241,7 +241,7 @@ public:
 				 */
 				indexableObjectModel->setDataAddrForContiguous((J9IndexableObject *)destinationObjectPtr);
 			}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 			if (UDATA_MAX != _extensions->getOmrVM()->_arrayletLeafSize) {
 				indexableObjectModel->fixupInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)sourceObjectPtr);

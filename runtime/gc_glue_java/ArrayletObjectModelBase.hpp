@@ -53,10 +53,10 @@ protected:
 	void * _arrayletRangeTop; /**< The top heap range of where discontiguous arraylets are allowed. */
 	MM_MemorySubSpace * _arrayletSubSpace; /**< The only subspace that is allowed to have discontiguous arraylets. */
 	uintptr_t _largestDesirableArraySpineSize; /**< A cached copy of the subspace's _largestDesirableArraySpineSize to be used when we don't have access to a subspace. */
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	bool _enableVirtualLargeObjectHeap;
 	bool _isIndexableDataAddrPresent;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	uintptr_t _contiguousIndexableHeaderSize;
 	uintptr_t _discontiguousIndexableHeaderSize;
 public:
@@ -166,7 +166,7 @@ public:
 		_discontiguousIndexableHeaderSize = vm->discontiguousIndexableHeaderSize;
 	}
 
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	/**
 	 * Sets whether the dataAddr field is present in the indexable object header
 	 * @param vm Java VM
@@ -176,7 +176,7 @@ public:
 	{
 		_isIndexableDataAddrPresent = vm->isIndexableDataAddrPresent;
 	}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	/**

@@ -52,9 +52,9 @@ private:
 	const uintptr_t _gcAllocationType;
 
 	uintptr_t _contiguousIndexableHeaderSize;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	bool _isIndexableDataAddrPresent;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 #if defined(J9VM_GC_BATCH_CLEAR_TLH)
 	const uintptr_t _initializeSlotsOnTLHAllocate;
@@ -84,20 +84,20 @@ private:
 			J9IndexableObjectContiguousCompressed *header = (J9IndexableObjectContiguousCompressed *)objectHeader;
 			header->clazz = (uint32_t)(uintptr_t)arrayClass;
 			header->size = size;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			if (_isIndexableDataAddrPresent) {
 				((J9IndexableObjectWithDataAddressContiguousCompressed *)header)->dataAddr = dataAddr;
 			}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		} else {
 			J9IndexableObjectContiguousFull *header = (J9IndexableObjectContiguousFull *)objectHeader;
 			header->clazz = (uintptr_t)arrayClass;
 			header->size = size;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			if (_isIndexableDataAddrPresent) {
 				((J9IndexableObjectWithDataAddressContiguousFull *)header)->dataAddr = dataAddr;
 			}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		}
 		initializeIndexableSlots(initializeSlots, dataSize, dataAddr);
 	}
@@ -111,21 +111,21 @@ private:
 			header->clazz = (uint32_t)(uintptr_t)arrayClass;
 			header->mustBeZero = 0;
 			header->size = 0;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			if (_isIndexableDataAddrPresent) {
 				((J9IndexableObjectWithDataAddressDiscontiguousCompressed *)header)->dataAddr = NULL;
 			}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		} else {
 			J9IndexableObjectDiscontiguousFull *header = (J9IndexableObjectDiscontiguousFull *)objectHeader;
 			header->clazz = (uintptr_t)arrayClass;
 			header->mustBeZero = 0;
 			header->size = 0;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			if (_isIndexableDataAddrPresent) {
 				((J9IndexableObjectWithDataAddressDiscontiguousFull *)header)->dataAddr = NULL;
 			}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		}
 	}
 
@@ -320,9 +320,9 @@ public:
 	MM_ObjectAllocationAPI(J9VMThread *currentThread)
 		: _gcAllocationType(currentThread->javaVM->gcAllocationType)
 		, _contiguousIndexableHeaderSize(currentThread->contiguousIndexableHeaderSize)
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		, _isIndexableDataAddrPresent(currentThread->isIndexableDataAddrPresent)
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 #if defined(J9VM_GC_BATCH_CLEAR_TLH)
 		, _initializeSlotsOnTLHAllocate(currentThread->javaVM->initializeSlotsOnTLHAllocate)
 #endif /* J9VM_GC_BATCH_CLEAR_TLH */

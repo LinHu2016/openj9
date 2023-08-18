@@ -836,8 +836,7 @@ public:
 		return getSpineSize(J9GC_J9OBJECT_CLAZZ(arrayPtr, this), layout, getSizeInElements(arrayPtr));
 	}
 
-#if defined(J9VM_ENV_DATA64)
-
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	/**
 	 * Gets data pointer of a contiguous indexable object.
 	 * Helper to get dataAddr field of contiguous indexable objects.
@@ -956,11 +955,9 @@ public:
 	getDataAddrForContiguous(J9IndexableObject *arrayPtr)
 	{
 		void *dataAddr = NULL;
-
 		if (_isIndexableDataAddrPresent) {
 			dataAddr = *dataAddrSlotForContiguous(arrayPtr);
 		}
-
 		return dataAddr;
 	}
 
@@ -1020,12 +1017,10 @@ public:
 	isValidDataAddr(J9IndexableObject *arrayPtr, bool isValidDataAddrForDoubleMappedObject)
 	{
 		bool isValidDataAddress = true;
-
 		if (_isIndexableDataAddrPresent) {
 			void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
 			isValidDataAddress = isValidDataAddr(arrayPtr, dataAddr, isValidDataAddrForDoubleMappedObject);
 		}
-
 		return isValidDataAddress;
 	}
 
@@ -1061,7 +1056,7 @@ public:
 
 		return isValidDataAddress;
 	}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 	/**
 	 * External fixup dataAddr API to update pointer of indexable objects.
@@ -1075,7 +1070,7 @@ public:
 	MMINLINE void
 	fixupDataAddr(MM_ForwardedHeader *forwardedHeader, omrobjectptr_t arrayPtr)
 	{
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		J9IndexableObject *j9ArrayPtr = (J9IndexableObject *)arrayPtr;
 
 		if (InlineContiguous == getPreservedArrayLayout(forwardedHeader)) {
@@ -1083,7 +1078,7 @@ public:
 				setDataAddrForContiguous(j9ArrayPtr);
 			}
 		}
-#endif /* J9VM_ENV_DATA64 */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	}
 
 	/**
@@ -1240,7 +1235,13 @@ public:
 	MMINLINE void *
 	getDataPointerForContiguous(J9IndexableObject *arrayPtr)
 	{
-		return (void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize());
+		void *dataAddr = (void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize());;
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+		if (isVirtualLargeObjectHeapEnabled()) {
+			dataAddr = *dataAddrSlotForContiguous(arrayPtr);
+		}
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+		return dataAddr;
 	}
 
 	/**

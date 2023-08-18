@@ -1391,9 +1391,9 @@ MM_WriteOnceCompactor::fixupPointerArrayObject(MM_EnvironmentVLHGC* env, J9Objec
 		 * balanced, wants to fixup only truly contiguous arrays
 		 */
 		if (indexableObjectModel->isArrayletDataAdjacentToHeader((J9IndexableObject *)objectPtr)
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		 || (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && (NULL != indexableObjectModel->getDataAddrForContiguous((J9IndexableObject *)objectPtr)))
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		 ) {
 			uintptr_t elementsToWalk = indexableObjectModel->getSizeInElements((J9IndexableObject *)objectPtr);
 			GC_PointerArrayIterator it(_javaVM, objectPtr);

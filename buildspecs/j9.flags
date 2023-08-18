@@ -360,6 +360,10 @@ all data is stored in their own region. It additionaly reduces footprint, mainly
 			<require flag="gc_vlhgc"/>
 		</requires>
 	</flag>
+	<flag id="gc_enableSparseHeapAllocation">
+		<description>Allows large arrays to be allocated off-heap</description>
+		<ifRemoved></ifRemoved>
+	</flag>
 	<flag id="gc_compressedPointerBarrier">
 		<description>VM performs runtime checks for missed access barriers in a compressed pointer sense</description>
 		<ifRemoved>VM does not check for missed access barriers in a compressed pointer sense</ifRemoved>

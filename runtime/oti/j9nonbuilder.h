@@ -5293,9 +5293,9 @@ typedef struct J9VMThread {
 	void* gcExtensions;
 	UDATA contiguousIndexableHeaderSize;
 	UDATA discontiguousIndexableHeaderSize;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	UDATA isIndexableDataAddrPresent;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	void* gpInfo;
 	void* jitVMwithThreadInfo;
 	U_8* profilingBufferEnd;
@@ -5809,10 +5809,10 @@ typedef struct J9JavaVM {
 	UDATA arrayletLeafLogSize;
 	UDATA contiguousIndexableHeaderSize;
 	UDATA discontiguousIndexableHeaderSize;
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	UDATA isIndexableDataAddrPresent;
 	BOOLEAN isIndexableDualHeaderShapeEnabled;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	struct J9VMThread* exclusiveVMAccessQueueHead;
 	struct J9VMThread* exclusiveVMAccessQueueTail;
 	omrthread_monitor_t statisticsMutex;

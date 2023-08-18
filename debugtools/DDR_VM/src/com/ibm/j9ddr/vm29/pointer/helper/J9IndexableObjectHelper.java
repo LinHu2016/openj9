@@ -146,7 +146,7 @@ public class J9IndexableObjectHelper extends J9ObjectHelper
 		if (0 == contiguousHeaderSize) {
 			try {
 				J9JavaVMPointer javaVM = J9RASHelper.getVM(DataType.getJ9RASPointer());
-				if (J9BuildFlags.env_data64 && !javaVM.isIndexableDataAddrPresent().isZero()) {
+				if (J9BuildFlags.gc_enableSparseHeapAllocation && !javaVM.isIndexableDataAddrPresent().isZero()) {
 					contiguousHeaderSize = contiguousHeaderSizeWithDataAddress();
 					return contiguousHeaderSize;
 				}
@@ -193,7 +193,7 @@ public class J9IndexableObjectHelper extends J9ObjectHelper
 		if (0 == discontiguousHeaderSize) {
 			try {
 				J9JavaVMPointer javaVM = J9RASHelper.getVM(DataType.getJ9RASPointer());
-				if (J9BuildFlags.env_data64 && !javaVM.isIndexableDataAddrPresent().isZero()) {
+				if (J9BuildFlags.gc_enableSparseHeapAllocation && !javaVM.isIndexableDataAddrPresent().isZero()) {
 					discontiguousHeaderSize = discontiguousHeaderSizeWithDataAddress();
 					return discontiguousHeaderSize;
 				}
