@@ -188,14 +188,14 @@ GC_ArrayletObjectModel::isAddressWithinHeap(MM_GCExtensionsBase *extensions, voi
 bool
 GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr)
 {
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
 	bool isObjectWithinHeap = isAddressWithinHeap(extensions, dataAddr);
 	return ((getDataSizeInBytes(arrayPtr) >= _omrVM->_arrayletLeafSize) && (!isObjectWithinHeap));
 
-#else /* defined(J9VM_ENV_DATA64) */
+#else /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	return false;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 }
 
 bool

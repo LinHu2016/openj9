@@ -199,7 +199,7 @@ public:
 			_gcEnv.movedObjectHashCodeCache.originalHashCode = computeObjectAddressToHash((J9JavaVM *)_extensions->getOmrVM()->_language_vm, objectPtr);
 		}
 
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		if (objectModel->isIndexable(objectPtr)) {
 			GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
 			if (_vmThread->isIndexableDataAddrPresent && indexableObjectModel->isInlineContiguousArraylet((J9IndexableObject *)objectPtr)) {
@@ -208,7 +208,7 @@ public:
 				_gcEnv.shouldFixupDataAddrForContiguous = false;
 			}
 		}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	}
 
 	/**

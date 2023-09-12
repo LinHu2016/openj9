@@ -64,6 +64,8 @@ extern "C" {
 #define J9VM_OPT_MULTI_LAYER_SHARED_CLASS_CACHE
 #endif
 
+#undef J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION
+
 #ifdef __cplusplus
 }
 #endif
