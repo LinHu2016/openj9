@@ -456,7 +456,7 @@ copyFieldsFromContinuation(J9VMThread *currentThread, J9VMThread *vmThread, J9VM
 }
 
 UDATA
-walkContinuationStackFrames(J9VMThread *currentThread, J9VMContinuation *continuation, J9StackWalkState *walkState)
+walkContinuationStackFrames(J9VMThread *currentThread, J9VMContinuation *continuation, j9object_t threadObject, J9StackWalkState *walkState)
 {
 	Assert_VM_notNull(currentThread);
 
@@ -467,7 +467,7 @@ walkContinuationStackFrames(J9VMThread *currentThread, J9VMContinuation *continu
 		J9VMEntryLocalStorage els = {0};
 
 		copyFieldsFromContinuation(currentThread, &stackThread, &els, continuation);
-
+		stackThread.threadObject = threadObject;
 		walkState->walkThread = &stackThread;
 		rc = currentThread->javaVM->walkStackFrames(currentThread, walkState);
 	}
@@ -479,11 +479,18 @@ walkContinuationStackFrames(J9VMThread *currentThread, J9VMContinuation *continu
 jvmtiIterationControl
 walkContinuationCallBack(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData)
 {
-	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, object->object);
+	j9object_t continuationObj = object->object;
+	J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(vmThread, continuationObj);
 	if (NULL != continuation) {
 		J9StackWalkState localWalkState = *(J9StackWalkState*)userData;
 		/* Walk non-null continuation's stack */
-		walkContinuationStackFrames(vmThread, continuation, &localWalkState);
+		j9object_t virtualthread = (j9object_t)J9VMJDKINTERNALVMCONTINUATION_VTHREAD(vmThread, continuationObj);
+		j9object_t carrierThread = (j9object_t)J9VMJAVALANGVIRTUALTHREAD_CARRIERTHREAD(vmThread, virtualthread);
+		if (NULL != carrierThread) {
+			walkContinuationStackFrames(vmThread, continuation, carrierThread, &localWalkState);
+		} else {
+			walkContinuationStackFrames(vmThread, continuation, virtualthread, &localWalkState);
+		}
 	}
 	return JVMTI_ITERATION_CONTINUE;
 }
