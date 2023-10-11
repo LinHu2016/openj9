@@ -487,6 +487,12 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			break;
 		}
 
+		arrayletLeaveAddrs[arrayoidIndex] = leaf;
+		if (0 == arrayoidIndex) {
+			MM_HeapRegionDescriptorVLHGC *firstLeafRegionDescriptor = (MM_HeapRegionDescriptorVLHGC *)extensions->getHeap()->getHeapRegionManager()->tableDescriptorForAddress(leaf);
+			firstLeafRegionDescriptor->_sparseHeapAllocation = true;
+		}
+
 		/* Disable region for reads and writes, since that'll be done through the contiguous double mapped region */
 		void *highAddress = (void *)((uintptr_t)leaf + arrayletLeafSize);
 		bool ret = extensions->heap->decommitMemory(leaf, arrayletLeafSize, leaf, highAddress);
@@ -494,7 +500,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			Trc_MM_VirtualMemory_decommitMemory_failure(leaf, arrayletLeafSize);
 		}
 
-		arrayletLeaveAddrs[arrayoidIndex] = leaf;
+//		arrayletLeaveAddrs[arrayoidIndex] = leaf;
 
 		/* refresh the spine -- it might move if we GC while allocating the leaf */
 		spine = _allocateDescription.getSpine();
