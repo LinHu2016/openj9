@@ -90,6 +90,105 @@ J9::TransformUtil::generateArrayElementShiftAmountTrees(
    return shiftAmount;
    }
 
+
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+// Generates IL trees to load dataAddr field from array header
+TR::Node *
+J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject)
+   {
+   TR_ASSERT_FATAL_WITH_NODE(arrayObject,
+      TR::Compiler->om.isOffHeapAllocationEnabled(),
+      "This helpler shouldn't be called when off heap allocation is disabled.\n");
+
+   // TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(comp->fej9()->getOffsetOfContiguousDataAddrField());
+   TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateContiguousArrayDataAddrFieldShadowSymRef();
+   TR::Node *dataAddrField = TR::Node::createWithSymRef(TR::aloadi, 1, arrayObject, 0, dataAddrFieldOffset);
+   dataAddrField->setIsInternalPointer(true);
+
+   return dataAddrField;
+   }
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+
+// Generates IL trees for array access. It accepts offset in bytes and array base node
+TR::Node *
+J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *arrayNode, TR::Node *offsetNode)
+   {
+   TR::Node *arrayAddressNode = NULL;
+   TR::Node *totalOffsetNode = NULL;
+
+   TR_ASSERT_FATAL_WITH_NODE(arrayNode,
+      !TR::Compiler->om.canGenerateArraylets(),
+      "This helper shouldn't be called if arraylets are enabled.\n");
+
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+   if (TR::Compiler->om.isOffHeapAllocationEnabled())
+      {
+      arrayAddressNode = generateDataAddrLoadTrees(comp, arrayNode);
+      if (offsetNode)
+         arrayAddressNode = TR::Node::create(TR::aladd, 2, arrayAddressNode, offsetNode);
+      }
+   else if (comp->target().is64Bit())
+#else
+   if (comp->target().is64Bit())
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+      {
+      totalOffsetNode = TR::Node::lconst(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      if (offsetNode)
+         totalOffsetNode = TR::Node::create(TR::ladd, 2, offsetNode, totalOffsetNode);
+      arrayAddressNode = TR::Node::create(TR::aladd, 2, arrayNode, totalOffsetNode);
+      }
+   else
+      {
+      totalOffsetNode = TR::Node::iconst(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      if (offsetNode)
+         totalOffsetNode = TR::Node::create(TR::iadd, 2, offsetNode, totalOffsetNode);
+      arrayAddressNode = TR::Node::create(TR::aiadd, 2, arrayNode, totalOffsetNode);
+      }
+
+   return arrayAddressNode;
+   }
+
+// Generates IL trees to access first array element. It accepts array base node
+TR::Node *
+J9::TransformUtil::generateArrayStartTrees(TR::Compilation *comp, TR::Node *arrayObject)
+   {
+   TR::Node *firstArrayElementNode = generateArrayAddressTrees(comp, arrayObject);
+   return firstArrayElementNode;
+   }
+
+// Generates IL trees to convert element index to offset in bytes. It accepts index node, stride node or element size
+TR::Node *
+J9::TransformUtil::generateArrayOffsetTrees(TR::Compilation *comp, TR::Node *indexNode, TR::Node *strideNode, int32_t elementSize, bool useShiftOpCode)
+   {
+   TR::Node *offsetNode = indexNode->createLongIfNeeded();
+
+   if (strideNode != NULL || elementSize > 1)
+      {
+      TR::Node *newStrideNode = NULL;
+      if (strideNode)
+         newStrideNode = strideNode->convertStoreDirectToLoadWithI2LIfNeeded();
+
+      TR::ILOpCodes offsetOpCode = TR::BadILOp;
+      if (comp->target().is64Bit())
+         {
+         if (newStrideNode == NULL && elementSize > 1)
+            newStrideNode = TR::Node::lconst(indexNode, elementSize);
+
+         offsetOpCode = useShiftOpCode ? TR::lshl : TR::lmul;
+         }
+      else
+         {
+         if (newStrideNode == NULL && elementSize > 1)
+            newStrideNode = TR::Node::iconst(indexNode, elementSize);
+
+         offsetOpCode = useShiftOpCode ? TR::ishl : TR::imul;
+         }
+      offsetNode = TR::Node::create(offsetOpCode, 2, offsetNode, newStrideNode);
+      }
+
+   return offsetNode;
+   }
+
 //
 // A few predicates describing shadow symbols that we can reason about at
 // compile time.  Note that "final field" here doesn't rule out a pointer to a
