@@ -26,8 +26,8 @@
 #include "Math.hpp"
 #include "MemorySpace.hpp"
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-#include <sys/mman.h>
-#include <errno.h>
+//#include <sys/mman.h>
+//#include <errno.h>
 #include "ArrayletLeafIterator.hpp"
 #include "HeapRegionManager.hpp"
 #include "HeapRegionDescriptorVLHGC.hpp"
