@@ -47,9 +47,6 @@ MM_HeapRegionDescriptorVLHGC::MM_HeapRegionDescriptorVLHGC(MM_EnvironmentVLHGC *
 	,_projectedLiveBytesDeviation(0)
 	,_compactDestinationQueueNext(NULL)
 	,_defragmentationTarget(false)
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
-	,_sparseHeapAllocation(false)
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 	,_extensions(MM_GCExtensions::getExtensions(env))
 	,_allocationAge(0)
 	,_allocationAgeSizeProduct(0.0)
