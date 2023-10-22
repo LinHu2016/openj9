@@ -1245,7 +1245,6 @@ public:
 	getDataPointerForContiguous(J9IndexableObject *arrayPtr)
 	{
 		void *dataAddr = (void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize());;
-#if defined(J9VM_ENV_DATA64)
 		if (isVirtualLargeObjectHeapEnabled()
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 			|| isDoubleMappingEnabled()
@@ -1253,7 +1252,6 @@ public:
 		) {
 			dataAddr = *dataAddrSlotForContiguous(arrayPtr);
 		}
-#endif /* defined(J9VM_ENV_DATA64) */
 		return dataAddr;
 	}
 
