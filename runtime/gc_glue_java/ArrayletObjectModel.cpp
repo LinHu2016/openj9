@@ -26,6 +26,7 @@
 #include "ModronAssertions.h"
 #include "ObjectModel.hpp"
 #include "Heap.hpp"
+#include "HeapRegionManager.hpp"
 
 bool
 GC_ArrayletObjectModel::initialize(MM_GCExtensionsBase *extensions)
@@ -65,6 +66,8 @@ GC_ArrayletObjectModel::AssertArrayletIsDiscontiguous(J9IndexableObject *objPtr)
 				MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
 				Assert_MM_true((getSpineSize(objPtr) + remainderBytes + extensions->getObjectAlignmentInBytes()) > arrayletLeafSize);
 			}
+		} else if (0 != getSizeInElements(objPtr)) {
+			Assert_MM_unreachable();
 		}
 	}
 }
@@ -179,19 +182,11 @@ GC_ArrayletObjectModel::isArrayletDataAdjacentToHeader(uintptr_t dataSizeInBytes
 }
 
 bool
-GC_ArrayletObjectModel::isAddressWithinHeap(MM_GCExtensionsBase *extensions, void *address)
-{
-	uintptr_t heapBase = (uintptr_t)extensions->heap->getHeapBase();
-	uintptr_t heapTop = (uintptr_t)extensions->heap->getHeapTop();
-	return ((uintptr_t)address >= heapBase) && ((uintptr_t)address < heapTop);
-}
-
-bool
 GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr)
 {
 #if defined(J9VM_ENV_DATA64)
 	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
-	bool isObjectWithinHeap = isAddressWithinHeap(extensions, dataAddr);
+	bool isObjectWithinHeap = (NULL != extensions->getHeap()->getHeapRegionManager()->regionDescriptorForAddress(dataAddr));
 	return ((getDataSizeInBytes(arrayPtr) >= _omrVM->_arrayletLeafSize) && (!isObjectWithinHeap));
 
 #else /* defined(J9VM_ENV_DATA64) */
