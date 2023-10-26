@@ -893,6 +893,10 @@ static jobject JNICALL popLocalFrame(JNIEnv *env,  jobject  result) {
 	VM_VMAccess::inlineEnterVMFromJNI((J9VMThread*)env);
 
 	unwrappedResult = result ? *(j9object_t*)result : NULL;
+
+	PORT_ACCESS_FROM_VMC( ((J9VMThread *) env) );
+	j9tty_printf(PORTLIB, "popLocalFrame env=%p\n", env);
+
 	jniPopFrame((J9VMThread*)env, JNIFRAME_TYPE_USER);
 	result = VM_VMHelpers::createLocalRef(env, unwrappedResult);
 
@@ -1959,6 +1963,10 @@ jniPushFrame(J9VMThread * vmThread, UDATA type, UDATA capacity)
 		if ((vmThread->jniReferenceFrames = pool_new(sizeof(struct J9JNIReferenceFrame), 16, 0, POOL_NO_ZERO, J9_GET_CALLSITE(), J9MEM_CATEGORY_JNI, POOL_FOR_PORT(javaVM->portLibrary))) == NULL) {
 			goto exit;
 		}
+
+		PORT_ACCESS_FROM_VMC(vmThread);
+		j9tty_printf(PORTLIB, "jniPushFrame vmThread=%p, vmThread->jniLocalReferences=%p, pool_new\n", vmThread, vmThread->jniLocalReferences);
+
 	}
 
 	frame = (J9JNIReferenceFrame*)pool_newElement(vmThread->jniReferenceFrames);
@@ -1968,6 +1976,16 @@ jniPushFrame(J9VMThread * vmThread, UDATA type, UDATA capacity)
 		frame->previous = (J9JNIReferenceFrame*)vmThread->jniLocalReferences;
 		frame->references = pool_new( sizeof(UDATA), capacity, sizeof(UDATA), POOL_NO_ZERO, J9_GET_CALLSITE(), J9MEM_CATEGORY_JNI, POOL_FOR_PORT(javaVM->portLibrary));
 		if (frame->references) {
+
+			PORT_ACCESS_FROM_VMC(vmThread);
+
+			I_64 threadID = 0;
+			if (NULL != vmThread->threadObject) {
+				threadID = J9VMJAVALANGTHREAD_TID(vmThread, vmThread->threadObject);
+			}
+
+			j9tty_printf(PORTLIB, "jniPushFrame threadID=%zu, vmThread=%p, vmThread->jniLocalReferences=%p, frame=%p\n", threadID, vmThread, vmThread->jniLocalReferences, frame);
+
 			vmThread->jniLocalReferences = (UDATA*)frame;
 			result = 0;
 		} else {
@@ -2010,6 +2028,15 @@ jniPopFrame(J9VMThread * vmThread, UDATA type)
 			break;
 		}
 	}
+
+	PORT_ACCESS_FROM_VMC(vmThread);
+
+	I_64 threadID = 0;
+	if (NULL != vmThread->threadObject) {
+		threadID = J9VMJAVALANGTHREAD_TID(vmThread, vmThread->threadObject);
+	}
+
+	j9tty_printf(PORTLIB, "jniPopFrame threadID=%zu, vmThread=%p, vmThread->jniLocalReferences=%p, frame=%p\n", threadID, vmThread, vmThread->jniLocalReferences, frame);
 
 	vmThread->jniLocalReferences = (UDATA*)frame;
 

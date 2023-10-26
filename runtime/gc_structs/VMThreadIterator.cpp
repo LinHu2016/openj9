@@ -52,10 +52,16 @@ GC_VMThreadIterator::nextSlot()
 		_state += 1;
 		
 	case vmthreaditerator_state_jni_slots:
+	{
+//		PORT_ACCESS_FROM_VMC(_vmThread);
+//		j9tty_printf(PORTLIB, "GC_VMThreadIterator::nextSlot vmthreaditerator_state_jni_slots GC_VMThreadIterator=%p, _jniSlotIterator=%p, _vmThread=%p, _vmThread->jniLocalReferences=%p\n",
+//				this, &_jniSlotIterator, _vmThread, _vmThread->jniLocalReferences);
+
 		slotPtr = _jniSlotIterator.nextSlot();
 		if(NULL != slotPtr) {
 			return slotPtr;
 		}
+	}
 #if defined(J9VM_INTERP_HOT_CODE_REPLACEMENT)
 		_state += 1;
 		

@@ -646,10 +646,13 @@ MM_ReferenceChainWalker::doStackSlot(J9Object **slotPtr, void *walkState, const 
 	/* Only report heap objects */
 
 	if (isHeapObject(slotValue) && !_heap->objectIsInGap(slotValue)) {
-		doSlot(slotPtr, J9GC_ROOT_TYPE_STACK_SLOT, -1, (J9Object *)walkState);
+		if (J9_STACKWALK_SLOT_TYPE_JNI_LOCAL == ((J9StackWalkState *)walkState)->slotType) {
+			doSlot(slotPtr, J9GC_ROOT_TYPE_JNI_LOCAL, -1, (J9Object *)walkState);;
+		} else {
+			doSlot(slotPtr, J9GC_ROOT_TYPE_STACK_SLOT, -1, (J9Object *)walkState);
+		}
 	}
 }
-
 #if defined(J9VM_OPT_JVMTI)
 /**
  * @todo Provide function documentation
@@ -674,7 +677,11 @@ MM_ReferenceChainWalker::doVMThreadSlot(J9Object **slotPtr, GC_VMThreadIterator 
 		doSlot(slotPtr, J9GC_ROOT_TYPE_THREAD_SLOT, -1, NULL);
 		break;
 	case vmthreaditerator_state_jni_slots:
+	{
+		PORT_ACCESS_FROM_ENVIRONMENT(_env);
+		j9tty_printf(PORTLIB, "MM_ReferenceChainWalker::doVMThreadSlot _env=%p, *slotPtr=%p\n", _env, *slotPtr);
 		doSlot(slotPtr, J9GC_ROOT_TYPE_JNI_LOCAL, -1, NULL);
+	}
 		break;
 #if defined(J9VM_INTERP_HOT_CODE_REPLACEMENT)
 	case vmthreaditerator_state_monitor_records:

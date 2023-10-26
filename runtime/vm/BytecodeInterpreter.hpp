@@ -487,6 +487,10 @@ retry:
 			freeStacks(_currentThread, bp);
 		}
 		if (flags & J9_SSF_CALL_OUT_FRAME_ALLOC) {
+
+			PORT_ACCESS_FROM_VMC(_currentThread);
+			j9tty_printf(PORTLIB, "recordJNIReturn _currentThread=%p\n", _currentThread);
+
 			jniPopFrame(_currentThread, JNIFRAME_TYPE_INTERNAL);
 		}
 		return frame;
@@ -2320,6 +2324,17 @@ done:
 			}
 		}
 		{
+
+			PORT_ACCESS_FROM_VMC(_currentThread);
+
+			I_64 threadID = 0;
+			if (NULL != _currentThread->threadObject) {
+				threadID = J9VMJAVALANGTHREAD_TID(_currentThread, _currentThread->threadObject);
+			}
+
+			if (threadID) {
+				j9tty_printf(PORTLIB, "runJNINative threadID=%zu, _currentThread=%p\n", threadID, _currentThread);
+			}
 			recordJNIReturn(REGISTER_ARGS, bp);
 			J9SFStackFrame *frame = (((J9SFStackFrame*)(bp + 1)) - 1);
 			_sp = _arg0EA;
@@ -4900,6 +4915,10 @@ done:
 #endif /* JAVA_SPEC_VERSION >= 19 */
 		VMStructHasBeenUpdated(REGISTER_ARGS);
 		bp = _arg0EA - 5;
+
+		PORT_ACCESS_FROM_VMC(_currentThread);
+		j9tty_printf(PORTLIB, "inlAttachmentLoadAgentLibraryImpl _currentThread=%p\n", _currentThread);
+
 		recordJNIReturn(REGISTER_ARGS, bp);
 		restoreSpecialStackFrameLeavingArgs(REGISTER_ARGS, bp);
 		returnSingleFromINL(REGISTER_ARGS, status, 5);
@@ -5076,6 +5095,9 @@ nativeOOM:
 			}
 		}
 		bp = _arg0EA - 3;
+
+		j9tty_printf(PORTLIB, "inlClassLoaderLoadLibraryWithPath _currentThread=%p\n", _currentThread);
+
 		recordJNIReturn(REGISTER_ARGS, bp);
 		restoreSpecialStackFrameLeavingArgs(REGISTER_ARGS, bp);
 		returnObjectFromINL(REGISTER_ARGS, errorBytes, 3);
@@ -5297,6 +5319,9 @@ done:
 			rc = GOTO_THROW_CURRENT_EXCEPTION;
 		}
 		bp = _arg0EA - argSlots;
+
+		j9tty_printf(PORTLIB, "inlInternalDowncallHandlerInvokeNative _currentThread=%p\n", _currentThread);
+
 		recordJNIReturn(REGISTER_ARGS, bp);
 		restoreSpecialStackFrameLeavingArgs(REGISTER_ARGS, bp);
 

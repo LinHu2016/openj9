@@ -1122,6 +1122,10 @@ jniResetStackReferences(JNIEnv *env)
 	J9SFJNINativeMethodFrame *nativeMethodFrame = VM_VMHelpers::findNativeMethodFrame(currentThread);
 	UDATA flags = nativeMethodFrame->specialFrameFlags;
 	if (J9_ARE_ANY_BITS_SET(flags, J9_SSF_CALL_OUT_FRAME_ALLOC)) {
+
+		PORT_ACCESS_FROM_VMC(currentThread);
+		j9tty_printf(PORTLIB, "jniResetStackReferences currentThread=%p\n", currentThread);
+
 		jniPopFrame(currentThread, JNIFRAME_TYPE_INTERNAL);
 	}
 	UDATA bits = J9_SSF_CALL_OUT_FRAME_ALLOC | J9_SSF_JNI_PUSHED_REF_COUNT_MASK;
@@ -1148,6 +1152,10 @@ returnFromJNI(J9VMThread *currentThread, void *vbp)
 		freeStacks(currentThread, bp);
 	}
 	if (flags & J9_SSF_CALL_OUT_FRAME_ALLOC) {
+
+		PORT_ACCESS_FROM_VMC(currentThread);
+		j9tty_printf(PORTLIB, "returnFromJNI currentThread=%p\n", currentThread);
+
 		jniPopFrame(currentThread, JNIFRAME_TYPE_INTERNAL);
 	}
 }

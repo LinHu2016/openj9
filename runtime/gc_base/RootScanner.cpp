@@ -537,6 +537,17 @@ MM_RootScanner::scanOneThread(MM_EnvironmentBase *env, J9VMThread* walkThread, v
 	}
 
 	J9VMThread *currentThread = (J9VMThread *)env->getOmrVMThread()->_language_vmthread;
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+
+	I_64 threadID = 0;
+	if (NULL != walkThread->threadObject) {
+		threadID = J9VMJAVALANGTHREAD_TID(currentThread, walkThread->threadObject);
+	}
+
+	j9tty_printf(PORTLIB, "MM_RootScanner::scanOneThread threadID=%zu, walkThread=%p, currentThread=%p, vmThreadIterator=%p, walkThread->jniLocalReferences=%p\n",
+			threadID, walkThread, currentThread, &vmThreadIterator, walkThread->jniLocalReferences);
+
 	/* In a case this thread is a carrier thread, and a virtual thread is mounted, we will scan virtual thread's stack.
 	 * If virtual thread is not mounted, or this is just a regular thread, this will scan its own stack. */
 	GC_VMThreadStackSlotIterator::scanSlots(currentThread, walkThread, localData, stackSlotIterator, isStackFrameClassWalkNeeded(), _trackVisibleStackFrameDepth);

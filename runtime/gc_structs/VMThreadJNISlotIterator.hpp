@@ -42,11 +42,13 @@
  */
 class GC_VMThreadJNISlotIterator
 {
+	J9VMThread *_vmThread;
 	J9JNIReferenceFrame *_jniFrame;
 	GC_PoolIterator _poolIterator;
 
 public:
 	GC_VMThreadJNISlotIterator(J9VMThread *vmThread) :
+		_vmThread(vmThread),
 		_jniFrame((J9JNIReferenceFrame*)vmThread->jniLocalReferences),
 		_poolIterator(_jniFrame ? (J9Pool*)_jniFrame->references : (J9Pool *)NULL)
 	{};

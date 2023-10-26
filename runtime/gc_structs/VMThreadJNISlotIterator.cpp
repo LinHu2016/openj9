@@ -38,10 +38,17 @@
 j9object_t *
 GC_VMThreadJNISlotIterator::nextSlot()
 {
+	PORT_ACCESS_FROM_VMC(_vmThread);
+//	if (_vmThread->jniLocalReferences) {
+//		j9tty_printf(PORTLIB, "GC_VMThreadJNISlotIterator::nextSlot _vmThread=%p, vmThread->jniLocalReferences=%p, _jniFrame=%p, _jniFrame->references=%p, GC_VMThreadJNISlotIterator=%p\n",
+//				_vmThread, _vmThread->jniLocalReferences, _jniFrame, (_jniFrame!=NULL)?_jniFrame->references:NULL, this);
+//	}
+
 	while(_jniFrame) {
 		j9object_t *objectPtr;
 
 		objectPtr = (j9object_t *)_poolIterator.nextSlot();
+		j9tty_printf(PORTLIB, "GC_VMThreadJNISlotIterator::nextSlot _vmThread=%p, _jniFrame=%p, _jniFrame->references=%p, objectPtr=%p\n", _vmThread, _jniFrame, _jniFrame->references, objectPtr);
 		if(objectPtr) {
 			return objectPtr;
 		}
