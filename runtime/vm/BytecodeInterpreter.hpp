@@ -2325,16 +2325,16 @@ done:
 		}
 		{
 
-			PORT_ACCESS_FROM_VMC(_currentThread);
-
-			I_64 threadID = 0;
-			if (NULL != _currentThread->threadObject) {
-				threadID = J9VMJAVALANGTHREAD_TID(_currentThread, _currentThread->threadObject);
-			}
-
-			if (threadID) {
-				j9tty_printf(PORTLIB, "runJNINative threadID=%zu, _currentThread=%p\n", threadID, _currentThread);
-			}
+//			PORT_ACCESS_FROM_VMC(_currentThread);
+//
+//			I_64 threadID = 0;
+//			if (NULL != _currentThread->threadObject) {
+//				threadID = J9VMJAVALANGTHREAD_TID(_currentThread, _currentThread->threadObject);
+//			}
+//
+//			if (threadID) {
+//				j9tty_printf(PORTLIB, "runJNINative threadID=%zu, _currentThread=%p\n", threadID, _currentThread);
+//			}
 			recordJNIReturn(REGISTER_ARGS, bp);
 			J9SFStackFrame *frame = (((J9SFStackFrame*)(bp + 1)) - 1);
 			_sp = _arg0EA;
