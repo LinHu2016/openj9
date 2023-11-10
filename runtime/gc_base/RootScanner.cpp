@@ -250,7 +250,7 @@ MM_RootScanner::doDoubleMappedObjectSlot(J9Object *objectPtr, struct J9PortVmemI
 
 #if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 void
-MM_RootScanner::doObjectInVirtualLargeObjectHeap(J9Object *objectPtr)
+MM_RootScanner::doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, bool *sparseHeapAllocation)
 {
 	/* No need to call doSlot() here since there's nothing to update */
 }
@@ -954,8 +954,7 @@ MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 				if (region->_sparseHeapAllocation) {
 					J9Object *spineObject = (J9Object *)region->_allocateData.getSpine();
 					Assert_MM_true(NULL != spineObject);
-					doObjectInVirtualLargeObjectHeap(spineObject);
-					region->_sparseHeapAllocation = false;
+					doObjectInVirtualLargeObjectHeap(spineObject, &region->_sparseHeapAllocation);
 				}
 			}
 		}

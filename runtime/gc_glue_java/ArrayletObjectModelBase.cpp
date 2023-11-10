@@ -22,6 +22,7 @@
 
 #include "ArrayletObjectModelBase.hpp"
 #include "GCExtensionsBase.hpp"
+#include "ModronAssertions.h"
 
 bool
 GC_ArrayletObjectModelBase::initialize(MM_GCExtensionsBase * extensions)
@@ -123,3 +124,25 @@ GC_ArrayletObjectModelBase::getSpineSizeWithoutHeader(ArrayLayout layout, uintpt
 
 	return spinePaddingSize + spineArrayoidSize + spineDataSize;
 }
+
+#if defined(J9VM_ENV_DATA64)
+void
+GC_ArrayletObjectModelBase::setIsIndexableDataAddrPresent(J9JavaVM *vm)
+{
+	_isIndexableDataAddrPresent = vm->isIndexableDataAddrPresent;
+	if (_isIndexableDataAddrPresent) {
+		Assert_MM_true(!vm->isIndexableDualHeaderShapeEnabled || (J9_GC_POLICY_BALANCED == vm->gcPolicy));
+	}
+}
+#endif /* defined(J9VM_ENV_DATA64) */
+
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+void
+GC_ArrayletObjectModelBase::setEnableVirtualLargeObjectHeap(bool enableVirtualLargeObjectHeap)
+{
+#if defined(J9VM_ENV_DATA64)
+	Assert_MM_true(true == _isIndexableDataAddrPresent);
+#endif /* defined(J9VM_ENV_DATA64) */
+	_enableVirtualLargeObjectHeap = enableVirtualLargeObjectHeap;
+}
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */

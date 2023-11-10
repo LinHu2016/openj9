@@ -1914,6 +1914,12 @@ gcParseCommandLineAndInitializeWithValues(J9JavaVM *vm, IDATA *memoryParameters)
         xGCColonIndex = FIND_NEXT_ARG_IN_VMARGS_FORWARD(STARTSWITH_MATCH, OPT_XGC_COLON, NULL, xGCColonIndex);
 	}
 
+	/* for test only */
+//	if (gc_policy_balanced == extensions->configurationOptions._gcPolicy) {
+//		extensions->regionSize = (512 * 1024);
+//		extensions->regionSize = (128 * 1024);
+//	}
+
 #if defined(J9VM_GC_GENERATIONAL)
 	/*
 	 * If Split Heap is requested, -Xms, -Xmns and -Xmos will be overwritten

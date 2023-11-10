@@ -329,11 +329,11 @@ MM_AllocationContextBalanced::allocateArrayletLeaf(MM_EnvironmentBase *env, MM_A
 		/* for off-heap case zeroing leaf is unecessary */
 		MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
 		GC_ArrayObjectModel *indexableObjectModel = &extensions->indexableObjectModel;
-		Assert_MM_false(indexableObjectModel->isVirtualLargeObjectHeapEnabled());
-//		if (!indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
-		/* zero the leaf here since we are not under any of the context or exclusive locks */
-		OMRZeroMemory(result, _heapRegionManager->getRegionSize());
-//		}
+//		Assert_MM_false(indexableObjectModel->isVirtualLargeObjectHeapEnabled());
+		if (!indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
+			/* zero the leaf here since we are not under any of the context or exclusive locks */
+			OMRZeroMemory(result, _heapRegionManager->getRegionSize());
+		}
 	}
 	return result;
 }

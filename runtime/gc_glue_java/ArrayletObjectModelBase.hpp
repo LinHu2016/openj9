@@ -173,11 +173,7 @@ public:
 	 * Sets whether the dataAddr field is present in the indexable object header
 	 * @param vm Java VM
 	 */
-	MMINLINE void
-	setIsIndexableDataAddrPresent(J9JavaVM *vm)
-	{
-		_isIndexableDataAddrPresent = vm->isIndexableDataAddrPresent;
-	}
+	void setIsIndexableDataAddrPresent(J9JavaVM *vm);
 #endif /* defined(J9VM_ENV_DATA64) */
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
@@ -227,11 +223,7 @@ public:
 	/**
 	 * Set whether the virtual large object heap (off-heap) allocation for large objects is enabled.
 	 */
-	MMINLINE void
-	setEnableVirtualLargeObjectHeap(bool enableVirtualLargeObjectHeap)
-	{
-		_enableVirtualLargeObjectHeap = enableVirtualLargeObjectHeap;
-	}
+	void setEnableVirtualLargeObjectHeap(bool enableVirtualLargeObjectHeap);
 #endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 #if defined(J9VM_ENV_DATA64)
@@ -242,6 +234,12 @@ public:
 	setIsDataAddressPresent(bool isDataAddressPresent)
 	{
 		_isIndexableDataAddrPresent = isDataAddressPresent;
+	}
+
+	MMINLINE bool
+	getIsDataAddressPresent()
+	{
+		return _isIndexableDataAddrPresent;
 	}
 #endif /* defined(J9VM_ENV_DATA64) */
 

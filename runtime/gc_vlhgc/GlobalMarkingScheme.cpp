@@ -1378,7 +1378,7 @@ private:
 #endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
 
 #if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, bool *sparseHeapAllocation) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_markVLHGCStats._offHeapRegionCandidates += 1;
 		if (!_markingScheme->isMarked(objectPtr)) {
@@ -1386,6 +1386,7 @@ private:
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 			if (NULL != dataAddr) {
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr);
+				*sparseHeapAllocation = false;
 			}
 		}
 	}

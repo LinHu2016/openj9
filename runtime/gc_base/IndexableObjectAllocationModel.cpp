@@ -486,6 +486,10 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 	/* allocate leaf for each arraylet and attach it to its leaf pointer in the spine */
 	uintptr_t arrayoidIndex = 0;
 	Trc_MM_getSparseAddressAndDecommitLeaves_Entry(env->getLanguageVMThread(), spine, (void *)bytesRemaining, arrayletLeafCount, (void *)arrayletLeafSize);
+
+//	PORT_ACCESS_FROM_ENVIRONMENT(env);
+//    j9tty_printf(PORTLIB, "MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves start env=%p, spine=%p, bytesRemaining=%zu, arrayletLeafCount=%zu\n", env, spine, bytesRemaining, arrayletLeafCount);
+
 	while (0 < bytesRemaining) {
 		/* allocate the next arraylet leaf - leaves are allocated solely for the purpose of decommitting the memory later on in this function */
 		void *leaf = env->_objectAllocationInterface->allocateArrayletLeaf(env, &_allocateDescription,
@@ -500,15 +504,19 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			break;
 		}
 
+//		j9tty_printf(PORTLIB, "allocateArrayletLeaf env=%p, spine=%p, leaf=%p, arrayoidIndex=%zu\n", env, spine, leaf, arrayoidIndex);
+
 		arrayletLeaveAddrs[arrayoidIndex] = leaf;
 		if (0 == arrayoidIndex) {
 			MM_HeapRegionDescriptorVLHGC *firstLeafRegionDescriptor = (MM_HeapRegionDescriptorVLHGC *)extensions->getHeap()->getHeapRegionManager()->tableDescriptorForAddress(leaf);
+//			j9tty_printf(PORTLIB, "firstLeafRegionDescriptor env=%p, spine=%p, firstLeafRegionDescriptor=%p\n", env, spine, firstLeafRegionDescriptor);
 			firstLeafRegionDescriptor->_sparseHeapAllocation = true;
 		}
 
 		/* Disable region for reads and writes, since that'll be done through the contiguous double mapped region */
 		void *highAddress = (void *)((uintptr_t)leaf + arrayletLeafSize);
 		bool ret = extensions->heap->decommitMemory(leaf, arrayletLeafSize, leaf, highAddress);
+//		j9tty_printf(PORTLIB, " extensions->heap->decommitMemory env=%p, spine=%p, leaf=%p, highAddress=%p\n", env, spine, leaf, highAddress);
 		if (!ret) {
 			Trc_MM_VirtualMemory_decommitMemory_failure(leaf, arrayletLeafSize);
 		}
@@ -518,6 +526,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 		bytesRemaining -= OMR_MIN(bytesRemaining, arrayletLeafSize);
 		arrayoidIndex += 1;
+//		j9tty_printf(PORTLIB, "bytesRemaining=%zu, env=%p, spine=%p, arrayoidIndex=%zu\n", bytesRemaining, env, spine, arrayoidIndex);
 	}
 
 
@@ -529,7 +538,8 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		Assert_MM_true(arrayletLeafCount == arrayoidIndex);
 
 		byteAmount = _dataSize;
-		void *virtualLargeObjectHeapAddress = extensions->largeObjectVirtualMemory->allocateSparseFreeEntryAndMapToHeapObject(spine, byteAmount);
+		void *virtualLargeObjectHeapAddress = extensions->largeObjectVirtualMemory->allocateSparseFreeEntryAndMapToHeapObject(env, spine, byteAmount);
+//		j9tty_printf(PORTLIB, "allocateSparseFreeEntryAndMapToHeapObject env=%p, spine=%p, virtualLargeObjectHeapAddress=%p\n", env, spine, virtualLargeObjectHeapAddress);
 		if (NULL != virtualLargeObjectHeapAddress) {
 			indexableObjectModel->setDataAddrForContiguous((J9IndexableObject *)spine, virtualLargeObjectHeapAddress);
 		}
@@ -538,6 +548,8 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			env->getForge()->free((void *)arrayletLeaveAddrs);
 		}
 	}
+
+ //   j9tty_printf(PORTLIB, "MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves end env=%p, spine=%p, bytesRemaining=%zu, arrayletLeafCount=%zu\n", env, spine, bytesRemaining, arrayletLeafCount);
 
 	Trc_MM_getSparseAddressAndDecommitLeaves_Exit(env->getLanguageVMThread(), spine, (void *)bytesRemaining);
 

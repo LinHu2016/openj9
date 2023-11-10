@@ -1148,6 +1148,17 @@ redefineClassesCommon(jvmtiEnv* env,
 	/* Check whether we should permit j9 specific class redefine extensions */
 
 	extensionsEnabled = areExtensionsEnabled(vm);
+	j9tty_printf(PORTLIB, "redefineClassesCommon1 currentThread=%p\n",currentThread);
+
+	if (currentThread->isIndexableDataAddrPresent) {
+		j9tty_printf(PORTLIB, "redefineClassesCommon currentThread=%p, currentThread->isIndexableDataAddrPresent=true\n",currentThread);
+//		JNIEnv *jni_env = (JNIEnv *) currentThread;
+//		jclass classLocalRef = (*jni_env)->FindClass(jni_env, "java/lang/Class");
+//		jmethodID getNameMID = (*jni_env)->GetMethodID(jni_env, classLocalRef, "getName", "()Ljava/lang/String;");
+//
+//		jstring className = (jstring) (*jni_env)->CallObjectMethod(jni_env, class_definitions->klass, getNameMID);
+//		j9tty_printf(PORTLIB, "redefineClassesCommon currentThread=%p, ClassName=%s\n",currentThread, className);
+	}
 	
 	/* Verify that all of the classes are allowed to be replaced */
 
@@ -1165,6 +1176,7 @@ redefineClassesCommon(jvmtiEnv* env,
 	}
 	memset(specifiedClasses, 0, class_count * sizeof(J9JVMTIClassPair));
 	
+	j9tty_printf(PORTLIB, "redefineClassesCommon2 currentThread=%p, class_count=%zu, class_definitions=%p\n",currentThread, class_count, class_definitions);
 	/* Create ROM classes for each of the replaced classes */
 
 	rc = reloadROMClasses(currentThread, class_count, class_definitions, specifiedClasses, options);
@@ -1172,6 +1184,7 @@ redefineClassesCommon(jvmtiEnv* env,
 		goto failed;
 	}
 
+	j9tty_printf(PORTLIB, "redefineClassesCommon3 after reloadROMClasses currentThread=%p\n",currentThread);
 	/* Make sure the replaced classes are compatible with the old versions */
 
 	rc = verifyClassesAreCompatible(currentThread, class_count, specifiedClasses, extensionsEnabled, &extensionsUsed);
@@ -1401,6 +1414,16 @@ failedWithVMAccess:
 
 failed:
 
+if (rc != JVMTI_ERROR_NONE) {
+	j9tty_printf(PORTLIB, "reloadROMClasses currentThread=%p, rc=%zu, class_count=%zu, specifiedClasses=%p\n",currentThread, rc, class_count, specifiedClasses);
+//	JNIEnv *jni_env = (JNIEnv *) currentThread;
+//    jclass classLocalRef = (*jni_env)->FindClass(jni_env, "java/lang/Class");
+//    jmethodID getNameMID = (*jni_env)->GetMethodID(jni_env, classLocalRef, "getName", "()Ljava/lang/String;");
+//
+//	jstring className = (jstring) (*jni_env)->CallObjectMethod(jni_env, class_definitions->klass, getNameMID);
+
+//	j9tty_printf(PORTLIB, "reloadROMClasses currentThread=%p, rc=%zu, class_count=%zu, specifiedClasses=%p, ClassName=%s\n",currentThread, rc, class_count, specifiedClasses, className);
+}
 	if (specifiedClasses) {
 		int i;
 		J9JVMTIClassPair * classPair = specifiedClasses;

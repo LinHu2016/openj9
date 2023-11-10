@@ -43,3 +43,7 @@ TraceAssert=Assert_hshelp_true noEnv Overhead=1 Level=1 Assert="(P1)"
 TraceAssert=Assert_hshelp_false noEnv Overhead=1 Level=1 Assert="!(P1)"
 
 TraceAssert=Assert_hshelp_ShouldNeverHappen NoEnv Overhead=1 Level=3 Assert="(0)"
+
+TraceDebug=Trc_hshelp_reloadROMClasses_error Overhead=1 Level=1 Template="reloadROMClasses: loadRC=%d, errorCode=%d, errorAction=%d, errorCatalog=%d, errorOffset=%d, errorMethod=%d, errorPC=%d, errorFrameBCI=%d, errorFrameIndex=%d, errorDataIndex=%d, verboseErrorType=%d, errorBsmIndex=%d, errorBsmArgsIndex=%d, errorCPType=%d, errorMaxMajorVersion=%d, errorMajorVersion=%d, errorMinorVersion=%d"
+
+

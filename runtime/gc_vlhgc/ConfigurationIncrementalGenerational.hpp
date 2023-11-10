@@ -46,7 +46,9 @@ class MM_ConfigurationIncrementalGenerational : public MM_Configuration
 public:
 protected:
 private:
-	static const uintptr_t _tarokMinimumRegionSizeInBytes = (512 * 1024);
+	/* for test only */
+//	static const uintptr_t _tarokMinimumRegionSizeInBytes = (512 * 1024);
+	static const uintptr_t _tarokMinimumRegionSizeInBytes = (128 * 1024);
 
 /* Methods */
 public:

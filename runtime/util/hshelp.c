@@ -3669,6 +3669,7 @@ reloadROMClasses(J9VMThread * currentThread, jint class_count, const jvmtiClassD
 #ifdef J9VM_THR_PREEMPTIVE
 	omrthread_monitor_enter(vm->classTableMutex);
 #endif
+	PORT_ACCESS_FROM_VMC(currentThread);
 
 	for (i = 0; i < class_count; ++i) {
 		const jvmtiClassDefinition * currentDefinition = &(class_definitions[i]);
@@ -3678,6 +3679,8 @@ reloadROMClasses(J9VMThread * currentThread, jint class_count, const jvmtiClassD
 		J9LoadROMClassData loadData;
 		j9object_t heapClass = J9VM_J9CLASS_TO_HEAPCLASS(originalRAMClass);
 		J9TranslationLocalBuffer localBuffer = {J9_CP_INDEX_NONE, LOAD_LOCATION_UNKNOWN, NULL};
+
+		j9tty_printf(PORTLIB, "reloadROMClasses idx of class_count =%zu, originalRAMClass=%p, className=%s, localBuffer=%p\n", i, originalRAMClass, J9UTF8_DATA(className), &localBuffer);
 
 		/* The original rom class might have been marked unsafe (we loaded it via
 		 * sun.misc.Unsafe). The new class version must also be marked as unsafe
@@ -3727,7 +3730,10 @@ reloadROMClasses(J9VMThread * currentThread, jint class_count, const jvmtiClassD
 		loadData.freeUserData = NULL;
 		loadData.freeFunction = NULL;
 		loadData.romClass = NULL;
+		j9tty_printf(PORTLIB, "reloadROMClasses before internalLoadROMClassFunction currentThread=%p, loadData=%p\n", currentThread, loadData);
 		loadRC = vm->dynamicLoadBuffers->internalLoadROMClassFunction(currentThread, &loadData, &localBuffer);
+		j9tty_printf(PORTLIB, "reloadROMClasses after internalLoadROMClassFunction currentThread=%p, loadData=%p, classNameLength=%zu, loadData.className=%s, loadRC=%d, localBuffer.entryIndex=%d, loadLocationType=%d\n",
+				currentThread, &loadData, loadData.classNameLength, loadData.className, loadRC, localBuffer.entryIndex, localBuffer.loadLocationType);
 
 		if (loadRC == BCT_ERR_NO_ERROR) {
 
@@ -3769,6 +3775,46 @@ reloadROMClasses(J9VMThread * currentThread, jint class_count, const jvmtiClassD
 				case BCT_ERR_OUT_OF_MEMORY:
 					return JVMTI_ERROR_OUT_OF_MEMORY;
 			}
+
+			j9tty_printf(PORTLIB, "reloadROMClasses currentThread=%p,loadRC=%d, errorCode=%d, errorAction=%d, errorCatalog=%d, errorOffset=%d, errorMethod=%d, errorPC=%d, errorFrameBCI=%d, errorFrameIndex=%d, errorDataIndex=%d, verboseErrorType=%d, errorBsmIndex=%d, errorBsmArgsIndex=%d, errorCPType=%d, errorMaxMajorVersion=%d, errorMajorVersion=%d, errorMinorVersion=%d, errorMember=%p, constantPool=%p\n",
+					currentThread, loadRC,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorCode,
+					errorAction,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorCatalog,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorOffset,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMethod,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorPC,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorFrameBCI,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorFrameIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorDataIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->verboseErrorType,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorBsmIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorBsmArgsIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorCPType,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMaxMajorVersion,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMajorVersion,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMinorVersion,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMember,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->constantPool);
+
+			Trc_hshelp_reloadROMClasses_error(currentThread, loadRC,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorCode,
+					errorAction,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorCatalog,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorOffset,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMethod,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorPC,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorFrameBCI,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorFrameIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorDataIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->verboseErrorType,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorBsmIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorBsmArgsIndex,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorCPType,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMaxMajorVersion,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMajorVersion,
+					((J9CfrError *) vm->dynamicLoadBuffers->classFileError)->errorMinorVersion);
+			Assert_hshelp_true(0);
 
 			return JVMTI_ERROR_INVALID_CLASS_FORMAT;
 		}

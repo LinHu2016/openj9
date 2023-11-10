@@ -387,6 +387,12 @@ MM_StandardAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jar
 		if (NULL != isCopy) {
 			*isCopy = JNI_FALSE;
 		}
+
+		if ((!_extensions->isAddressWithinHeap(arrayObject)) || (((UDATA)arrayObject + 0x10) != (UDATA) data)) {
+			PORT_ACCESS_FROM_VMC(vmThread);
+			j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical vmThread=%p, array=%p, arrayObject=%p, data=%p, getIsDataAddressPresent=%zu, indexableObjectModel=%p\n",
+					vmThread, array, arrayObject, data, indexableObjectModel->getIsDataAddressPresent(), indexableObjectModel);
+		}
 	}
 	return data;
 }
@@ -416,6 +422,9 @@ MM_StandardAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread,
 		 */
 		void *data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
 		if (elems != data) {
+			PORT_ACCESS_FROM_VMC(vmThread);
+			j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical vmThread=%p, mode=%zu, array=%p, arrayObject=%p, elems=%p, data=%p, getIsDataAddressPresent=%zu, indexableObjectModel=%p\n",
+					vmThread, mode, array, arrayObject, elems, data, indexableObjectModel->getIsDataAddressPresent(), indexableObjectModel);
 			Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
 		}
 

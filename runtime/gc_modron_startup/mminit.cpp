@@ -2957,6 +2957,7 @@ gcInitializeDefaults(J9JavaVM* vm)
 	vm->gcExtensions = vm->omrVM->_gcOmrVMExtensions;
 #if defined(J9VM_ENV_DATA64)
 	vm->isIndexableDualHeaderShapeEnabled = TRUE;
+//	vm->isIndexableDualHeaderShapeEnabled = FALSE;
 	vm->isIndexableDataAddrPresent = FALSE;
 #endif /* defined(J9VM_ENV_DATA64) */
 
