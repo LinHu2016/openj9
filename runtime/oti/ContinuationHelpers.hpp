@@ -90,10 +90,10 @@ public:
 		vmThread->scopedValueCache = scopedValueCache;
 	}
 
-	static VMINLINE ContinuationState volatile *
+	static VMINLINE volatile ContinuationState *
 	getContinuationStateAddress(J9VMThread *vmThread , j9object_t object)
 	{
-		return (ContinuationState volatile *) ((uintptr_t) object + J9VMJDKINTERNALVMCONTINUATION_STATE_OFFSET(vmThread));
+		return (volatile ContinuationState *) ((uintptr_t) object + J9VMJDKINTERNALVMCONTINUATION_STATE_OFFSET(vmThread));
 	}
 
 	static VMINLINE bool
@@ -103,7 +103,7 @@ public:
 	}
 
 	static VMINLINE void
-	setStarted(ContinuationState volatile *continuationStatePtr)
+	setStarted(volatile ContinuationState *continuationStatePtr)
 	{
 		*continuationStatePtr |= J9_GC_CONTINUATION_STATE_STARTED;
 	}
@@ -115,7 +115,7 @@ public:
 	}
 
 	static VMINLINE void
-	setLastUnmount(ContinuationState volatile *continuationStatePtr)
+	setLastUnmount(volatile ContinuationState *continuationStatePtr)
 	{
 		*continuationStatePtr |= J9_GC_CONTINUATION_STATE_LAST_UNMOUNT;
 	}
@@ -127,7 +127,7 @@ public:
 	}
 
 	static VMINLINE void
-	setFinished(ContinuationState volatile *continuationStatePtr)
+	setFinished(volatile ContinuationState *continuationStatePtr)
 	{
 		*continuationStatePtr |= J9_GC_CONTINUATION_STATE_FINISHED;
 	}
@@ -178,6 +178,13 @@ public:
 	resetConcurrentlyScanned(ContinuationState *continuationStatePtr, bool isGlobalGC)
 	{
 		*continuationStatePtr &= ~getConcurrentGCMask(isGlobalGC);
+	}
+
+	static VMINLINE void
+	resetConcurrentlyScanned(ContinuationState *continuationStatePtr)
+	{
+		*continuationStatePtr &= ~getConcurrentGCMask(true);
+		*continuationStatePtr &= ~getConcurrentGCMask(false);
 	}
 
 	static VMINLINE bool
@@ -231,7 +238,7 @@ public:
 	}
 
 	static VMINLINE void
-	resetCarrierID(ContinuationState volatile *continuationStatePtr)
+	resetCarrierID(volatile ContinuationState *continuationStatePtr)
 	{
 		*continuationStatePtr &= ~J9_GC_CONTINUATION_STATE_CARRIERID_MASK;
 	}
@@ -249,7 +256,7 @@ public:
 	{
 		/* threadObject points to the virtual thread. */
 		j9object_t threadObject = (j9object_t)J9VMJDKINTERNALVMCONTINUATION_VTHREAD(vmThread, continuationObject);
-		ContinuationState volatile *continuationStatePtr = getContinuationStateAddress(vmThread, continuationObject);
+		volatile ContinuationState *continuationStatePtr = getContinuationStateAddress(vmThread, continuationObject);
 		ContinuationState continuationState = *continuationStatePtr;
 
 		if (isFullyMounted(continuationState)) {

@@ -359,13 +359,13 @@ public:
 	 *   a carrier thread winning to mount, we don't need to do anything, since it will be compensated by pre/post mount actions
 	 *   another GC thread winning to scan(CONCURRENT_SCAN_LOCAL and CONCURRENT_SCAN_GLOBAL are irrelevant and independent), again don't do anything, and let the winning thread do the work, instead
 	 */
-	static bool tryWinningConcurrentGCScan(ContinuationState volatile *continuationStatePtr, bool isGlobalGC, bool beingMounted);
+	static bool tryWinningConcurrentGCScan(volatile ContinuationState *continuationStatePtr, bool isGlobalGC, bool beingMounted);
 
 	/**
 	 * clear CONCURRENTSCANNING flag for LocalConcurrentScanning or for GlobalConcurrentScanning base on isGlobalGC,
 	 * if all CONCURRENTSCANNING bits are cleared and the continuation mounting is blocked by concurrent scanning, notify it.
 	 */
-	MMINLINE static void exitConcurrentGCScan(ContinuationState volatile *continuationStatePtr, bool isGlobalGC);
+	MMINLINE static void exitConcurrentGCScan(volatile ContinuationState *continuationStatePtr, bool isGlobalGC);
 
 	static void exitContinuationConcurrentGCScan(J9VMThread *vmThread, j9object_t continuationObject, bool isGlobalGC);
 

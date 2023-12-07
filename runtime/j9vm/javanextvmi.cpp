@@ -298,7 +298,7 @@ setContinuationStateToLastUnmount(J9VMThread *currentThread, jobject thread)
 	/* Re-fetch reference as enterVThreadTransitionCritical may release VMAccess. */
 	j9object_t threadObj = J9_JNI_UNWRAP_REFERENCE(thread);
 	j9object_t continuationObj = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, threadObj);
-	ContinuationState volatile *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(currentThread, continuationObj);
+	volatile ContinuationState *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(currentThread, continuationObj);
 	/* Used in JVMTI to not suspend the virtual thread once it enters the last unmount phase. */
 	VM_ContinuationHelpers::setLastUnmount(continuationStatePtr);
 	exitVThreadTransitionCritical(currentThread, threadObj);

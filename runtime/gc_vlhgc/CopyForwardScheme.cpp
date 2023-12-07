@@ -2304,6 +2304,10 @@ MM_CopyForwardScheme::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject
 		copyAndForward(MM_EnvironmentVLHGC::getEnvironment(env), reservingContext, fromObject, slotPtr);
 	} else if (NULL != *slotPtr) {
 		/* stack object - just validate */
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "doStackSlot out of heap!! *slotPtr=%p, fromObject=%p, _heapTop=%p, _heapBase=%p\n", *slotPtr, fromObject, _heapTop, _heapBase);
+
 		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, *slotPtr, stackLocation, walkState).validate(env));
 	}
 }

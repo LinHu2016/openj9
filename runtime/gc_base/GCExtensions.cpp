@@ -319,7 +319,7 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 {
 	bool needScan = false;
 #if JAVA_SPEC_VERSION >= 19
-	ContinuationState volatile *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(vmThread, objectPtr);
+	volatile ContinuationState *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(vmThread, objectPtr);
 	/**
 	 * We don't scan mounted continuations:
 	 *
@@ -345,6 +345,14 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 	 */
 	if (isConcurrentGC) {
 		needScan = MM_GCExtensions::tryWinningConcurrentGCScan(continuationStatePtr, isGlobalGC, beingMounted);
+		if (needScan) {
+			ContinuationState continuationState = *continuationStatePtr;
+			if (VM_ContinuationHelpers::isFullyMounted(continuationState) || !VM_ContinuationHelpers::isActive(continuationState)) {
+				PORT_ACCESS_FROM_VMC(vmThread);
+				j9tty_printf(PORTLIB, "needScanStacksForContinuationObject continuationState=%p, objectPtr=%p, isGlobalGC=%zu, isConcurrentGC=%zu, beingMounted=%zu\n", continuationState, objectPtr, isGlobalGC, isConcurrentGC, beingMounted);
+			}
+			Assert_MM_false(VM_ContinuationHelpers::isFullyMounted(continuationState) || !VM_ContinuationHelpers::isActive(continuationState));
+		}
 	} else {
 		/* for STW GCs */
 		ContinuationState continuationState = *continuationStatePtr;
@@ -357,11 +365,11 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 }
 
 bool
-MM_GCExtensions::tryWinningConcurrentGCScan(ContinuationState volatile *continuationStatePtr, bool isGlobalGC, bool beingMounted)
+MM_GCExtensions::tryWinningConcurrentGCScan(volatile ContinuationState *continuationStatePtr, bool isGlobalGC, bool beingMounted)
 {
 #if JAVA_SPEC_VERSION >= 19
 	do {
-		uintptr_t oldContinuationState = *continuationStatePtr;
+		volatile uintptr_t oldContinuationState = *continuationStatePtr;
 		if (VM_ContinuationHelpers::isActive(oldContinuationState)) {
 
 			/* If it's being concurrently scanned within the same type of GC by another thread , it's unnecessary to do it again */
@@ -391,12 +399,12 @@ MM_GCExtensions::tryWinningConcurrentGCScan(ContinuationState volatile *continua
 }
 
 void
-MM_GCExtensions::exitConcurrentGCScan(ContinuationState volatile *continuationStatePtr, bool isGlobalGC)
+MM_GCExtensions::exitConcurrentGCScan(volatile ContinuationState *continuationStatePtr, bool isGlobalGC)
 {
 #if JAVA_SPEC_VERSION >= 19
 	/* clear CONCURRENTSCANNING flag bit3:LocalConcurrentScanning /bit4:GlobalConcurrentScanning */
-	uintptr_t oldContinuationState = 0;
-	uintptr_t returnContinuationState = 0;
+	volatile uintptr_t oldContinuationState = 0;
+	volatile uintptr_t returnContinuationState = 0;
 	do {
 		oldContinuationState = *continuationStatePtr;
 		Assert_MM_true(VM_ContinuationHelpers::isConcurrentlyScanned(oldContinuationState, isGlobalGC));
@@ -404,6 +412,8 @@ MM_GCExtensions::exitConcurrentGCScan(ContinuationState volatile *continuationSt
 		VM_ContinuationHelpers::resetConcurrentlyScanned(&newContinuationState, isGlobalGC);
 		returnContinuationState = VM_AtomicSupport::lockCompareExchange(continuationStatePtr, oldContinuationState, newContinuationState);
 	} while (returnContinuationState != oldContinuationState);
+
+//	VM_AtomicSupport::writeBarrier();
 
 	if (!VM_ContinuationHelpers::isConcurrentlyScanned(returnContinuationState, !isGlobalGC)) {
 		J9VMThread *carrierThread = VM_ContinuationHelpers::getCarrierThread(returnContinuationState);
@@ -421,8 +431,13 @@ void
 MM_GCExtensions::exitContinuationConcurrentGCScan(J9VMThread *vmThread, j9object_t continuationObject, bool isGlobalGC)
 {
 #if JAVA_SPEC_VERSION >= 19
-	ContinuationState volatile *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(vmThread, continuationObject);
+	volatile ContinuationState *continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(vmThread, continuationObject);
 	MM_GCExtensions::exitConcurrentGCScan(continuationStatePtr, isGlobalGC);
+
+//	PORT_ACCESS_FROM_VMC(vmThread);
+//	j9tty_printf(PORTLIB, "exitContinuationConcurrentGCScan *continuationStatePtr=%p, continuationObject=%p, isGlobalGC=%zu\n",
+//			*continuationStatePtr, continuationObject, isGlobalGC);
+
 #endif /* JAVA_SPEC_VERSION >= 19 */
 }
 
