@@ -172,7 +172,7 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 		if (VM_ContinuationHelpers::isConcurrentlyScanned(oldContinuationState)) {
 			omrthread_monitor_enter(currentThread->publicFlagsMutex);
 			/* Wait till potentially concurrent GC scans are complete */
-			for(;;) {
+			do {
 				oldContinuationState = *continuationStatePtr;
 				if (VM_ContinuationHelpers::isConcurrentlyScanned(oldContinuationState)) {
 					PUSH_OBJECT_IN_SPECIAL_FRAME(currentThread, continuationObject);
@@ -185,10 +185,9 @@ synchronizeWithConcurrentGCScan(J9VMThread *currentThread, j9object_t continuati
 					continuationObject = POP_OBJECT_IN_SPECIAL_FRAME(currentThread);
 					/* Object might have moved - update its address and the address of the state slot. */
 					continuationStatePtr = VM_ContinuationHelpers::getContinuationStateAddress(currentThread, continuationObject);
-				} else {
-					break;
+					continue;
 				}
-			}
+			} while (false);
 			omrthread_monitor_exit(currentThread->publicFlagsMutex);
 		}
 		/* Remove pending state */
