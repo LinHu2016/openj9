@@ -191,10 +191,7 @@ MM_HeapRegionManagerVLHGC::getHeapMemorySnapshot(MM_GCExtensionsBase *extensions
 				free = 0;
 			}
 			age = region->getLogicalAge();
-			/* increment logic age for regions happens after getHeapMemorySnapshot(),
-			 * which is triggered by gcEnd event, so at gcEnd, counts any of regions with logic age = 0 as survivor regions.
-			 * TODO: increment logic age for regions should be called before gcEnd */
-			if ((0 == age) && !gcEnd) {
+			if (0 == age) {
 				allocateEdenTotal += regionSize;
 				snapshot->_freeRegionEdenSize += free;
 			} else if (extensions->tarokRegionMaxAge == age) {

@@ -509,7 +509,7 @@ j9gc_pools_memory(J9JavaVM *javaVM, UDATA poolIDs, UDATA *totals, UDATA *frees, 
 	manager->getHeapMemorySnapshot(extensions, &snapShot, (TRUE == gcEnd));
 	UDATA idx = 0;
 	
-	for (UDATA count = 0, mask = 1; count < J9_GC_MANAGEMENT_MAX_POOL; count++, mask <<= 1)
+	for (UDATA count = 0, mask = J9_GC_MANAGEMENT_POOL_BASE; count < J9_GC_MANAGEMENT_MAX_POOL; count++, mask <<= 1)
 	{
 		if (0 != (poolIDs & mask)) {
 			switch (poolIDs & mask) {
