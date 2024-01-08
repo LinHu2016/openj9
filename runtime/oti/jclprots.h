@@ -376,6 +376,8 @@ extern J9_CFUNC jlong JNICALL
 Java_com_ibm_java_lang_management_internal_GarbageCollectorMXBeanImpl_getMemoryUsedImpl(JNIEnv *env, jobject beanInstance, jint id);
 extern J9_CFUNC jobject JNICALL
 Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLastGcInfoImpl(JNIEnv *env, jobject beanInstance, jint id);
+extern J9_CFUNC jobject JNICALL
+Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getMemorypoolIDsImpl(JNIEnv *env, jobject beanInstance);
 
 /* BBjclNativesCommonClassLoader*/
 jboolean JNICALL Java_java_lang_ClassLoader_isVerboseImpl (JNIEnv *env, jclass clazz);

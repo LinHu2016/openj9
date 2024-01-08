@@ -44,6 +44,8 @@ public final class ExtendedGarbageCollectorMXBeanImpl
 		extends GarbageCollectorMXBeanImpl
 		implements GarbageCollectorMXBean {
 
+	private static String[] poolNames = null;
+
 	ExtendedGarbageCollectorMXBeanImpl(String domainName, String name, int id, ExtendedMemoryMXBeanImpl memBean) {
 		super(domainName, name, id, memBean);
 	}
@@ -76,17 +78,46 @@ public final class ExtendedGarbageCollectorMXBeanImpl
 	 * @see #getLastGcInfo()
 	 */
 	private native GcInfo getLastGcInfoImpl(int id);
-
+	
+	private static native int[] getMemorypoolIDsImpl();
+	 
 	static GcInfo buildGcInfo(long index, long startTime, long endTime,
 							long[] initialSize, long[] preUsed, long[] preCommitted, long[] preMax,
 							long[] postUsed, long[] postCommitted, long[] postMax) {
 		/* retrieve the names of MemoryPools*/
-		List<MemoryPoolMXBean> memoryPoolList = ManagementFactory.getMemoryPoolMXBeans();
-		String[] poolNames = new String[memoryPoolList.size()];
-		int idx = 0;
-		for (MemoryPoolMXBean bean : memoryPoolList) {
+		if (null == poolNames) {
+//			List<MemoryPoolMXBean> memoryPoolList = ExtendedMemoryMXBeanImpl.getInstance().getMemoryPoolMXBeans(false);
+//			poolNames = new String[memoryPoolList.size()];
+//			int[] ids = getMemorypoolIDsImpl(); 
+//
+//			for (MemoryPoolMXBean bean : memoryPoolList) {
+//				int idx = 0;
+//				int id = ((MemoryPoolMXBeanImpl) bean).getID();
+//				System.out.println("buildGcInfo1 id=" + id);
+//				for (idx=0; idx < memoryPoolList.size(); idx++) {
+//					System.out.println("buildGcInfo2 idx=" + idx +", ids[idx]=" + ids[idx]);
+//					if (ids[idx] == id) {
+//						poolNames[idx] = bean.getName();
+//						System.out.println("buildGcInfo idx=" + idx + ", name=" + poolNames[idx]);
+//						break;
+//					}
+//				}
+//
+//				if (idx == memoryPoolList.size()) {
+//					throw new RuntimeException("unexpected MemoryPool");
+//				}
+//			}
+		
+			List<MemoryPoolMXBean> memoryPoolList = ExtendedMemoryMXBeanImpl.getInstance().getMemoryPoolMXBeans(false);
+			poolNames = new String[memoryPoolList.size()];
+
+			int idx = 0;
+			for (MemoryPoolMXBean bean : memoryPoolList) {
+				System.out.println("buildGcInfo idx=" + idx + ", name=" + bean.getName());
 			poolNames[idx++] = bean.getName();
+			}			
 		}
+
 		int poolNamesLength = poolNames.length;
 		/*[IF JAVA_SPEC_VERSION >= 19]
 		Map<String, MemoryUsage> usageBeforeGc = HashMap.newHashMap(poolNamesLength);

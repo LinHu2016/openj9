@@ -19,7 +19,6 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0 OR GPL-2.0-only WITH OpenJDK-assembly-exception-1.0
  *******************************************************************************/
-
 #include "jni.h"
 #include "j9.h"
 #include "mmhook.h"
@@ -29,6 +28,8 @@
 #include "omrgcconsts.h"
 #include "j9modron.h"
 #include "jcl_internal.h"
+#include "jclglob.h"
+#include "jclprots.h"
 
 #include "mgmtinit.h"
 
@@ -417,7 +418,7 @@ managementGC(OMR_VMThread *omrVMThread, void *userData, BOOLEAN isEnd)
 	mmFuncs->j9gc_pools_memory(vm, 0, &totals[0], &frees[0], isEnd);
 	if (isEnd) {
 		supportedMemoryPoolIDs = (U_32)mmFuncs->j9gc_allsupported_memorypools(vm);
-		for (count = 0, mask = 1, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
+		for (count = 0, mask = J9_GC_MANAGEMENT_POOL_BASE, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
 			id = (supportedMemoryPoolIDs & mask);
 			if (0 != id) {
 				maxs[idx] = mmFuncs->j9gc_pool_maxmemory(vm, id);
@@ -937,7 +938,7 @@ initMemoryManagement(J9JavaVM *vm)
 	/* request all supported pool data for initial size */
 	mmFuncs->j9gc_pools_memory(vm, 0, &totals[0], &frees[0], FALSE);
 
-	for (count = 0, mask = 1, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
+	for (count = 0, mask = J9_GC_MANAGEMENT_POOL_BASE, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
 
 		id = (supportedMemoryPoolIDs & mask);
 		if (0 != id) {
@@ -1016,7 +1017,6 @@ initMemoryManagement(J9JavaVM *vm)
 		getSegmentSizes(vm, segList, &mgmt->nonHeapMemoryPools[idx].initialSize, &used, &mgmt->nonHeapMemoryPools[idx].peakSize, &mgmt->nonHeapMemoryPools[idx].peakUsed, (JIT_CODECACHE == idx));
 	}
 	return 0;
-
 }
 
 static U_32
@@ -1129,3 +1129,33 @@ updateNonHeapMemoryPoolSizes(J9JavaVM *vm, J9JavaLangManagementData *mgmt, BOOLE
 		getSegmentSizes(vm, segList, storedSize, storedUsed, &mgmt->nonHeapMemoryPools[idx].peakSize, &mgmt->nonHeapMemoryPools[idx].peakUsed, (JIT_CODECACHE== idx));
 	}
 }
+
+jobject JNICALL
+Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getMemorypoolIDsImpl(JNIEnv *env, jobject beanInstance)
+{
+	jintArray idArray = NULL;
+	jint* idArrayElems = NULL;
+
+	J9JavaVM *javaVM = ((J9VMThread *) env)->javaVM;
+	J9JavaLangManagementData *mgmt = javaVM->managementData;
+
+	idArray = (*env)->NewIntArray(env, mgmt->supportedMemoryPools + mgmt->supportedNonHeapMemoryPools);
+	if (NULL != idArray) {
+		jboolean isCopy = JNI_FALSE;
+		idArrayElems = (jint*) (*env)->GetPrimitiveArrayCritical(env, idArray, &isCopy);
+		if (NULL != idArrayElems) {
+			UDATA idx = 0;
+			for (idx = 0; idx < mgmt->supportedMemoryPools; ++idx) {
+				idArrayElems[idx] = (jint) mgmt->memoryPools[idx].id;
+			}
+
+			/* NonHeap Memory Pools */
+			for (idx = 0; idx < mgmt->supportedNonHeapMemoryPools; ++idx) {
+				idArrayElems[mgmt->supportedMemoryPools + idx] = mgmt->nonHeapMemoryPools[idx].id;
+			}
+		}
+		(*env)->ReleasePrimitiveArrayCritical(env, idArray, idArrayElems, 0);
+	}
+	return idArray;
+}
+
