@@ -807,6 +807,7 @@ gcEndEvent(J9JavaVM *vm, UDATA heapSize, UDATA heapUsed, UDATA *totals, UDATA *f
 	for (idx = 0; supportedMemoryPools > idx; ++idx) {
 		J9MemoryPoolData *memoryPool = &memoryPools[idx];
 		gcInfo->initialSize[idx] = memoryPool->initialSize;
+		gcInfo->memoryPoolID[idx] = memoryPool->id;
 		if (mmFuncs->j9gc_is_managedpool_by_collector(vm, (UDATA)(gcData->id & J9VM_MANAGEMENT_GC_HEAP_ID_MASK), (UDATA)(memoryPool->id & J9VM_MANAGEMENT_POOL_HEAP_ID_MASK))) {
 			/**
 			 * the memoryPool is managed by this collection, update preCollection postCollection Memory Usage of this memory Pool
@@ -846,6 +847,7 @@ gcEndEvent(J9JavaVM *vm, UDATA heapSize, UDATA heapUsed, UDATA *totals, UDATA *f
 		gcInfo->postUsed[idx] = nonHeapMemory->postCollectionUsed;
 		gcInfo->postCommitted[idx] = nonHeapMemory->postCollectionSize;
 		gcInfo->postMax[idx] = nonHeapMemory->maxSize;
+		gcInfo->memoryPoolID[idx] = nonHeapMemory->id;
 
 		if (TrcEnabled_Trc_JCL_memoryManagement_verifyMemoryUsageAfterGC_memoryUsageError
 		|| TrcEnabled_Trc_JCL_memoryManagement_verifyMemoryUsageAfterGC_memoryUsage

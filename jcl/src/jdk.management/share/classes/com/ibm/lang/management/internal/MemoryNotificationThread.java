@@ -89,10 +89,10 @@ final class MemoryNotificationThread implements Runnable {
      *            the sequence identifier of the current notification
      */
 	private void dispatchGCNotificationHelper(String gcName, String gcAction, String gcCause, long index,
-			long startTime, long endTime, long[] initialSize, long[] preUsed,
+			long startTime, long endTime, int[] ids, long[] initialSize, long[] preUsed,
 			long[] preCommitted, long[] preMax, long[] postUsed, long[] postCommitted, long[] postMax,
 			long sequenceNumber) {
-		GcInfo gcInfo = ExtendedGarbageCollectorMXBeanImpl.buildGcInfo(index, startTime, endTime, initialSize, preUsed, preCommitted, preMax, postUsed, postCommitted, postMax);
+		GcInfo gcInfo = ExtendedGarbageCollectorMXBeanImpl.buildGcInfo(index, startTime, endTime, ids, initialSize, preUsed, preCommitted, preMax, postUsed, postCommitted, postMax);
 		GarbageCollectionNotificationInfo info = new GarbageCollectionNotificationInfo(gcName, gcAction, gcCause, gcInfo);
 
 		for (MemoryManagerMXBean bean : memBean.getMemoryManagerMXBeans(false)) {

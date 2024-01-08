@@ -588,7 +588,7 @@ Java_com_ibm_lang_management_internal_MemoryNotificationThread_processNotificati
 		return;
 	}
 
-	helperGCID = (*env)->GetMethodID(env, threadClass, "dispatchGCNotificationHelper", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJ[J[J[J[J[J[J[JJ)V");
+	helperGCID = (*env)->GetMethodID(env, threadClass, "dispatchGCNotificationHelper", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJ[I[J[J[J[J[J[J[JJ)V");
 	if (NULL == helperGCID) {
 		return;
 	}
@@ -623,6 +623,7 @@ Java_com_ibm_lang_management_internal_MemoryNotificationThread_processNotificati
 			jstring gcAction = NULL;
 			jstring gcCause = NULL;
 			J9GarbageCollectionInfo *gcInfo = notification->gcInfo;
+			jintArray idArray = NULL;
 			jlongArray initialArray = NULL;
 			jlongArray preUsedArray = NULL;
 			jlongArray preCommittedArray = NULL;
@@ -630,6 +631,11 @@ Java_com_ibm_lang_management_internal_MemoryNotificationThread_processNotificati
 			jlongArray postUsedArray = NULL;
 			jlongArray postCommittedArray = NULL;
 			jlongArray postMaxArray = NULL;
+
+			idArray = (*env)->NewIntArray(env, gcInfo->arraySize);
+			if (NULL == idArray) {
+				return;
+			}
 
 			initialArray = (*env)->NewLongArray(env, gcInfo->arraySize);
 			if (NULL == initialArray) {
@@ -673,6 +679,11 @@ Java_com_ibm_lang_management_internal_MemoryNotificationThread_processNotificati
 				return;
 			}
 
+
+			(*env)->SetIntArrayRegion(env, idArray, 0, gcInfo->arraySize, (jint *)&gcInfo->memoryPoolID[0]);
+			if ((*env)->ExceptionCheck(env)) {
+				return;
+			}
 			(*env)->SetLongArrayRegion(env, initialArray, 0, gcInfo->arraySize, (jlong *)&gcInfo->initialSize[0]);
 			if ((*env)->ExceptionCheck(env)) {
 				return;
@@ -712,6 +723,7 @@ Java_com_ibm_lang_management_internal_MemoryNotificationThread_processNotificati
 					(jlong)gcInfo->index,
 					(jlong)gcInfo->startTime,
 					(jlong)gcInfo->endTime,
+					idArray,
 					initialArray,
 					preUsedArray,
 					preCommittedArray,

@@ -30,6 +30,7 @@ import com.sun.management.GarbageCollectionNotificationInfo;
 import com.sun.management.GcInfo;
 import com.sun.management.internal.GcInfoUtil;
 
+import java.lang.management.MemoryType;
 import java.lang.management.MemoryUsage;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.ManagementFactory;
@@ -43,6 +44,8 @@ import java.util.List;
 public final class ExtendedGarbageCollectorMXBeanImpl
 		extends GarbageCollectorMXBeanImpl
 		implements GarbageCollectorMXBean {
+
+	private static String[] poolNames = null;
 
 	ExtendedGarbageCollectorMXBeanImpl(String domainName, String name, int id, ExtendedMemoryMXBeanImpl memBean) {
 		super(domainName, name, id, memBean);
@@ -77,16 +80,30 @@ public final class ExtendedGarbageCollectorMXBeanImpl
 	 */
 	private native GcInfo getLastGcInfoImpl(int id);
 
-	static GcInfo buildGcInfo(long index, long startTime, long endTime,
+	static GcInfo buildGcInfo(long index, long startTime, long endTime, int[] ids,
 							long[] initialSize, long[] preUsed, long[] preCommitted, long[] preMax,
 							long[] postUsed, long[] postCommitted, long[] postMax) {
 		/* retrieve the names of MemoryPools*/
-		List<MemoryPoolMXBean> memoryPoolList = ManagementFactory.getMemoryPoolMXBeans();
-		String[] poolNames = new String[memoryPoolList.size()];
-		int idx = 0;
-		for (MemoryPoolMXBean bean : memoryPoolList) {
-			poolNames[idx++] = bean.getName();
+		if (null == poolNames) {
+			List<MemoryPoolMXBean> memoryPoolList = ExtendedMemoryMXBeanImpl.getInstance().getMemoryPoolMXBeans(false);
+			poolNames = new String[memoryPoolList.size()];
+
+			for (MemoryPoolMXBean bean : memoryPoolList) {
+				int idx = 0;
+				int id = ((MemoryPoolMXBeanImpl) bean).getID();
+				for (idx=0; idx < memoryPoolList.size(); idx++) {
+					if (ids[idx] == id) {
+						poolNames[idx] = bean.getName();
+						break;
+					}
+				}
+
+				if (idx == memoryPoolList.size()) {
+					throw new RuntimeException("unexpected MemoryPool");
+				}
+			}
 		}
+
 		int poolNamesLength = poolNames.length;
 		/*[IF JAVA_SPEC_VERSION >= 19]
 		Map<String, MemoryUsage> usageBeforeGc = HashMap.newHashMap(poolNamesLength);

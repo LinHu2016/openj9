@@ -108,6 +108,7 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 	jmethodID callBackID = NULL;
 
 	U_32 idx = 0;
+	jintArray idArray = NULL;
 	jlongArray initialArray = NULL;
 	jlongArray preUsedArray = NULL;
 	jlongArray preCommittedArray = NULL;
@@ -116,6 +117,7 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 	jlongArray postCommittedArray = NULL;
 	jlongArray postMaxArray = NULL;
 
+	jint* idArrayElems = NULL;
 	jlong* initialArrayElems = NULL;
 	jlong* preUsedArrayElems = NULL;
 	jlong* preCommittedArrayElems = NULL;
@@ -141,11 +143,16 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 
 	callBackID = JCL_CACHE_GET(env, MID_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_buildGcInfo);
 	if (NULL == callBackID) {
-		callBackID = (*env)->GetStaticMethodID(env, gcBean, "buildGcInfo", "(JJJ[J[J[J[J[J[J[J)Lcom/sun/management/GcInfo;");
+		callBackID = (*env)->GetStaticMethodID(env, gcBean, "buildGcInfo", "(JJJ[I[J[J[J[J[J[J[J)Lcom/sun/management/GcInfo;");
 		if (NULL == callBackID) {
 			goto fail;
 		}
 		JCL_CACHE_SET(env, MID_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_buildGcInfo, callBackID);
+	}
+
+	idArray = (*env)->NewIntArray(env, gcInfo->arraySize);
+	if (NULL == idArray) {
+		goto fail;
 	}
 
 	initialArray = (*env)->NewLongArray(env, gcInfo->arraySize);
@@ -179,6 +186,10 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 
 	{
 		jboolean isCopy = JNI_FALSE;
+		idArrayElems = (jint*) (*env)->GetPrimitiveArrayCritical(env, idArray, &isCopy);
+		if (NULL == idArrayElems) {
+			goto fail2;
+		}
 		initialArrayElems = (jlong*) (*env)->GetPrimitiveArrayCritical(env, initialArray, &isCopy);
 		if (NULL == initialArrayElems) {
 			goto fail2;
@@ -209,6 +220,7 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 		}
 		omrthread_rwmutex_enter_read(mgmt->managementDataLock);
 		for (idx = 0; idx < gcInfo->arraySize; idx++) {
+			idArrayElems[idx] = gcInfo->memoryPoolID[idx];
 			initialArrayElems[idx] = gcInfo->initialSize[idx];
 			preUsedArrayElems[idx] = gcInfo->preUsed[idx];
 			preCommittedArrayElems[idx] = gcInfo->preCommitted[idx];
@@ -218,6 +230,7 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 			postMaxArrayElems[idx] = gcInfo->postMax[idx];
 		}
 		omrthread_rwmutex_exit_read(mgmt->managementDataLock);
+		(*env)->ReleasePrimitiveArrayCritical(env, idArray, idArrayElems, 0);
 		(*env)->ReleasePrimitiveArrayCritical(env, initialArray, initialArrayElems, 0);
 		(*env)->ReleasePrimitiveArrayCritical(env, preUsedArray, preUsedArrayElems, 0);
 		(*env)->ReleasePrimitiveArrayCritical(env, preCommittedArray, preCommittedArrayElems, 0);
@@ -229,6 +242,7 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 
 	return (*env)->CallStaticObjectMethod(env, gcBean, callBackID,
 			(jlong)gcInfo->index, (jlong)gcInfo->startTime, (jlong)gcInfo->endTime,
+			idArray,
 			initialArray,
 			preUsedArray,
 			preCommittedArray,
@@ -237,6 +251,9 @@ Java_com_ibm_lang_management_internal_ExtendedGarbageCollectorMXBeanImpl_getLast
 			postCommittedArray,
 			postMaxArray);
 fail2:
+	if (NULL != idArrayElems) {
+		(*env)->ReleasePrimitiveArrayCritical(env, idArray, initialArrayElems, 0);
+	}
 	if (NULL != initialArrayElems) {
 		(*env)->ReleasePrimitiveArrayCritical(env, initialArray, initialArrayElems, 0);
 	}
