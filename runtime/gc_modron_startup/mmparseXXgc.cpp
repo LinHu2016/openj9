@@ -1047,6 +1047,11 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			continue;
 		}
 
+		if (try_scan(&scan_start, "debugJniGetPrimitiveArrayCritical")) {
+			extensions->debugJniGetPrimitiveArrayCritical = true;
+			continue;
+		}
+
 #if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		if (try_scan(&scan_start, "enableVirtualLargeObjectHeap")) {
 			extensions->isVirtualLargeObjectHeapRequested = true;

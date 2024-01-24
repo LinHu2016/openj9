@@ -229,6 +229,7 @@ public:
 		onStarted = 1,
 	};
 	TimingAddContinuationInList timingAddContinuationInList;
+	bool debugJniGetPrimitiveArrayCritical;
 protected:
 private:
 protected:
@@ -425,6 +426,7 @@ public:
 		, forceGPFOnHeapInitializationError(false)
 		, continuationListOption(enable_continuation_list)
 		, timingAddContinuationInList(onCreated)
+		, debugJniGetPrimitiveArrayCritical(false)
 	{
 		_typeId = __FUNCTION__;
 	}
