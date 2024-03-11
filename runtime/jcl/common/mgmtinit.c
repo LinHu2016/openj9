@@ -418,7 +418,7 @@ managementGC(OMR_VMThread *omrVMThread, void *userData, BOOLEAN isEnd)
 	mmFuncs->j9gc_pools_memory(vm, 0, &totals[0], &frees[0], isEnd);
 	if (isEnd) {
 		supportedMemoryPoolIDs = (U_32)mmFuncs->j9gc_allsupported_memorypools(vm);
-		for (count = 0, mask = J9_GC_MANAGEMENT_POOL_BASE, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
+		for (count = 0, mask = 1, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
 			id = (supportedMemoryPoolIDs & mask);
 			if (0 != id) {
 				maxs[idx] = mmFuncs->j9gc_pool_maxmemory(vm, id);
@@ -938,7 +938,7 @@ initMemoryManagement(J9JavaVM *vm)
 	/* request all supported pool data for initial size */
 	mmFuncs->j9gc_pools_memory(vm, 0, &totals[0], &frees[0], FALSE);
 
-	for (count = 0, mask = J9_GC_MANAGEMENT_POOL_BASE, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
+	for (count = 0, mask = 1, idx = 0; count < J9_GC_MANAGEMENT_MAX_POOL; ++count, mask <<= 1) {
 
 		id = (supportedMemoryPoolIDs & mask);
 		if (0 != id) {
