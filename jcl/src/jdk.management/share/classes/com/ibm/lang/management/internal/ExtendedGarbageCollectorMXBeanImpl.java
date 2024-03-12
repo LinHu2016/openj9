@@ -81,10 +81,12 @@ public final class ExtendedGarbageCollectorMXBeanImpl
 							long[] initialSize, long[] preUsed, long[] preCommitted, long[] preMax,
 							long[] postUsed, long[] postCommitted, long[] postMax) {
 		/* retrieve the names of MemoryPools*/
-		List<MemoryPoolMXBean> memoryPoolList = ManagementFactory.getMemoryPoolMXBeans();
+//		List<MemoryPoolMXBean> memoryPoolList = ManagementFactory.getMemoryPoolMXBeans();
+		List<MemoryPoolMXBean> memoryPoolList = ExtendedMemoryMXBeanImpl.getInstance().getMemoryPoolMXBeans(false);
 		String[] poolNames = new String[memoryPoolList.size()];
 		int idx = 0;
 		for (MemoryPoolMXBean bean : memoryPoolList) {
+			System.out.println("buildGcInfo idx=" + idx + ", name=" + bean.getName());
 			poolNames[idx++] = bean.getName();
 		}
 		int poolNamesLength = poolNames.length;
