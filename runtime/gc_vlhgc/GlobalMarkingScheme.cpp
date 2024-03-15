@@ -1126,6 +1126,7 @@ MM_GlobalMarkingScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
 						}
 						object = next;
 					}
+					region->getContinuationObjectList()->finishProcessing();
 				}
 			}
 		}

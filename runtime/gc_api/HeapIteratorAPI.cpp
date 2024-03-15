@@ -566,6 +566,59 @@ j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portL
 	return returnCode;
 }
 
+/**
+ * Walk all old continuation objects, call user provided function.
+ * this function for inspecting continuations in GC error/crash cases(during GC time,
+ * (some continuation sub-lists might not be accessible regularly
+ * due to GC need to prepare the lists for continuation pruning/refreshing),
+ * this function might report duplicate continuations with j9mm_iterate_all_continuation_objects and
+ * "dead" continuations
+ * @param flags The flags describing the walk (unused currently)
+ * @param func The function to call on each object descriptor.
+ * @param userData Pointer to storage for userData.
+ * @return return 0 on successfully iterating entire list, return user provided function call if it did not return JVMTI_ITERATION_CONTINUE
+ */
+jvmtiIterationControl
+j9mm_iterate_all_old_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData)
+{
+	J9JavaVM *javaVM = vmThread->javaVM;
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(javaVM->omrVM);
+	MM_ObjectAccessBarrier *barrier = extensions->accessBarrier;
+	MM_ContinuationObjectList *continuationObjectList = extensions->getContinuationObjectListsExternal(vmThread);
+
+	Assert_MM_true(NULL != continuationObjectList);
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+
+	J9MM_IterateObjectDescriptor objectDescriptor;
+	J9MM_IterateRegionDescriptor regionDesc;
+	jvmtiIterationControl returnCode = JVMTI_ITERATION_CONTINUE;
+
+	while (NULL != continuationObjectList) {
+		omrobjectptr_t objectPtr = continuationObjectList->getPriorList();
+		while (NULL != objectPtr) {
+			omrobjectptr_t next = barrier->getContinuationLink(objectPtr);
+			omrobjectptr_t forwardObject = barrier->getForwardObject(objectPtr);
+			j9tty_printf(PORTLIB, "j9mm_iterate_all_old_continuation_objects DB objectPtr=%p, forwardObject=%p, next=%p\n", objectPtr, forwardObject, next);
+			if (NULL != forwardObject) {
+				objectPtr = forwardObject;
+			}
+			uintptr_t regionFound = j9mm_find_region_for_pointer(javaVM, objectPtr, &regionDesc);
+			if (0 != regionFound) {
+				initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
+				returnCode = func(vmThread, &objectDescriptor, userData);
+				if (JVMTI_ITERATION_ABORT == returnCode) {
+					return returnCode;
+				}
+			} else {
+				Assert_MM_unreachable();
+			}
+			objectPtr = next;
+		}
+		continuationObjectList = continuationObjectList->getNextList();
+	}
+	return returnCode;
+}
+
 } /* extern "C" */
 
 /**

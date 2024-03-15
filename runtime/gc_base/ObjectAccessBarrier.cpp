@@ -2088,7 +2088,6 @@ MM_ObjectAccessBarrier::preWeakRootSlotRead(J9JavaVM *vm, j9object_t *srcAddress
 	return true;
 }
 
-
 bool
 MM_ObjectAccessBarrier::preObjectRead(J9VMThread *vmThread, J9Class *srcClass, J9Object **srcAddress)
 {

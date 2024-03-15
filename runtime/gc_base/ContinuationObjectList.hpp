@@ -96,6 +96,9 @@ public:
 #endif /* defined(J9VM_GC_VLHGC) */
 	}
 
+	void finishProcessing() {
+		_priorHead = NULL;
+	}
 	/**
 	 * copy the list to the prior list for backup, can be restored via calling backoutList()
 	 */

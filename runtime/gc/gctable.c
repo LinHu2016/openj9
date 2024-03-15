@@ -253,6 +253,7 @@ J9MemoryManagerFunctions MemoryManagerFunctions = {
 	j9gc_get_cumulative_bytes_allocated_by_thread,
 	j9mm_iterate_all_ownable_synchronizer_objects,
 	j9mm_iterate_all_continuation_objects,
+	j9mm_iterate_all_old_continuation_objects,
 	ownableSynchronizerObjectCreated,
 	continuationObjectCreated,
 	continuationObjectStarted,

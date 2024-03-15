@@ -165,6 +165,7 @@ MM_CompactSchemeFixupRoots::fixupContinuationObjects(MM_EnvironmentBase *env)
 						/* store the object in this thread's buffer. It will be flushed to the appropriate list when necessary. */
 						env->getGCEnvironment()->_continuationObjectBuffer->add(env, forwardedPtr);
 					}
+					list->finishProcessing();
 				}
 			}
 		}

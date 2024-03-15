@@ -36,6 +36,7 @@
 
 #include "AtomicOperations.hpp"
 #include "GCExtensions.hpp"
+#include "ForwardedHeader.hpp"
 #include "Heap.hpp"
 #include "ModronAssertions.h"
 #include "ObjectModel.hpp"
@@ -602,6 +603,12 @@ public:
 	virtual void jniDeleteGlobalReference(J9VMThread *vmThread, J9Object *reference)
 	{
 		/* no-op default implementation */
+	}
+
+	MMINLINE J9Object *getForwardObject(j9object_t object)
+	{
+		MM_ForwardedHeader forwardedHeader(object, compressObjectReferences());
+		return forwardedHeader.getForwardedObject();
 	}
 
 	MM_ObjectAccessBarrier(MM_EnvironmentBase *env) : MM_BaseVirtual()

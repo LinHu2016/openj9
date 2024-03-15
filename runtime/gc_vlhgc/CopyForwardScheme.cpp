@@ -3562,6 +3562,7 @@ MM_CopyForwardScheme::scanContinuationObjects(MM_EnvironmentVLHGC *env)
 					}
 					pointer = next;
 				}
+				region->getContinuationObjectList()->finishProcessing();
 			}
 		}
 	}

@@ -224,6 +224,9 @@ void
 MM_ScavengerRootClearer::scavengeContinuationObjects(MM_EnvironmentStandard *env)
 {
 #if JAVA_SPEC_VERSION >= 19
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+
 	MM_HeapRegionDescriptorStandard *region = NULL;
 	GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
 	GC_Environment *gcEnv = env->getGCEnvironment();
@@ -246,6 +249,9 @@ MM_ScavengerRootClearer::scavengeContinuationObjects(MM_EnvironmentStandard *env
 								forwardedPtr = forwardedHeader.getForwardedObject();
 								Assert_GC_true_with_message(env, NULL != forwardedPtr, "Continuation object  %p should be forwarded\n", object);
 							}
+
+							j9tty_printf(PORTLIB, "scavengeContinuationObjects DB object=%p, forwardedPtr=%p, next=%p\n", object, forwardedPtr, next);
+
 							if (!forwardedHeader.isForwardedPointer() || VM_ContinuationHelpers::isFinished(*VM_ContinuationHelpers::getContinuationStateAddress((J9VMThread *)env->getLanguageVMThread() , forwardedPtr))) {
 								gcEnv->_scavengerJavaStats._continuationCleared += 1;
 								_extensions->releaseNativesForContinuationObject(env, forwardedPtr);
@@ -254,6 +260,7 @@ MM_ScavengerRootClearer::scavengeContinuationObjects(MM_EnvironmentStandard *env
 							}
 							object = next;
 						}
+						list->finishProcessing();
 					}
 				}
 			}

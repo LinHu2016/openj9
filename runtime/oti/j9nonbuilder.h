@@ -4668,6 +4668,7 @@ typedef struct J9MemoryManagerFunctions {
 
 	jvmtiIterationControl  ( *j9mm_iterate_all_ownable_synchronizer_objects)(struct J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(struct J9VMThread *vmThread, struct J9MM_IterateObjectDescriptor *object, void *userData), void *userData) ;
 	jvmtiIterationControl  ( *j9mm_iterate_all_continuation_objects)(struct J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(struct J9VMThread *vmThread, struct J9MM_IterateObjectDescriptor *object, void *userData), void *userData) ;
+	jvmtiIterationControl  ( *j9mm_iterate_all_old_continuation_objects)(struct J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(struct J9VMThread *vmThread, struct J9MM_IterateObjectDescriptor *object, void *userData), void *userData) ;
 	UDATA ( *ownableSynchronizerObjectCreated)(struct J9VMThread *vmThread, j9object_t object) ;
 	UDATA ( *continuationObjectCreated)(struct J9VMThread *vmThread, j9object_t object) ;
 	UDATA ( *continuationObjectStarted)(struct J9VMThread *vmThread, j9object_t object) ;

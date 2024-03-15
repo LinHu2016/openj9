@@ -339,6 +339,7 @@ MM_MarkingSchemeRootClearer::scanContinuationObjects(MM_EnvironmentBase *env)
 							}
 							object = next;
 						}
+						list->finishProcessing();
 					}
 				}
 			}

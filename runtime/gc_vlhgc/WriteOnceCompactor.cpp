@@ -2059,6 +2059,7 @@ MM_WriteOnceCompactor::fixupArrayletLeafRegionContentsAndObjectLists(MM_Environm
 						/* store the object in this thread's buffer. It will be flushed to the appropriate list when necessary. */
 						env->getGCEnvironment()->_continuationObjectBuffer->add(env, forwardedPtr);
 					}
+					region->getContinuationObjectList()->finishProcessing();
 				}
 			}
 		}

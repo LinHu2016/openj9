@@ -362,6 +362,7 @@ MM_ScavengerBackOutScanner::backoutContinuationObjects(MM_EnvironmentStandard *e
 
 						object = next;
 					}
+					list->finishProcessing();
 				}
 			}
 		}
@@ -391,6 +392,7 @@ MM_ScavengerBackOutScanner::backoutContinuationObjects(MM_EnvironmentStandard *e
 
 						object = next;
 					}
+					list->finishProcessing();
 				}
 			}
 		}

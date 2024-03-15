@@ -2169,6 +2169,8 @@ JavaCoreDumpWriter::writeUnmountedThreads(void)
 
 	_VirtualMachine->memoryManagerFunctions->j9mm_iterate_all_continuation_objects(_VirtualMachine->mainThread, PORTLIB, 0, continuationIteratorCallback, this);
 	_OutputStream.writeCharacters("NULL\n");
+	_VirtualMachine->memoryManagerFunctions->j9mm_iterate_all_old_continuation_objects(_VirtualMachine->mainThread, PORTLIB, 0, continuationIteratorCallback, this);
+	_OutputStream.writeCharacters("NULL\n");
 }
 #endif /* JAVA_SPEC_VERSION >= 21 */
 

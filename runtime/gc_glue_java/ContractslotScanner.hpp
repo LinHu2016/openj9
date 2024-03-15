@@ -242,6 +242,7 @@ public:
 							/* store the object in this thread's buffer. It will be flushed to the appropriate list when necessary. */
 							env->getGCEnvironment()->_continuationObjectBuffer->add(env, movePtr);
 						}
+						list->finishProcessing();
 					}
 				}
 			}

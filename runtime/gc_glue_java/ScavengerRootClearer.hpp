@@ -158,6 +158,10 @@ public:
 	scanContinuationObjects(MM_EnvironmentBase *env)
 	{
 		if (_scavenger->getDelegate()->getShouldScavengeContinuationObjects()) {
+
+			if (_extensions->DebugUnmountedThreadJavaCore) {
+				Assert_MM_unreachable();
+			}
 			/* allow the scavenger to handle this */
 			reportScanningStarted(RootScannerEntity_ContinuationObjects);
 			scavengeContinuationObjects(MM_EnvironmentStandard::getEnvironment(env));

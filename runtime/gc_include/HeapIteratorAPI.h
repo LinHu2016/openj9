@@ -283,6 +283,8 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 jvmtiIterationControl
 j9mm_iterate_all_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData);
 
+jvmtiIterationControl
+j9mm_iterate_all_old_continuation_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData);
 /**
  * Shortcut specific for Segregated heap to find the page the pointer belongs to
  * This is instead of iterating pages, which may be very time consuming.

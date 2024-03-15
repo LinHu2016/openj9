@@ -1355,6 +1355,7 @@ MM_MetronomeDelegate::scanContinuationObjects(MM_EnvironmentRealtime *env)
 						objectsVisited = 0;
 					}
 				}
+				list->finishProcessing();
 				_scheduler->condYieldFromGC(env);
 			}
 		}
