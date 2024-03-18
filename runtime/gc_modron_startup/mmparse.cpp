@@ -1914,6 +1914,13 @@ gcParseCommandLineAndInitializeWithValues(J9JavaVM *vm, IDATA *memoryParameters)
 		extensions->numaForced = true;
 #endif /* defined(J9VM_GC_VLHGC) || defined(J9VM_GC_GENERATIONAL) */
 	}
+
+	/* for test only */
+	if (gc_policy_balanced == extensions->configurationOptions._gcPolicy) {
+		extensions->regionSize = (512 * 1024);
+//		extensions->regionSize = (128 * 1024);
+	}
+
 	/* Since the user is not specifying a value, ensure that -Xmdx is set to the same value
 	 * as -Xmx.  It does not matter whether -Xmx was specified or not.
 	 */

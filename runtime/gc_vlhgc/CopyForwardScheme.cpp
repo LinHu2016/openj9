@@ -4085,21 +4085,9 @@ private:
 			objectPtr = forwardedHeader.getForwardedObject();
 			if (NULL == objectPtr) {
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
-				env->_copyForwardStats._doubleMappedOrVirtualLargeObjectHeapArrayletsCleared += 1;
+				env->_copyForwardStats._offHeapRegionsCleared += 1;
 				OMRPORT_ACCESS_FROM_OMRVM(_javaVM->omrVM);
-				/* If forwardedObject is NULL and virtualLargeObjectHeapEnabled is true, free the sparse region occupied by the data of the indexable object */
-				if (virtualLargeObjectHeapEnabled) {
-					_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr);
-					_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
-				} else {
-					omrvmem_release_double_mapped_region(identifier->address, identifier->size, identifier);
-				}
-			} else if (virtualLargeObjectHeapEnabled && NULL != dataAddr) {
-				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
-				 * failure (reason why this GC cycle is happening). */
-				if (!_extensions->indexableObjectModel.isAddressWithinHeap(_extensions, dataAddr)) {
-					_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, forwardedObject);
-				}
+				omrvmem_release_double_mapped_region(identifier->address, identifier->size, identifier);
 			}
 		}
 	}

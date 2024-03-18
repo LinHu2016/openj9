@@ -26,6 +26,7 @@
 #include "ModronAssertions.h"
 #include "ObjectModel.hpp"
 #include "Heap.hpp"
+#include "HeapRegionManager.hpp"
 
 bool
 GC_ArrayletObjectModel::initialize(MM_GCExtensionsBase *extensions)
@@ -185,7 +186,7 @@ GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *exten
 {
 #if defined(J9VM_ENV_DATA64)
 	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
-	bool isObjectWithinHeap = extensions->isAddressWithinHeap(dataAddr);
+	bool isObjectWithinHeap = (NULL != extensions->getHeap()->getHeapRegionManager()->regionDescriptorForAddress(dataAddr));
 	return ((getDataSizeInBytes(arrayPtr) >= _omrVM->_arrayletLeafSize) && (!isObjectWithinHeap));
 
 #else /* defined(J9VM_ENV_DATA64) */
