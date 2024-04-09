@@ -317,6 +317,8 @@ MM_MarkingSchemeRootClearer::scanContinuationObjects(MM_EnvironmentBase *env)
 		reportScanningStarted(RootScannerEntity_ContinuationObjects);
 		GC_Environment *gcEnv = env->getGCEnvironment();
 
+		bool const compressed = _extensions->compressObjectReferences();
+
 		MM_HeapRegionDescriptorStandard *region = NULL;
 		GC_HeapRegionIteratorStandard regionIterator(_extensions->heap->getHeapRegionManager());
 		while (NULL != (region = regionIterator.nextRegion())) {
@@ -329,12 +331,40 @@ MM_MarkingSchemeRootClearer::scanContinuationObjects(MM_EnvironmentBase *env)
 						while (NULL != object) {
 							gcEnv->_markJavaStats._continuationCandidates += 1;
 							omrobjectptr_t next = _extensions->accessBarrier->getContinuationLink(object);
+
+							{
+								MM_ForwardedHeader forwardHeader(object, compressed);
+								omrobjectptr_t forwardPtr = forwardHeader.getNonStrictForwardedObject();
+
+								if (NULL != forwardPtr) {
+									Assert_MM_false(_markingScheme->isMarked(object));
+									if (!forwardHeader.isSelfForwardedPointer()) {
+//										if (!_markingScheme->isMarked(object)) {
+//											PORT_ACCESS_FROM_ENVIRONMENT(env);
+//											j9tty_printf(PORTLIB, "MM_MarkingSchemeRootClearer::scanContinuationObjects strictly forwarded region=%p, LowAddress=%p, HighAddress=%p, object=%p, forwardPtr=%p, isSelfForwardedPointer()=%zu, isMarked=%zu\n",
+//													region, region->getLowAddress(), region->getHighAddress(), object, forwardPtr, forwardHeader.isSelfForwardedPointer(), _markingScheme->isMarked(object));
+//
+//										}
+										object = forwardPtr;
+//										Assert_MM_true(_markingScheme->isMarked(object));
+									} else {
+										forwardHeader.restoreSelfForwardedPointer();
+//										PORT_ACCESS_FROM_ENVIRONMENT(env);
+//										j9tty_printf(PORTLIB, "MM_MarkingSchemeRootClearer::scanContinuationObjects SelfForwardedPointer region=%p, LowAddress=%p, HighAddress=%p, object=%p, forwardPtr=%p, isSelfForwardedPointer()=%zu, isMarked=%zu\n",
+//												region, region->getLowAddress(), region->getHighAddress(), object, forwardPtr, forwardHeader.isSelfForwardedPointer(), _markingScheme->isMarked(object));
+									}
+								}
+							}
+
 							if (_markingScheme->isMarked(object) && !VM_ContinuationHelpers::isFinished(*VM_ContinuationHelpers::getContinuationStateAddress((J9VMThread *)env->getLanguageVMThread() , object))) {
 								/* object was already marked. */
 								gcEnv->_continuationObjectBuffer->add(env, object);
 							} else {
 								/* object was not previously marked */
 								gcEnv->_markJavaStats._continuationCleared += 1;
+//								PORT_ACCESS_FROM_ENVIRONMENT(env);
+//								j9tty_printf(PORTLIB, "MM_MarkingSchemeRootClearer::scanContinuationObjects releaseNativesForContinuationObject object=%p, isMarked=%zu, isFinished=%zu\n",
+//										object, _markingScheme->isMarked(object), VM_ContinuationHelpers::isFinished(*VM_ContinuationHelpers::getContinuationStateAddress((J9VMThread *)env->getLanguageVMThread() , object)));
 								_extensions->releaseNativesForContinuationObject(env, object);
 							}
 							object = next;

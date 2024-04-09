@@ -139,6 +139,10 @@ public:
 
 		/* object class must have proper eye catcher */
 		/* TODO: should define J9CLASS_EYECATCHER */
+		if ((uintptr_t)0x99669966 != clazz->eyecatcher) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "getObjectScanner objectPtr=%p, header=%p\n", objectPtr, *objectPtr);
+		}
 		Assert_MM_true((uintptr_t)0x99669966 == clazz->eyecatcher);
 
 		GC_ObjectScanner *objectScanner = NULL;

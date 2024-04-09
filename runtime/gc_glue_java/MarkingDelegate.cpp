@@ -240,6 +240,17 @@ MM_MarkingDelegate::doStackSlot(MM_EnvironmentBase *env, omrobjectptr_t objectPt
 	omrobjectptr_t object = *slotPtr;
 	if (_markingScheme->isHeapObject(object) && !_extensions->heap->objectIsInGap(object)) {
 		if (_extensions->isConcurrentScavengerEnabled() && _extensions->isScavengerBackOutFlagRaised()) {
+//			{
+//				PORT_ACCESS_FROM_ENVIRONMENT(env);
+//				bool const compressed = _extensions->compressObjectReferences();
+//
+//				MM_ForwardedHeader forwardHeader(object, compressed);
+//				omrobjectptr_t forwardPtr = forwardHeader.getNonStrictForwardedObject();
+//				if (NULL != forwardPtr) {
+//					j9tty_printf(PORTLIB, "MM_MarkingDelegate::doStackSlot isStwCollectionInProgress=%zu, isScavengerBackOutFlagRaised=%zu, slotPtr=%p, object=%p, forwardPtr=%p\n",
+//							_extensions->getGlobalCollector()->isStwCollectionInProgress(), _extensions->isScavengerBackOutFlagRaised(), slotPtr, object, forwardPtr);
+//				}
+//			}
 			_markingScheme->fixupForwardedSlot(slotPtr);
 		}
 		_markingScheme->inlineMarkObject(env, *slotPtr);

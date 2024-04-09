@@ -861,6 +861,7 @@ MM_StandardAccessBarrier::preObjectRead(J9VMThread *vmThread, J9Object *srcObjec
 	if (NULL != _scavenger) {
 		MM_EnvironmentStandard *env = MM_EnvironmentStandard::getEnvironment(vmThread->omrVMThread);
 		Assert_GC_true_with_message(env, !_scavenger->isObjectInEvacuateMemory((omrobjectptr_t)srcAddress) || _extensions->isScavengerBackOutFlagRaised(), "readObject %llx in Evacuate\n", srcAddress);
+//		if ((MUTATOR_THREAD == env->getThreadType()) && _scavenger->isObjectInEvacuateMemory(object)) {
 		if (_scavenger->isObjectInEvacuateMemory(object)) {
 			Assert_GC_true_with_message2(env, _scavenger->isConcurrentCycleInProgress(),
 					"CS not in progress, found a object in Survivor: slot %llx object %llx\n", srcAddress, object);

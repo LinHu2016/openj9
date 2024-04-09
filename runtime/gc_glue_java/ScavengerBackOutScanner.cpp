@@ -59,29 +59,58 @@ MM_ScavengerBackOutScanner::scanAllSlots(MM_EnvironmentBase *env)
 	/* Walk roots fixing up pointers through reverse forwarding information */
 	MM_RootScanner::scanAllSlots(env);
 
-	if (!_extensions->isConcurrentScavengerEnabled()) {
-		/* Back out Ownable Synchronizer and Continuation Processing */
-		MM_HeapRegionDescriptorStandard *region = NULL;
-		GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
-		while (NULL != (region = regionIterator.nextRegion())) {
-			MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
-			for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
-				/**
-				 * For Ownable Synchronizers lists, back out all of regions (includes tenure region, which is backed up during startProcessing).
-				 * Tenure list might have gotten new elements during main Scavenge phase and it is important to restore the list, since it will be iterated later during Marking Clearable phase.
-				 */
+	/* Back out Ownable Synchronizer and Continuation Processing */
+	MM_HeapRegionDescriptorStandard *region = NULL;
+	GC_HeapRegionIteratorStandard regionIterator(_extensions->heapRegionManager);
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_ScavengerBackOutScanner::scanAllSlots Back out Ownable Synchronizer and Continuation Processing start env=%p\n", env);
+
+	while (NULL != (region = regionIterator.nextRegion())) {
+		MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+		for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+			// Back out all of regions (includes tenure region, which is backed up during startProcessing).
+			if (!_extensions->isConcurrentScavengerEnabled()) {
 				regionExtension->_ownableSynchronizerObjectLists[i].backoutList();
-				if ((MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW))) {
-					/**
-					 * For Continuation lists, Consistent with startProcessing that was earlier (in this GC cycle) called only on NEW regions.
-					 * Tenure list cannot get new elements, since they are added only during Scavenge Clearable phase that cannot be reached if there was a Scavenge abort.
-					 */
-					regionExtension->_continuationObjectLists[i].backoutList();
+			}
+			if (!_extensions->isConcurrentScavengerEnabled() || (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW))) {
+				if (_extensions->isConcurrentScavengerEnabled()) {
+					// for concurrent scavenger case, only backout lists in Evacuate region( if the lists in Survivor region are empty, the backout would not hurt)
+					omrobjectptr_t object = regionExtension->_continuationObjectLists[i].getHeadOfList();
+					omrobjectptr_t priorObject = regionExtension->_continuationObjectLists[i].getPriorList();
+
+					j9tty_printf(PORTLIB, "concurrent scavenger case env=%p, region=%p, i=%zu, list=%p, object=%p, priorObject=%p\n",
+							env, region, i, &regionExtension->_continuationObjectLists[i], object, priorObject);
+
+					if (NULL != object) {
+						if (!_scavenger->isObjectInEvacuateMemory(object)) {
+							j9tty_printf(PORTLIB, "keep Continuation survivorRegion env=%p, region=%p, lowAddr=%p, highAddr=%p, object=%p, priorObject=%p\n",
+									env, region, region->getLowAddress(), region->getHighAddress(), object, priorObject);
+							continue;
+						} else if (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)) {
+							j9tty_printf(PORTLIB, "backout Continuation evacurateRegion env=%p, region=%p, lowAddr=%p, highAddr=%p, object=%p, priorObject=%p\n",
+									env, region, region->getLowAddress(), region->getHighAddress(), object, priorObject);
+						} else {
+							j9tty_printf(PORTLIB, "backout Continuation TenureRegion env=%p, region=%p, lowAddr=%p, highAddr=%p, object=%p, priorObject=%p\n",
+									env, region, region->getLowAddress(), region->getHighAddress(), object, priorObject);
+						}
+					} else if (NULL != priorObject) {
+						if (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)) {
+							j9tty_printf(PORTLIB, "backout Continuation evacurateRegion env=%p, region=%p, lowAddr=%p, highAddr=%p, object=%p, priorObject=%p\n",
+									env, region, region->getLowAddress(), region->getHighAddress(), object, priorObject);
+						} else {
+							j9tty_printf(PORTLIB, "backout Continuation TenureRegion env=%p, region=%p, lowAddr=%p, highAddr=%p, object=%p, priorObject=%p\n",
+									env, region, region->getLowAddress(), region->getHighAddress(), object, priorObject);
+						}
+					}
+
 				}
+				regionExtension->_continuationObjectLists[i].backoutList();
 			}
 		}
 	}
 
+	j9tty_printf(PORTLIB, "MM_ScavengerBackOutScanner::scanAllSlots Back out Ownable Synchronizer and Continuation Processing end env=%p\n", env);
  	/* Done backout */
 	Assert_MM_true(env->getGCEnvironment()->_referenceObjectBuffer->isEmpty());
 }
@@ -328,4 +357,53 @@ MM_ScavengerBackOutScanner::backoutUnfinalizedObjects(MM_EnvironmentStandard *en
 	env->getGCEnvironment()->_unfinalizedObjectBuffer->flush(env);
 }
 #endif /* J9VM_GC_FINALIZATION */
+
+void
+MM_ScavengerBackOutScanner::backoutContinuationObjects(MM_EnvironmentStandard *env)
+{
+#if defined(OMR_GC_CONCURRENT_SCAVENGER)
+	if (_extensions->isConcurrentScavengerEnabled()) {
+		return;
+	} else
+#endif /* OMR_GC_CONCURRENT_SCAVENGER */
+	{
+		MM_Heap *heap = _extensions->heap;
+		MM_HeapRegionManager *regionManager = heap->getHeapRegionManager();
+		MM_HeapRegionDescriptorStandard *region = NULL;
+		bool const compressed = _extensions->compressObjectReferences();
+		GC_HeapRegionIteratorStandard regionIterator(regionManager);
+		
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+//		j9tty_printf(PORTLIB, "backoutContinuationObjects env=%p\n", env);
+
+		while (NULL != (region = regionIterator.nextRegion())) {
+
+			j9tty_printf(PORTLIB, "backoutContinuationObjects region=%p, MEMORY_TYPE_NEW=%zu\n", region, (MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)));
+
+			if ((MEMORY_TYPE_NEW == (region->getTypeFlags() & MEMORY_TYPE_NEW)) && _scavenger->isObjectInEvacuateMemory((omrobjectptr_t )region->getLowAddress())) {
+				MM_HeapRegionDescriptorStandardExtension *regionExtension = MM_ConfigurationDelegate::getHeapRegionDescriptorStandardExtension(env, region);
+				for (uintptr_t i = 0; i < regionExtension->_maxListIndex; i++) {
+					MM_ContinuationObjectList *list = &regionExtension->_continuationObjectLists[i];
+
+					j9tty_printf(PORTLIB, "backoutContinuationObjects region=%p, continuationObjectLists[%zu]=%p, getPriorList=%p, getHeadOfList=%p\n", region, i, list, list->getPriorList(), list->getHeadOfList());
+
+					if (!list->wasEmpty()) {
+						omrobjectptr_t object = list->getPriorList();
+						while (NULL != object) {
+							omrobjectptr_t next = _extensions->accessBarrier->getContinuationLink(object);
+							MM_ForwardedHeader forwardHeader(object, compressed);
+							Assert_MM_false(forwardHeader.isForwardedPointer());
+							Assert_MM_false(forwardHeader.isReverseForwardedPointer());
+							_scavenger->getDelegate()->scanContinuationNativeSlots(env, object, SCAN_REASON_BACKOUT);
+
+							object = next;
+						}
+					}
+				}
+
+			}
+		}
+	}
+	/* Done backout */
+}
 #endif /* defined(OMR_GC_MODRON_SCAVENGER) */

@@ -66,6 +66,8 @@ MM_ScavengerRootScanner::startContinuationProcessing(MM_EnvironmentBase *env)
 					if (!list->wasEmpty()) {
 						_scavengerDelegate->setShouldScavengeContinuationObjects(true);
 					}
+				} else {
+					list->backupList();
 				}
 			}
 		}

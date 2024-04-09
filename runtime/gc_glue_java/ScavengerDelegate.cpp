@@ -356,6 +356,12 @@ MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, o
 #endif /* defined(OMR_GC_CONCURRENT_SCAVENGER) */
 	}
 	const bool isGlobalGC = false;
+
+//	if (SCAN_REASON_BACKOUT == reason) {
+//		PORT_ACCESS_FROM_ENVIRONMENT(env);
+//		j9tty_printf(PORTLIB, "scanContinuationNativeSlots SCAN_REASON_BACKOUT objectPtr=%p, beingMounted=%zu\n", objectPtr, beingMounted);
+//	}
+//
 	if (MM_GCExtensions::needScanStacksForContinuationObject(currentThread, objectPtr, isConcurrentGC, isGlobalGC, beingMounted)) {
 		StackIteratorData4Scavenge localData;
 		localData.scavengerDelegate = this;
@@ -363,6 +369,11 @@ MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, o
 		localData.reason = reason;
 		localData.shouldRemember = &shouldRemember;
 
+//		if (SCAN_REASON_BACKOUT == reason) {
+//			PORT_ACCESS_FROM_ENVIRONMENT(env);
+//			j9tty_printf(PORTLIB, "scanContinuationSlots SCAN_REASON_BACKOUT objectPtr=%p, beingMounted=%zu\n", objectPtr, beingMounted);
+//		}
+//
 		GC_VMThreadStackSlotIterator::scanContinuationSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false);
 		if (isConcurrentGC) {
 			MM_GCExtensions::exitContinuationConcurrentGCScan(currentThread, objectPtr, isGlobalGC);
@@ -653,17 +664,21 @@ MM_ScavengerDelegate::reverseForwardedObject(MM_EnvironmentBase *env, MM_Forward
 		if (NULL != finalizeLinkAddress) {
 			barrier->setFinalizeLink(objectPtr, barrier->getFinalizeLink(fwdObjectPtr));
 		}
-
-		/* fixup the references in the continuation native StackSlots */
-		switch (_extensions->objectModel.getScanType(forwardedClass)) {
-
-		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
-			scanContinuationNativeSlots(MM_EnvironmentStandard::getEnvironment(env), objectPtr, SCAN_REASON_BACKOUT);
-			break;
-		default:
-			break;
-		}
-
+//
+//		/* fixup the references in the continuation native StackSlots */
+//		switch (_extensions->objectModel.getScanType(forwardedClass)) {
+//
+//		case GC_ObjectModel::SCAN_CONTINUATION_OBJECT:
+//		{
+//			PORT_ACCESS_FROM_ENVIRONMENT(env);
+//			j9tty_printf(PORTLIB, "reverseForwardedObject scanContinuationNativeSlots objectPtr=%p\n", objectPtr);
+//		}
+//			scanContinuationNativeSlots(MM_EnvironmentStandard::getEnvironment(env), objectPtr, SCAN_REASON_BACKOUT);
+//			break;
+//		default:
+//			break;
+//		}
+//
 	}
 }
 

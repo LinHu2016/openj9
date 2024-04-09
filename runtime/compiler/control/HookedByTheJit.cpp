@@ -7207,6 +7207,11 @@ static void jitHookReleaseCodeGCCycleEnd(J9HookInterface **hook, UDATA eventNum,
    {
    MM_GCCycleEndEvent *event = (MM_GCCycleEndEvent *)eventData;
    OMR_VMThread *omrVMThread = event->omrVMThread;
+
+   if (-1 == event->cycleType) {
+	   /* for scavenger abort case, don't need to code cache reclaim here, the following glocal gc would do the reclamation */
+	   return;
+   }
    condYieldFromGCFunctionPtr condYield = NULL;
    if (TR::Options::getCmdLineOptions()->realTimeGC())
       condYield = event->condYieldFromGCFunction;
