@@ -99,8 +99,19 @@ class GCArrayletObjectModel_V2 extends GCArrayletObjectModelBase
 					hasCorrectDataAddrPointer = dataAddr.isNull();
 				}
 			}
+			
+			if (!hasCorrectDataAddrPointer) {
+				System.out.print("GCArrayletObjectModel_V2.hasCorrectDataAddrPointer arrayPtr=" + arrayPtr.getAddress() + ", dataSizeInBytes=" + dataSizeInBytes.longValue());
+				if (dataAddr.isNull()) { 
+					System.out.print("NULL");
+				} else {
+					System.out.print(dataAddr.getAddress());
+				}
+				System.out.println(", isValidDataAddrForDoubleMappedObject=" + isValidDataAddrForDoubleMappedObject);
+			}
 		} catch (NoSuchFieldException e) {
 			hasCorrectDataAddrPointer = true;
+			System.out.println("GCArrayletObjectModel_V2.hasCorrectDataAddrPointer NoSuchFieldException e=" + e.getMessage());
 		}
 
 		return hasCorrectDataAddrPointer;
