@@ -273,10 +273,8 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 	if (alwaysCopyInCritical) {
 		copyArrayCritical(vmThread, indexableObjectModel, functions, &data, arrayObject, isCopy);
 	} else if (!indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
-		if (indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
-			data = indexableObjectModel->getDataAddrForContiguous(arrayObject);
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+		if ((0 == indexableObjectModel->getSizeInElements(arrayObject)) || indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
+			data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
 		} else {
 			copyArrayCritical(vmThread, indexableObjectModel, functions, &data, arrayObject, isCopy);
 		}
@@ -309,7 +307,14 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 	if (alwaysCopyInCritical) {
 		copyBackArrayCritical(vmThread, indexableObjectModel, functions, elems, &arrayObject, mode);
 	} else if (!indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
-		if (!indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
+		if (indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
+			if (0 == indexableObjectModel->getSizeInElements(arrayObject)) {
+				void *data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
+				if (elems != data) {
+					Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
+				}
+			}
+		} else {
 			copyBackArrayCritical(vmThread, indexableObjectModel, functions, elems, &arrayObject, mode);
 		}
 	} else {
@@ -354,10 +359,8 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, j
 	if (alwaysCopyInCritical || isCompressed) {
 		copyStringCritical(vmThread, indexableObjectModel, functions, &data, javaVM, valueObject, stringObject, isCopy, isCompressed);
 	} else if (!indexableObjectModel->isInlineContiguousArraylet(valueObject)) {
-		if (indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
-			data = (jchar *)indexableObjectModel->getDataAddrForContiguous(valueObject);
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+		if ((0 == indexableObjectModel->getSizeInElements(valueObject)) || indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
+			data = (jchar*)indexableObjectModel->getDataPointerForContiguous(valueObject);
 		} else {
 			copyStringCritical(vmThread, indexableObjectModel, functions, &data, javaVM, valueObject, stringObject, isCopy, isCompressed);
 		}

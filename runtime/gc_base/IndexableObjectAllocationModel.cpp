@@ -181,7 +181,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 	switch (_layout) {
 	case GC_ArrayletObjectModel::InlineContiguous:
 #if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
-		if (!isArrayletDataAdjacentToHeader) {
+		if (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && !isArrayletDataAdjacentToHeader) {
 			/* We still need to create leaves for discontiguous arrays that will be allocated at off-heap */
 			spine = getSparseAddressAndDecommitLeaves(env, spine);
 			if (NULL != spine) {
