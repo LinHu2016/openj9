@@ -55,20 +55,15 @@ GC_ArrayletObjectModel::AssertContiguousArrayDataUnreachable()
 void
 GC_ArrayletObjectModel::AssertArrayletIsDiscontiguous(J9IndexableObject *objPtr)
 {
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-	if (!isDoubleMappingEnabled())
-#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
-	{
-		if (!isVirtualLargeObjectHeapEnabled()) {
-			uintptr_t arrayletLeafSize = _omrVM->_arrayletLeafSize;
-			uintptr_t remainderBytes = getDataSizeInBytes(objPtr) % arrayletLeafSize;
-			if (0 != remainderBytes) {
-				MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
-				Assert_MM_true((getSpineSize(objPtr) + remainderBytes + extensions->getObjectAlignmentInBytes()) > arrayletLeafSize);
-			}
-		} else if (0 != getSizeInElements(objPtr)) {
-			Assert_MM_unreachable();
+	if (!isVirtualLargeObjectHeapEnabled()) {
+		uintptr_t arrayletLeafSize = _omrVM->_arrayletLeafSize;
+		uintptr_t remainderBytes = getDataSizeInBytes(objPtr) % arrayletLeafSize;
+		if (0 != remainderBytes) {
+			MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
+			Assert_MM_true((getSpineSize(objPtr) + remainderBytes + extensions->getObjectAlignmentInBytes()) > arrayletLeafSize);
 		}
+	} else if (0 != getSizeInElements(objPtr)) {
+		Assert_MM_unreachable();
 	}
 }
 
@@ -115,11 +110,7 @@ GC_ArrayletObjectModel::getArrayletLayout(J9Class* clazz, uintptr_t numberOfElem
 		uintptr_t arrayletLeafSize = _omrVM->_arrayletLeafSize;
 		uintptr_t lastArrayletBytes = dataSizeInBytes & (arrayletLeafSize - 1);
 
-		bool isAllIndexableDataContiguousEnabled = isVirtualLargeObjectHeapEnabled();
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-		isAllIndexableDataContiguousEnabled = isAllIndexableDataContiguousEnabled || isDoubleMappingEnabled();
-#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
-		if (isAllIndexableDataContiguousEnabled && (0 < dataSizeInBytes)) {
+		if (isVirtualLargeObjectHeapEnabled() && (0 < dataSizeInBytes)) {
 			layout = InlineContiguous;
 		} else if (lastArrayletBytes > 0) {
 			/* determine how large the spine would be if this were a hybrid array */
@@ -179,19 +170,6 @@ GC_ArrayletObjectModel::isArrayletDataAdjacentToHeader(uintptr_t dataSizeInBytes
 	MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
 	uintptr_t minimumSpineSizeAfterGrowing = extensions->getObjectAlignmentInBytes();
 	return ((UDATA_MAX == _largestDesirableArraySpineSize) || (dataSizeInBytes <= (_largestDesirableArraySpineSize - minimumSpineSizeAfterGrowing - contiguousIndexableHeaderSize())));
-}
-
-bool
-GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr)
-{
-#if defined(J9VM_ENV_DATA64)
-	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
-	bool isObjectWithinHeap = (NULL != extensions->getHeap()->getHeapRegionManager()->regionDescriptorForAddress(dataAddr));
-	return ((getDataSizeInBytes(arrayPtr) >= _omrVM->_arrayletLeafSize) && (!isObjectWithinHeap));
-
-#else /* defined(J9VM_ENV_DATA64) */
-	return false;
-#endif /* defined(J9VM_ENV_DATA64) */
 }
 
 bool
