@@ -103,9 +103,6 @@ GC_ArrayletObjectModelBase::getSpineSizeWithoutHeader(ArrayLayout layout, uintpt
 		}
 	}
 	bool isAllIndexableDataContiguousEnabled = extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled();
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-	isAllIndexableDataContiguousEnabled = (isAllIndexableDataContiguousEnabled || extensions->indexableObjectModel.isDoubleMappingEnabled());
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
 	uintptr_t spineDataSize = 0;
 	if (InlineContiguous == layout) {

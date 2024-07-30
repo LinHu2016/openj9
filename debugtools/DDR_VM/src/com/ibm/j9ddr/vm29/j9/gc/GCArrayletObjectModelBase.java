@@ -54,7 +54,6 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 	protected UDATA arrayletLeafSize;
 	protected UDATA arrayletLeafLogSize;
 	protected UDATA arrayletLeafSizeMask;
-	protected boolean enableDoubleMapping;
 	protected boolean enableVirtualLargeObjectHeap;
 
 	public GCArrayletObjectModelBase() throws CorruptDataException
@@ -67,11 +66,6 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 		arrayletLeafSize = vm.arrayletLeafSize();
 		arrayletLeafLogSize = vm.arrayletLeafLogSize();
 		arrayletLeafSizeMask = arrayletLeafSize.sub(1);
-		try {
-			enableDoubleMapping = arrayletObjectModel._enableDoubleMapping();
-		} catch (NoSuchFieldException e) {
-			enableDoubleMapping = false;
-		}
 		try {
 			enableVirtualLargeObjectHeap = arrayletObjectModel._enableVirtualLargeObjectHeap();
 		} catch (NoSuchFieldException e) {
@@ -176,11 +170,9 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 			}
 		}
 
-		boolean isAllIndexableDataContiguousEnabled = enableDoubleMapping || enableVirtualLargeObjectHeap;
-
 		UDATA spineDataSize = new UDATA(0);
 		if (GC_ArrayletObjectModelBase$ArrayLayout.InlineContiguous == layout) {
-			if (!isAllIndexableDataContiguousEnabled || isArrayletDataAdjacentToHeader(dataSize)) {
+			if (!enableVirtualLargeObjectHeap || isArrayletDataAdjacentToHeader(dataSize)) {
 				spineDataSize = dataSize; // All data in spine
 			}
 		} else if (GC_ArrayletObjectModelBase$ArrayLayout.Hybrid == layout) {
@@ -259,9 +251,8 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 			}
 		} else {
 			UDATA lastArrayletBytes = dataSizeInBytes.bitAnd(arrayletLeafSizeMask);
-			boolean isAllIndexableDataContiguousEnabled = enableVirtualLargeObjectHeap || enableDoubleMapping;
 
-			if (isAllIndexableDataContiguousEnabled && dataSizeInBytes.gt(0)) {
+			if (enableVirtualLargeObjectHeap && dataSizeInBytes.gt(0)) {
 				layout = GC_ArrayletObjectModelBase$ArrayLayout.InlineContiguous;
 			} else if (lastArrayletBytes.gt(0)) {
 				/* determine how large the spine would be if this were a hybrid array */
@@ -382,13 +373,13 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 	}
 
 	/**
-	 * Check if the given indexable object is double mapped.
+	 * Check if the given indexable object is off heap.
 	 *
-	 * @param address indexable object to check if it is double mapped
+	 * @param address indexable object to check if it is off heap
 	 * @throws CorruptDataException if there's a problem accessing card table heap fields
-	 * @return true if the given indexable object is double mapped
+	 * @return true if the given indexable object is off heap
 	 */
-	public boolean isIndexableObjectDoubleMapped(VoidPointer indexableDataAddr, UDATA dataSizeInBytes) throws CorruptDataException
+	public boolean isIndexableObjectOffHeap(VoidPointer indexableDataAddr, UDATA dataSizeInBytes) throws CorruptDataException
 	{
 		boolean isObjectWithinHeap = isAddressWithinHeap(indexableDataAddr);
 		return !isObjectWithinHeap && dataSizeInBytes.gte(arrayletLeafSize);
