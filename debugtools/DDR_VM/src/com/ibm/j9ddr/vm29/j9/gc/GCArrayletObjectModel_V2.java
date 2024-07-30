@@ -84,7 +84,7 @@ class GCArrayletObjectModel_V2 extends GCArrayletObjectModelBase
 		try {
 			UDATA dataSizeInBytes = getDataSizeInBytes(arrayPtr);
 			VoidPointer dataAddr = J9IndexableObjectHelper.getDataAddrForIndexable(arrayPtr);
-			boolean isValidDataAddrForDoubleMappedObject = isIndexableObjectDoubleMapped(dataAddr, dataSizeInBytes);
+			boolean isValidDataAddrForOffHeapObject = isIndexableObjectOffHeap(dataAddr, dataSizeInBytes);
 
 			if (dataSizeInBytes.isZero()) {
 				VoidPointer discontiguousDataAddr = VoidPointer.cast(arrayPtr.addOffset(J9IndexableObjectHelper.discontiguousHeaderSize()));
@@ -93,8 +93,8 @@ class GCArrayletObjectModel_V2 extends GCArrayletObjectModelBase
 				VoidPointer contiguousDataAddr = VoidPointer.cast(arrayPtr.addOffset(J9IndexableObjectHelper.contiguousHeaderSize()));
 				hasCorrectDataAddrPointer = dataAddr.equals(contiguousDataAddr);
 			} else {
-				if (enableVirtualLargeObjectHeap || enableDoubleMapping) {
-					hasCorrectDataAddrPointer = isValidDataAddrForDoubleMappedObject;
+				if (enableVirtualLargeObjectHeap) {
+					hasCorrectDataAddrPointer = isValidDataAddrForOffHeapObject;
 				} else {
 					hasCorrectDataAddrPointer = dataAddr.isNull();
 				}

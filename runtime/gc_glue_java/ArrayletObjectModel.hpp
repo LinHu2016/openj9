@@ -1024,16 +1024,16 @@ public:
 	 * Checks that the dataAddr field of the indexable object is correct.
 	 *
 	 * @param arrayPtr      Pointer to the indexable object
-	 * @param isValidDataAddrForDoubleMappedObject	Boolean to determine whether the given indexable object is double mapped
+	 * @param isValidDataAddrForOffHeapObject	Boolean to determine whether the given indexable object is off heap
 	 * @return if the dataAddr field of the indexable object is correct
 	 */
 	MMINLINE bool
-	isValidDataAddr(J9IndexableObject *arrayPtr, bool isValidDataAddrForDoubleMappedObject)
+	isValidDataAddr(J9IndexableObject *arrayPtr, bool isValidDataAddrForOffHeapObject)
 	{
 		bool isValidDataAddress = true;
 		if (_isIndexableDataAddrPresent) {
 			void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
-			isValidDataAddress = isValidDataAddr(arrayPtr, dataAddr, isValidDataAddrForDoubleMappedObject);
+			isValidDataAddress = isValidDataAddr(arrayPtr, dataAddr, isValidDataAddrForOffHeapObject);
 		}
 		return isValidDataAddress;
 	}
@@ -1042,11 +1042,11 @@ public:
 	 * Checks that the dataAddr field of the indexable object is correct.
 	 *
 	 * @param arrayPtr      Pointer to the indexable object
-	 * @param isValidDataAddrForDoubleMappedObject	Boolean to determine whether the given indexable object is double mapped
+	 * @param isValidDataAddrForOffHeapObject	Boolean to determine whether the given indexable object is off heap
 	 * @return if the dataAddr field of the indexable object is correct
 	 */
 	MMINLINE bool
-	isValidDataAddr(J9IndexableObject *arrayPtr, void *dataAddr, bool isValidDataAddrForDoubleMappedObject)
+	isValidDataAddr(J9IndexableObject *arrayPtr, void *dataAddr, bool isValidDataAddrForOffHeapObject)
 	{
 		bool isValidDataAddress = false;
 		uintptr_t dataSizeInBytes = getDataSizeInBytes(arrayPtr);
@@ -1057,11 +1057,8 @@ public:
 			isValidDataAddress = (dataAddr == (void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize()));
 		} else {
 			if (isVirtualLargeObjectHeapEnabled()
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-			 || isDoubleMappingEnabled()
-#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
 			 ) {
-				isValidDataAddress = isValidDataAddrForDoubleMappedObject;
+				isValidDataAddress = isValidDataAddrForOffHeapObject;
 			}
 			else {
 				isValidDataAddress = (dataAddr == NULL);
@@ -1245,17 +1242,11 @@ public:
 	getDataPointerForContiguous(J9IndexableObject *arrayPtr)
 	{
 		void *dataAddr = (void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize());;
-#if defined(J9VM_ENV_DATA64)
-		/* could be replaced with "if (_isIndexableDataAddrPresent) {"? */
-//		if (isVirtualLargeObjectHeapEnabled()
-//#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-//			|| isDoubleMappingEnabled()
-//#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
-//		) {
-		if (_isIndexableDataAddrPresent) {
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+		if (isVirtualLargeObjectHeapEnabled()) {
 			dataAddr = *dataAddrSlotForContiguous(arrayPtr);
 		}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		return dataAddr;
 	}
 
@@ -1341,16 +1332,6 @@ public:
 	 * @return true if based on the value of dataSizeInBytes, the arraylet data is adjacent to the header, false otherwise
 	 */
 	bool isArrayletDataAdjacentToHeader(uintptr_t dataSizeInBytes);
-
-	/**
-	 * Check if the indexable object is double mapped.
-	 *
-	 * @param extensions pointer to MM_GCExtensionsBase
-	 * @param arrayPtr  pointer to indexable object we are checking to see if it is double mapped
-	 * @return true if the indexable object is double mapped
-	 */
-	bool isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr);
-
 
 	/**
 	 * Check if the data address for the contiguous indexable object should be fixed up.
