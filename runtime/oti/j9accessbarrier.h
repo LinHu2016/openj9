@@ -135,12 +135,12 @@ typedef struct J9IndexableObject* mm_j9array_t;
 		: (&((elemType*)((((J9IndexableObjectWithDataAddressContiguousFull *)(array))->dataAddr)))[index]))
 
 #define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
-	(((vmThread)->isVirtualLargeObjectHeapEnabled) \
+	(((vmThread)->isIndexableDataAddrPresent) \
 		? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_EA(vmThread, array, index, elemType) \
 		: J9JAVAARRAYCONTIGUOUS_WITHOUT_DATAADDRESS_EA(vmThread, array, index, elemType))
 
 #define J9JAVAARRAYCONTIGUOUS_EA_VM(javaVM, array, index, elemType) \
-	(((javaVM)->isVirtualLargeObjectHeapEnabled) \
+	(((javaVM)->isIndexableDataAddrPresent) \
 		? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_EA_VM(javaVM, array, index, elemType) \
 		: J9JAVAARRAYCONTIGUOUS_WITHOUT_DATAADDRESS_EA_VM(javaVM, array, index, elemType))
 
