@@ -33,7 +33,9 @@ import com.ibm.j9ddr.vm29.j9.ObjectAccessBarrier;
 import com.ibm.j9ddr.vm29.pointer.generated.J9BuildFlags;
 import com.ibm.j9ddr.vm29.pointer.generated.J9ClassPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectContiguousPointer;
+import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectWithDataAddressContiguousPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectDiscontiguousPointer;
+import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectWithDataAddressDiscontiguousPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9ObjectMonitorPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9ObjectPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectPointer;
@@ -294,7 +296,8 @@ public abstract class AbstractPointer extends DataType {
 		String pointerType = getClass().getName();
 		try {
 			if ((this instanceof J9ObjectPointer)||(this instanceof J9IndexableObjectPointer) ||
-				(this instanceof J9IndexableObjectContiguousPointer) || (this instanceof J9IndexableObjectDiscontiguousPointer)) {
+				(this instanceof J9IndexableObjectContiguousPointer) || (this instanceof J9IndexableObjectDiscontiguousPointer) ||
+				(this instanceof J9IndexableObjectWithDataAddressContiguousPointer) || (this instanceof J9IndexableObjectWithDataAddressDiscontiguousPointer) ) {
 				pointerType = J9ObjectHelper.getClassName(J9ObjectPointer.cast(this));
 			}
 			if (this instanceof J9ROMFieldShapePointer) {

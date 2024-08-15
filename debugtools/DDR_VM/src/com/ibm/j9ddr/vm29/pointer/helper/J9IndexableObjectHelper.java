@@ -94,16 +94,35 @@ public class J9IndexableObjectHelper extends J9ObjectHelper
 
 	public static U32 rawSize(J9IndexableObjectPointer objPointer) throws CorruptDataException
 	{
+		boolean isIndexableDataAddrPresent = false;
+		try {
+			J9JavaVMPointer javaVM = J9RASHelper.getVM(DataType.getJ9RASPointer());
+			isIndexableDataAddrPresent = (J9BuildFlags.J9VM_ENV_DATA64 && !javaVM.isIndexableDataAddrPresent().isZero());
+		} catch (CorruptDataException | NoSuchFieldException e) {
+			isIndexableDataAddrPresent = false;
+		}
+		
 		if (mixedReferenceMode) {
 			try {
 				if (compressObjectReferences) {
-					return (U32) J9IndexableObjectContiguousCompressedPointer.cast(objPointer).size();
+					if (isIndexableDataAddrPresent) {
+						return (U32) J9IndexableObjectWithDataAddressContiguousCompressedPointer.cast(objPointer).size();
+					} else {
+						return (U32) J9IndexableObjectContiguousCompressedPointer.cast(objPointer).size();
+					}
 				}
-				return (U32) J9IndexableObjectContiguousFullPointer.cast(objPointer).size();
+				if (isIndexableDataAddrPresent) {
+					return (U32) J9IndexableObjectWithDataAddressContiguousFullPointer.cast(objPointer).size();
+				} else {
+					return (U32) J9IndexableObjectContiguousFullPointer.cast(objPointer).size();
+				}
 			} catch (NoSuchFieldException e) {
 				// the 'size' field should be present in a VM that supports mixed reference mode
 				throw new CorruptDataException(e);
 			}
+		}
+		if (isIndexableDataAddrPresent) {
+			return (U32) J9IndexableObjectWithDataAddressContiguousPointer.cast(objPointer).size();
 		}
 		return (U32) J9IndexableObjectContiguousPointer.cast(objPointer).size();
 	}
@@ -112,19 +131,38 @@ public class J9IndexableObjectHelper extends J9ObjectHelper
 	{
 		U32 size = rawSize(objPointer);
 		if (size.isZero()) {
+			boolean isIndexableDataAddrPresent = false;
+			try {
+				J9JavaVMPointer javaVM = J9RASHelper.getVM(DataType.getJ9RASPointer());
+				isIndexableDataAddrPresent = (J9BuildFlags.J9VM_ENV_DATA64 && !javaVM.isIndexableDataAddrPresent().isZero());
+			} catch (CorruptDataException | NoSuchFieldException e) {
+				isIndexableDataAddrPresent = false;
+			}
 			if (mixedReferenceMode) {
 				try {
 					if (compressObjectReferences) {
-						size = (U32) J9IndexableObjectDiscontiguousCompressedPointer.cast(objPointer).size();
+						if (isIndexableDataAddrPresent) {
+							size = (U32) J9IndexableObjectWithDataAddressDiscontiguousCompressedPointer.cast(objPointer).size();
+						} else {
+							size = (U32) J9IndexableObjectDiscontiguousCompressedPointer.cast(objPointer).size();
+						}
 					} else {
-						size = (U32) J9IndexableObjectDiscontiguousFullPointer.cast(objPointer).size();
+						if (isIndexableDataAddrPresent) {
+							size = (U32) J9IndexableObjectWithDataAddressDiscontiguousFullPointer.cast(objPointer).size();
+						} else {
+							size = (U32) J9IndexableObjectDiscontiguousFullPointer.cast(objPointer).size();
+						}
 					}
 				} catch (NoSuchFieldException e) {
 					// the 'size' field should be present in a VM that supports mixed reference mode
 					throw new CorruptDataException(e);
 				}
 			} else {
-				size = (U32) J9IndexableObjectDiscontiguousPointer.cast(objPointer).size();
+				if (isIndexableDataAddrPresent) {
+					size = (U32) J9IndexableObjectWithDataAddressDiscontiguousPointer.cast(objPointer).size();
+				} else {
+					size = (U32) J9IndexableObjectDiscontiguousPointer.cast(objPointer).size();
+				}
 			}
 		}
 		if (size.anyBitsIn(0x80000000)) {

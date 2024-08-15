@@ -46,10 +46,12 @@ import com.ibm.j9ddr.vm29.pointer.generated.J9ArrayClassPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9BuildFlags;
 import com.ibm.j9ddr.vm29.pointer.generated.J9ClassPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectPointer;
+import com.ibm.j9ddr.vm29.pointer.generated.J9JavaVMPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9ObjectPointer;
 import com.ibm.j9ddr.vm29.pointer.helper.J9ClassHelper;
 import com.ibm.j9ddr.vm29.pointer.helper.J9IndexableObjectHelper;
 import com.ibm.j9ddr.vm29.pointer.helper.J9ObjectHelper;
+import com.ibm.j9ddr.vm29.pointer.helper.J9RASHelper;
 import com.ibm.j9ddr.vm29.pointer.helper.J9UTF8Helper;
 import com.ibm.j9ddr.vm29.pointer.helper.PrintObjectFieldsHelper;
 import com.ibm.j9ddr.vm29.pointer.helper.ValueTypeHelper;
@@ -146,6 +148,13 @@ public class J9ObjectStructureFormatter extends BaseStructureFormatter
 
 	private void formatArrayObject(PrintStream out, J9ClassPointer localClazz, U8Pointer dataStart, J9IndexableObjectPointer localObject, int begin, int end) throws CorruptDataException
 	{
+		boolean isIndexableDataAddrPresent = false;
+		try {
+			J9JavaVMPointer javaVM = J9RASHelper.getVM(DataType.getJ9RASPointer());
+			isIndexableDataAddrPresent = (J9BuildFlags.J9VM_ENV_DATA64 && !javaVM.isIndexableDataAddrPresent().isZero());
+		} catch (CorruptDataException | NoSuchFieldException e) {
+			isIndexableDataAddrPresent = false;
+		}
 		String className = J9IndexableObjectHelper.getClassName(localObject);
 
 		out.format("!J9IndexableObject %s {%n", localObject.getHexAddress());
@@ -154,6 +163,19 @@ public class J9ObjectStructureFormatter extends BaseStructureFormatter
 		out.format("    struct J9Class* clazz = !j9arrayclass 0x%X   // %s%n", localClazz.getAddress(), className);
 		out.format("    Object flags = %s;%n", J9IndexableObjectHelper.flags(localObject).getHexValue());
 
+		if (isIndexableDataAddrPresent) {
+			VoidPointer dataAddr = null;
+			try {
+				dataAddr = J9IndexableObjectHelper.getDataAddrForIndexable(localObject);
+				if (dataAddr.isNull()) {
+					dataAddr = null;
+				}
+			} catch (NoSuchFieldException e) {
+				dataAddr = null;
+			}
+			out.format("    U_64 DataAddr = %s, %n", (dataAddr == null)? "NULL" : dataAddr.getHexAddress());
+		}
+
 		U32 size = J9IndexableObjectHelper.size(localObject);
 
 		if (size.anyBitsIn(0x80000000)) {
@@ -161,7 +183,7 @@ public class J9ObjectStructureFormatter extends BaseStructureFormatter
 		} else {
 			out.format("    U_32 size = %s;%n", size.getHexValue());
 		}
-
+				
 		printSubArrayType(out, 1, localClazz, dataStart, begin, end, localObject);
 		out.println("}");
 	}

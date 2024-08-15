@@ -1192,9 +1192,21 @@ class CheckEngine
 
 		try {
 			if (J9BuildFlags.J9VM_ENV_DATA64 && isIndexableDataAddressFlagSet() && ObjectModel.isIndexable(object)) {
+				System.out.println("checkJ9Object IndexableObject=" + object.getHexAddress());
 				if (!_javaVM.isIndexableDataAddrPresent().isZero()) {
 					J9IndexableObjectPointer array = J9IndexableObjectPointer.cast(object);
-
+					VoidPointer dataAddr = null;
+					try {
+						dataAddr = J9IndexableObjectHelper.getDataAddrForIndexable(array);
+						if (dataAddr.isNull()) {
+							dataAddr = null;
+						}
+					} catch (NoSuchFieldException e) {
+						dataAddr = null;
+					}
+					getReporter().print("J9IndexableObjectPointer DataArr=");
+					getReporter().println((dataAddr == null)? "NULL" : dataAddr.getHexAddress());
+					
 					if (false == J9IndexableObjectHelper.hasCorrectDataAddrPointer(array)) {
 						return J9MODRON_GCCHK_RC_INVALID_INDEXABLE_DATA_ADDRESS;
 					}
