@@ -3134,8 +3134,6 @@ gcInitializeDefaults(J9JavaVM* vm)
 
 		/* Try to initialize basic heap structures with the memory parameters we currently have */
 		if (JNI_OK == j9gc_initialize_heap(vm, memoryParameterTable, extensions->memoryMax)) {
-			/* set vm->isVirtualLargeObjectHeapEnabled after extensions->isVirtualLargeObjectHeapEnabled is set in j9gc_initialize_heap(). */
-			vm->isVirtualLargeObjectHeapEnabled = (extensions->isVirtualLargeObjectHeapEnabled) ? TRUE : FALSE;
 			break;
 		}
 
@@ -3344,6 +3342,7 @@ setIndexableObjectHeaderSizeWithoutDataAddress(J9JavaVM* vm)
 		vm->contiguousIndexableHeaderSize = sizeof(J9IndexableObjectContiguousFull);
 		vm->discontiguousIndexableHeaderSize = sizeof(J9IndexableObjectDiscontiguousFull);
 	}
+	vm->unsafeIndexableHeaderSize = vm->contiguousIndexableHeaderSize;
 }
 
 #if defined(OMR_GC_CONCURRENT_SCAVENGER)
