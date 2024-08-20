@@ -302,7 +302,15 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 	@Override
 	public VoidPointer getDataPointerForContiguous(J9IndexableObjectPointer array) throws CorruptDataException
 	{
-		return VoidPointer.cast(array.addOffset(J9IndexableObjectHelper.contiguousHeaderSize()));
+		VoidPointer dataAddr = VoidPointer.cast(array.addOffset(J9IndexableObjectHelper.contiguousHeaderSize()));
+		if (enableVirtualLargeObjectHeap) {
+			try {
+				dataAddr = J9IndexableObjectHelper.getDataAddrForIndexable(array);
+			} catch (NoSuchFieldException e) {
+			}
+		}
+
+		return dataAddr;
 	}
 
 	/**

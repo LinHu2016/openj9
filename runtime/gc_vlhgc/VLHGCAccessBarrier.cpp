@@ -290,6 +290,11 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		MM_AtomicOperations::add(criticalCount, 1);
 #endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
 	}
+
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical arrayObject=%p, alwaysCopyInCritical=%zu, SizeInElements=%zu, DataPointerForContiguous=%p, isInlineContiguousArraylet=%zu\n",
+			arrayObject, alwaysCopyInCritical, indexableObjectModel->getSizeInElements(arrayObject), indexableObjectModel->getDataPointerForContiguous(arrayObject), indexableObjectModel->isInlineContiguousArraylet(arrayObject));
+
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
 	return data;
 }
@@ -304,6 +309,11 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 
 	J9IndexableObject *arrayObject = (J9IndexableObject*)J9_JNI_UNWRAP_REFERENCE(array);
 	bool alwaysCopyInCritical = (javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
+
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
+	j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical arrayObject=%p, alwaysCopyInCritical=%zu, SizeInElements=%zu, DataPointerForContiguous=%p, isInlineContiguousArraylet=%zu\n",
+			arrayObject, alwaysCopyInCritical, indexableObjectModel->getSizeInElements(arrayObject), indexableObjectModel->getDataPointerForContiguous(arrayObject), indexableObjectModel->isInlineContiguousArraylet(arrayObject));
+
 	if (alwaysCopyInCritical) {
 		copyBackArrayCritical(vmThread, indexableObjectModel, functions, elems, &arrayObject, mode);
 	} else if (!indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
