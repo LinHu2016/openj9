@@ -113,6 +113,7 @@ GC_ArrayletObjectModel::getArrayletLayout(J9Class* clazz, uintptr_t numberOfElem
 		if (isVirtualLargeObjectHeapEnabled() && (0 < dataSizeInBytes)) {
 			layout = InlineContiguous;
 		} else if (lastArrayletBytes > 0) {
+			Assert_MM_false(isVirtualLargeObjectHeapEnabled());
 			/* determine how large the spine would be if this were a hybrid array */
 			uintptr_t numberArraylets = numArraylets(dataSizeInBytes);
 			bool align = shouldAlignSpineDataSection(clazz);

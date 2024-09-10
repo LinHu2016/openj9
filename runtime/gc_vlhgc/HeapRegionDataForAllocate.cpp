@@ -24,10 +24,6 @@
 #include "j9.h"
 #include "j9cfg.h"
 
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-#include <sys/mman.h>
-#include <errno.h>
-#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
 #include "AllocationContext.hpp"
 #include "CycleState.hpp"
 #include "EnvironmentVLHGC.hpp"
