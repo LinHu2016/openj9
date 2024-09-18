@@ -148,6 +148,8 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 			J9JavaVM *vm = (J9JavaVM *)extensions->getOmrVM()->_language_vm;
 			vm->isVirtualLargeObjectHeapEnabled = TRUE;
 			vm->unsafeIndexableHeaderSize = 0;
+			/* offheap testing */
+			extensions->isVirtualLargeObjectHeapRequested = true;
 		} else {
 #if defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD)
 			extensions->heapRegionStateTable->kill(env->getForge());

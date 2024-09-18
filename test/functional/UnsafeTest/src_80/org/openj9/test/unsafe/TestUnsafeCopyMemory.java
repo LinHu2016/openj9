@@ -967,6 +967,7 @@ public class TestUnsafeCopyMemory extends UnsafeTestBase {
 			Array.setByte(array, i, (byte) (i % Byte.SIZE));
 		}
 
+		System.out.println("testCopyLargeArrayIntoRawMemory baseOffset=" + baseOffset + ", maxNumBytes=" + maxNumBytes + ", maxNumElements=" + maxNumElements + ", indexScale=" + indexScale);
 		for (long arrayOffset = baseOffset; arrayOffset < (baseOffset + maxNumBytes); arrayOffset = arrayOffset * 11 - 1) {
 			long maxNumBytesLeft = ((baseOffset + maxNumBytes) - arrayOffset);
 			for (long numBytesToCopy = 1; numBytesToCopy < maxNumBytesLeft; numBytesToCopy = (numBytesToCopy + 1)
@@ -978,6 +979,8 @@ public class TestUnsafeCopyMemory extends UnsafeTestBase {
 				try {
 					long memoryOffset = memoryPointer
 							+ (arrayOffset - baseOffset);
+							
+					System.out.println("copyMemory arrayOffset=" + arrayOffset + ", memoryOffset=" + memoryOffset + ", numBytesToCopy=" + numBytesToCopy);
 					copyMemory(array, arrayOffset, null, memoryOffset,
 							numBytesToCopy);
 					testEqualRawMemoryAndArray(memoryOffset, numBytesToCopy,
