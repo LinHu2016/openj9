@@ -589,6 +589,13 @@ public static native long getJ9ConstantPoolFromJ9Class(long j9clazz);
 public static native boolean isJVMInSingleThreadedMode();
 
 /**
+ * Queries whether the JVM is running in off heap enabled.
+ *
+ * @return true if JVM is in off heap enabled, false otherwise
+ */
+public static native boolean isJVMInOffHeapMode();
+
+/**
  * A J9ConstantPool* is appended to anntation parameter byte arrays
  * so it will be consistent with annotation data if the class is redefined.
  * Only use this method with:
