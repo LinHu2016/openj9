@@ -193,6 +193,21 @@ Java_com_ibm_oti_vm_VM_isJVMInSingleThreadedMode(JNIEnv *env, jclass unused)
 	return result;
 }
 
+/**
+ * Queries whether the JVM is running in off heap eanbled.
+ *
+ * @return JNI_TRUE if JVM is in off heap eanbled, JNI_FALSE otherwise
+ */
+jboolean JNICALL
+Java_com_ibm_oti_vm_VM_isJVMInOffHeapMode(JNIEnv *env, jclass unused)
+{
+	jboolean result = JNI_FALSE;
+	if (((J9VMThread*)env)->javaVM->isVirtualLargeObjectHeapEnabled) {
+		result = JNI_TRUE;
+	}
+	return result;
+}
+
 #if defined(J9VM_OPT_JFR)
 void JNICALL
 Java_com_ibm_oti_vm_VM_triggerExecutionSample(JNIEnv *env, jclass unused) {

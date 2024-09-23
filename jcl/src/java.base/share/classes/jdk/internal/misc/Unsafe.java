@@ -6152,7 +6152,7 @@ public final class Unsafe {
 				throw invalidInput();
 			}
 		} else {
-			if (offset < 0) {
+			if ((offset < 0) && (VM.isJVMInOffHeapMode())) {
 				throw invalidInput();
 			}
 		}
