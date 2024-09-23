@@ -76,4 +76,5 @@
 	<export name="Java_com_ibm_oti_vm_VM_markCurrentThreadAsSystemImpl" />
 	<export name="Java_com_ibm_oti_vm_VM_getJ9ConstantPoolFromJ9Class" />
 	<export name="Java_com_ibm_oti_vm_VM_isJVMInSingleThreadedMode" />
+	<export name="Java_com_ibm_oti_vm_VM_isJVMInOffHeapMode" />
 </exports>

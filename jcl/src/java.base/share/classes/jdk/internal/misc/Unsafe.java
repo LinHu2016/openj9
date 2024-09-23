@@ -6164,7 +6164,7 @@ public final class Unsafe {
 	 * @throws IllegalArgumentException if offset is invalid
 	 */
 	private void checkPointer(Object obj, long offset) {
-		if (null == obj) {
+		if (null == obj || VM.isJVMInOffHeapMode()) {
 			checkNativeAddress(offset);
 		} else {
 			checkOffset(obj, offset);
