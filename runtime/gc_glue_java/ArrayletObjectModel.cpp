@@ -100,7 +100,8 @@ GC_ArrayletObjectModel::getArrayletLayout(J9Class* clazz, uintptr_t numberOfElem
 	}
 
 	/* CMVC 135307 : when checking for InlineContiguous layout, perform subtraction as adding to dataSizeInBytes could trigger overflow. */
-	if ((largestDesirableSpine == UDATA_MAX) || (dataSizeInBytes <= (largestDesirableSpine - minimumSpineSizeAfterGrowing - contiguousIndexableHeaderSize()))) {
+	if ((largestDesirableSpine == UDATA_MAX)
+		|| (dataSizeInBytes <= (largestDesirableSpine - minimumSpineSizeAfterGrowing - contiguousIndexableHeaderSize()))) {
 		layout = InlineContiguous;
 		if (0 == numberOfElements) {
 			/* Zero sized NUA uses the discontiguous shape */
@@ -143,7 +144,7 @@ void
 GC_ArrayletObjectModel::fixupInternalLeafPointersAfterCopy(J9IndexableObject *destinationPtr, J9IndexableObject *sourcePtr)
 {
 	if (hasArrayletLeafPointers(destinationPtr)) {
-		GC_ArrayletLeafIterator leafIterator((J9JavaVM*)_omrVM->_language_vm, destinationPtr);
+		GC_ArrayletLeafIterator leafIterator((J9JavaVM *)_omrVM->_language_vm, destinationPtr);
 		GC_SlotObject *leafSlotObject = NULL;
 		uintptr_t sourceStartAddress = (uintptr_t) sourcePtr;
 		uintptr_t sourceEndAddress = sourceStartAddress + getSizeInBytesWithHeader(destinationPtr);
@@ -152,7 +153,7 @@ GC_ArrayletObjectModel::fixupInternalLeafPointersAfterCopy(J9IndexableObject *de
 			uintptr_t leafAddress = (uintptr_t)leafSlotObject->readReferenceFromSlot();
 
 			if ((sourceStartAddress < leafAddress) && (leafAddress < sourceEndAddress)) {
-				leafSlotObject->writeReferenceToSlot((J9Object*)((uintptr_t)destinationPtr + (leafAddress - sourceStartAddress)));
+				leafSlotObject->writeReferenceToSlot((J9Object *)((uintptr_t)destinationPtr + (leafAddress - sourceStartAddress)));
 			}
 		}
 	}
@@ -170,7 +171,8 @@ GC_ArrayletObjectModel::isDataAdjacentToHeader(uintptr_t dataSizeInBytes)
 {
 	MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
 	uintptr_t minimumSpineSizeAfterGrowing = extensions->getObjectAlignmentInBytes();
-	return ((UDATA_MAX == _largestDesirableArraySpineSize) || (dataSizeInBytes <= (_largestDesirableArraySpineSize - minimumSpineSizeAfterGrowing - contiguousIndexableHeaderSize())));
+	return ((UDATA_MAX == _largestDesirableArraySpineSize)
+			|| (dataSizeInBytes <= (_largestDesirableArraySpineSize - minimumSpineSizeAfterGrowing - contiguousIndexableHeaderSize())));
 }
 
 bool
