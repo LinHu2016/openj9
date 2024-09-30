@@ -70,6 +70,12 @@ GC_ArrayletObjectModel::AssertArrayletIsDiscontiguous(J9IndexableObject *objPtr)
 void
 GC_ArrayletObjectModel::AssertContiguousArrayletLayout(J9IndexableObject *objPtr)
 {
+	//DEBUG
+	if (InlineContiguous != getArrayLayout(objPtr)) {
+		OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
+		omrtty_printf("AssertContiguousArrayletLayout objPtr=%p, ArrayLayout=%zu\n", objPtr, getArrayLayout(objPtr));
+	}
+
 	Assert_MM_true(InlineContiguous == getArrayLayout(objPtr));
 }
 
@@ -176,10 +182,17 @@ GC_ArrayletObjectModel::isDataAdjacentToHeader(uintptr_t dataSizeInBytes)
 }
 
 bool
-GC_ArrayletObjectModel::shouldFixupDataAddrForContiguous(J9IndexableObject *arrayPtr)
+GC_ArrayletObjectModel::shouldFixupDataAddrForContiguous(J9IndexableObject *arrayPtr, void *dataAddr)
 {
 #if defined(J9VM_ENV_DATA64)
-	return ((void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize()) == getDataAddrForContiguous(arrayPtr));
+	return ((void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize()) == dataAddr);
+
+//	uintptr_t dataSizeInBytes = getDataSizeInBytes(arrayPtr);
+//	// Debug
+//	OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
+//	omrtty_printf("shouldFixupDataAddrForContiguous arrayPtr=%p, dataSizeInBytes=%zu\n", arrayPtr, dataSizeInBytes);
+//
+//	return ((0 != dataSizeInBytes) && isDataAdjacentToHeader(dataSizeInBytes));
 #else /* defined(J9VM_ENV_DATA64) */
 	return false;
 #endif /* defined(J9VM_ENV_DATA64) */

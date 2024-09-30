@@ -208,7 +208,8 @@ public:
 		if (objectModel->isIndexable(objectPtr)) {
 			GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
 			if (_vmThread->isVirtualLargeObjectHeapEnabled && indexableObjectModel->isInlineContiguousArraylet((J9IndexableObject *)objectPtr)) {
-				_gcEnv._shouldFixupDataAddrForContiguous = indexableObjectModel->shouldFixupDataAddrForContiguous((J9IndexableObject *)objectPtr);
+				_gcEnv._shouldFixupDataAddrForContiguous = indexableObjectModel->shouldFixupDataAddrForContiguous((J9IndexableObject *)objectPtr,
+							indexableObjectModel->getDataAddrForContiguous((J9IndexableObject *)objectPtr));
 			} else {
 				_gcEnv._shouldFixupDataAddrForContiguous = false;
 			}

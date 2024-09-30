@@ -2035,7 +2035,12 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 					 * points to the array data. In the case of contiguous data, it will point to the data
 					 * itself, and in case of discontiguous data, it will be NULL.
 					 */
-					indexableObjectModel->fixupDataAddr(forwardedHeader, destinationObjectPtr);
+					if (_extensions->isVirtualLargeObjectHeapEnabled) {
+						PORT_ACCESS_FROM_ENVIRONMENT(env);
+						j9tty_printf(PORTLIB, "MM_CopyForwardScheme::copy fixupDataAddr forwardedHeader=%p, destinationObjectPtr=%p\n", forwardedHeader, destinationObjectPtr);
+
+						indexableObjectModel->fixupDataAddr(forwardedHeader, destinationObjectPtr);
+					}
 #endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 				}
 
@@ -4084,20 +4089,49 @@ private:
 
 		if (!_copyForwardScheme->isLiveObject(objectPtr)) {
 			Assert_MM_true(_copyForwardScheme->isObjectInEvacuateMemory(objectPtr));
-			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
+
 			MM_ForwardedHeader forwardedHeader(objectPtr, _extensions->compressObjectReferences());
-			objectPtr = forwardedHeader.getForwardedObject();
+			J9Object *fwdOjectPtr = forwardedHeader.getForwardedObject();
 			/* If forwarded object is NULL, free the sparse region occupied by the data of the indexable object */
-			if (NULL == objectPtr) {
+			if (NULL == fwdOjectPtr) {
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._offHeapRegionsCleared += 1;
+
+				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr);
 				*sparseHeapAllocation = false;
-			} else if (NULL != dataAddr) {
-				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
-				 * failure (reason why this GC cycle is happening) */
-				_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, objectPtr);
 			}
+			else {
+				bool const compressed = env->compressObjectReferences();
+				void *srcDataAddr = NULL;
+				if (compressed) {
+					srcDataAddr = ((J9IndexableObjectWithDataAddressContiguousCompressed *)objectPtr)->dataAddr;
+				} else {
+					srcDataAddr = ((J9IndexableObjectWithDataAddressContiguousFull *)objectPtr)->dataAddr;
+				}
+				uintptr_t dataSizeInBytes = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)fwdOjectPtr);
+				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)fwdOjectPtr);
+
+				MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap objectPtr=%p, objectHeader=%p, srcDataAddr=%p, dataSizeInBytes=%zu, fwdOjectPtr=%p, fwdOjectHeader=%p, fwdDataAddr=%p, dataSizeInBytes=%zu\n",
+						objectPtr, *objectPtr, srcDataAddr, _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr), fwdOjectPtr, *fwdOjectPtr, dataAddr, dataSizeInBytes);
+
+				Assert_MM_true(srcDataAddr == dataAddr);
+				Assert_MM_false(_copyForwardScheme->isHeapObject((J9Object *)srcDataAddr));
+				if (NULL != dataAddr) {
+				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
+				 * failure (reason why this GC cycle is happening).
+				 */
+					_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, fwdOjectPtr);
+				}
+//				Assert_MM_unreachable();
+			}
+//			if (NULL != dataAddr) {
+//				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
+//				 * failure (reason why this GC cycle is happening) */
+//				_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, objectPtr);
+//			}
 		}
 	}
 #endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */

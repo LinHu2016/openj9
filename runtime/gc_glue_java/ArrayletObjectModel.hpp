@@ -1004,10 +1004,18 @@ public:
 		J9IndexableObject *j9ArrayPtr = (J9IndexableObject *)arrayPtr;
 
 		if (InlineContiguous == getPreservedArrayLayout(forwardedHeader)) {
-			if (shouldFixupDataAddrForContiguous((J9IndexableObject *)forwardedHeader->getObject())) {
+			void *dataAddr = getDataAddrForContiguous(j9ArrayPtr);
+
+			if (shouldFixupDataAddrForContiguous((J9IndexableObject *)forwardedHeader->getObject(), dataAddr)) {
 				setDataAddrForContiguous(j9ArrayPtr);
 			}
 		}
+
+//		if (InlineContiguous == getPreservedArrayLayout(j9ArrayPtr)) {
+//			if (shouldFixupDataAddrForContiguous(j9ArrayPtr) {
+//				setDataAddrForContiguous(j9ArrayPtr);
+//			}
+//		}
 #endif /* defined(J9VM_ENV_DATA64) */
 	}
 
@@ -1257,9 +1265,10 @@ public:
 	 *
 	 * @param extensions pointer to MM_GCExtensionsBase
 	 * @param forwardedHeader pointer to the MM_ForwardedHeader instance encapsulating the object
+	 * @param dataAddr data address in the indexable object
 	 * @return true if we should fixup the data address of the indexable object
 	 */
-	bool shouldFixupDataAddrForContiguous(J9IndexableObject *arrayPtr);
+	bool shouldFixupDataAddrForContiguous(J9IndexableObject *arrayPtr, void *dataAddr);
 
 	/**
 	 * Initialize the receiver, a new instance of GC_ObjectModel
