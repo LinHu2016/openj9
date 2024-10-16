@@ -4088,10 +4088,16 @@ private:
 			Assert_MM_true(_copyForwardScheme->isObjectInEvacuateMemory(objectPtr));
 
 			MM_ForwardedHeader forwardedHeader(objectPtr, _extensions->compressObjectReferences());
-			Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
+//			Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 			J9Object *fwdOjectPtr = forwardedHeader.getForwardedObject();
+
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap objectPtr=%p, forwardedHeader=%p, fwdOjectPtr=%p\n",
+						objectPtr, &forwardedHeader, fwdOjectPtr);
+				
 			/* If forwarded object is NULL, free the sparse region occupied by the data of the indexable object */
 			if (NULL == fwdOjectPtr) {
+				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._offHeapRegionsCleared += 1;
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr);
