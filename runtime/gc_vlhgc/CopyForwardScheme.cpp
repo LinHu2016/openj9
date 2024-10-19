@@ -2592,6 +2592,13 @@ MM_CopyForwardScheme::scanPointerArrayObjectSlotsSplit(MM_EnvironmentVLHGC *env,
 				break;
 			}
 
+			// Debug
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			J9Object *value = slotObject->readReferenceFromSlot();
+
+			j9tty_printf(PORTLIB, "copyAndForwardPointerArray env=%p, arrayPtr=%p, startIndex=%zu, slotObject=%p, value=%p\n",
+					env, arrayPtr, startIndex, slotObject, value);
+
 			/* Copy/Forward the slot reference and perform any inter-region remember work that is required */
 			success = copyAndForwardPointerArray(env, reservingContext, arrayPtr, startIndex, slotObject);
 		}
@@ -3048,7 +3055,24 @@ MM_CopyForwardScheme::scanPointerArrayObjectSlots(MM_EnvironmentVLHGC *env, MM_A
 		 */
 		updateScanStats(env, (J9Object *)arrayPtr, reason);
 	}
-	
+
+
+	//Debug
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	uintptr_t dataSizeInBytes = _extensions->indexableObjectModel.getDataSizeInBytes(arrayPtr);
+	void *dataAddr = NULL;
+	if (_extensions->isVirtualLargeObjectHeapEnabled) {
+		bool const compressed = env->compressObjectReferences();
+		if (compressed) {
+			dataAddr = ((J9IndexableObjectWithDataAddressContiguousCompressed *)arrayPtr)->dataAddr;
+		} else {
+			dataAddr = ((J9IndexableObjectWithDataAddressContiguousFull *)arrayPtr)->dataAddr;
+		}
+	}
+	j9tty_printf(PORTLIB, "scanPointerArrayObjectSlotsSplit env=%p, arrayPtr=%p, arrayPtrHeader=%p, index=%zu, currentSplitUnitOnly=%zu, dataSizeInBytes=%zu, dataAddr=%p\n",
+			env, arrayPtr, *arrayPtr, index, currentSplitUnitOnly, dataSizeInBytes, dataAddr);
+
+
 	scanPointerArrayObjectSlotsSplit(env, reservingContext, arrayPtr, index, currentSplitUnitOnly);
 }
 

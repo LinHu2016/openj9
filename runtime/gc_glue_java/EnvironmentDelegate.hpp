@@ -209,6 +209,21 @@ public:
 			GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
 			if (_vmThread->isVirtualLargeObjectHeapEnabled && indexableObjectModel->isInlineContiguousArraylet((J9IndexableObject *)objectPtr)) {
 				_gcEnv._shouldFixupDataAddrForContiguous = indexableObjectModel->shouldFixupDataAddrForContiguous((J9IndexableObject *)objectPtr);
+
+				//Debug
+				J9JavaVM *javaVM = (J9JavaVM *)_extensions->getOmrVM()->_language_vm;
+				PORT_ACCESS_FROM_JAVAVM(javaVM);
+				J9IndexableObject *arrayPtr = (J9IndexableObject *) objectPtr;
+				uintptr_t dataSizeInBytes = _extensions->indexableObjectModel.getDataSizeInBytes(arrayPtr);
+				void *dataAddr = _extensions->indexableObjectModel.getDataPointerForContiguous(arrayPtr);
+//				bool const compressed = _env->compressObjectReferences();
+//				if (compressed) {
+//					dataAddr = ((J9IndexableObjectWithDataAddressContiguousCompressed *)arrayPtr)->dataAddr;
+//				} else {
+//					dataAddr = ((J9IndexableObjectWithDataAddressContiguousFull *)arrayPtr)->dataAddr;
+//				}
+				j9tty_printf(PORTLIB, "preObjectMoveForCompact env=%p, arrayPtr=%p, arrayPtrHeader=%p, dataSizeInBytes=%zu, dataAddr=%p, _shouldFixupDataAddrForContiguous=%zu\n",
+						_env, arrayPtr, *arrayPtr, dataSizeInBytes, dataAddr, _gcEnv._shouldFixupDataAddrForContiguous);
 			} else {
 				_gcEnv._shouldFixupDataAddrForContiguous = false;
 			}
