@@ -77,6 +77,9 @@
 #include "PointerArrayletInlineLeafIterator.hpp"
 #include "RememberedSetCardListCardIterator.hpp"
 #include "RootScanner.hpp"
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+#include "SparseVirtualMemory.hpp"
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #include "SlotObject.hpp"
 #include "SublistPool.hpp"
 #include "SublistPuddle.hpp"
@@ -1693,6 +1696,21 @@ public:
 		/* class loaders are fixed up as part of normal object fixup */
 		Assert_MM_unreachable();
 	}
+
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, bool *sparseHeapAllocation) {
+		J9IndexableObject *fwdOjectPtr = (J9IndexableObject *)_compactScheme->getForwardingPtr(objectPtr);
+		if ((J9IndexableObject *)objectPtr != fwdOjectPtr) {
+			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous(fwdOjectPtr);
+			if (NULL != dataAddr) {
+				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
+				 * failure (reason why this GC cycle is happening).
+				 */
+				_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, fwdOjectPtr);
+			}
+		}
+	}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 #if defined(J9VM_GC_FINALIZATION)
 	virtual void doFinalizableObject(j9object_t object) {
