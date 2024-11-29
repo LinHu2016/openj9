@@ -124,6 +124,13 @@ JVM_CopySwapMemory(JNIEnv *env, jobject srcObj, jlong srcOffset, jobject dstObj,
 	U_8 *srcBytes = NULL;
 	U_8 *dstBytes = NULL;
 	U_8 *dstAddr = NULL;
+
+
+	PORT_ACCESS_FROM_ENV(env);
+	j9tty_printf(PORTLIB, "JVM_CopySwapMemory srcObj=%p, srcOffset=%zu, dstObj=%p, dstOffset=%zu, size=%zu, elemSize=%zu",
+			srcObj, srcOffset, dstObj, dstOffset, size, elemSize);
+
+
 	if (NULL != srcObj) {
 		srcBytes = (*env)->GetPrimitiveArrayCritical(env, srcObj, NULL);
 		/* The java caller has added Unsafe.arrayBaseOffset() to the offset. Remove it
@@ -140,6 +147,10 @@ JVM_CopySwapMemory(JNIEnv *env, jobject srcObj, jlong srcOffset, jobject dstObj,
 		dstOffset -= J9VMTHREAD_CONTIGUOUS_INDEXABLE_HEADER_SIZE((J9VMThread*)env);
 	}
 	dstAddr += (UDATA)dstOffset;
+
+	j9tty_printf(PORTLIB, "memmove dstAddr=%p, srcAddr=%p, size=%zu",
+			dstAddr, srcBytes + (UDATA)srcOffset, size);
+
 	/* First copy the bytes unmodified to the new location (memmove handles the overlap case) */
 	memmove(dstAddr, srcBytes + (UDATA)srcOffset, (size_t)size);
 	/* Now flip each element in the destination */

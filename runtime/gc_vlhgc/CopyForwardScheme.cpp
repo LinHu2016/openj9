@@ -2037,6 +2037,9 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 					 */
 					if (_extensions->isVirtualLargeObjectHeapEnabled) {
 						indexableObjectModel->fixupDataAddr(forwardedHeader, (J9IndexableObject *)destinationObjectPtr);
+
+						PORT_ACCESS_FROM_ENVIRONMENT(env);
+						j9tty_printf(PORTLIB, "fixupDataAddr original=%p, destinationObjectPtr=%p\n", forwardedHeader->getObject(), destinationObjectPtr);
 					}
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 				}

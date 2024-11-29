@@ -274,6 +274,19 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 	J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
 	bool alwaysCopyInCritical = (vmThread->javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
 
+//	if (indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
+//		PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+//
+//		int32_t sizeInElements = (int32_t)indexableObjectModel->getSizeInElements(arrayObject);
+//		uintptr_t sizeInBytes = indexableObjectModel->getDataSizeInBytes(arrayObject);
+//		void *dataAddr = NULL;
+//		if (indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
+//			dataAddr = indexableObjectModel->getDataAddrForContiguous(arrayObject);
+//		}
+//		j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical vmThread=%p, array=%p, arrayObject=%p, alwaysCopyInCritical=%zu, sizeInElements=%zu, sizeInBytes=%zu, dataAddr=%p\n",
+//				vmThread, array, arrayObject, alwaysCopyInCritical, sizeInElements, sizeInBytes, dataAddr);
+//	}
+//
 	/* Set default isCopy value to JNI_FALSE, where in case we need to copy array critical
 	 * the value is set to JNI_TRUE in copyArrayCritical()
 	 */
@@ -298,6 +311,10 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		/* we need to increment this region's critical count so that we know not to compact it */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
 		MM_AtomicOperations::add(criticalCount, 1);
+//
+//		PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+//		j9tty_printf(PORTLIB, "enterCriticalRegion criticalCount=%zu\n", *criticalCount);
+//
 #endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
@@ -312,6 +329,9 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 
 	J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
 	bool alwaysCopyInCritical = (vmThread->javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
+//
+//	PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+//	j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical vmThread=%p, array=%p, arrayObject=%p, alwaysCopyInCritical=%zu\n", vmThread, array, arrayObject, alwaysCopyInCritical);
 
 	if (alwaysCopyInCritical || !indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
 		/* alwaysCopyInCritical or discontiguous (including 0 size array) */
