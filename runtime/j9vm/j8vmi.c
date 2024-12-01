@@ -125,9 +125,11 @@ JVM_CopySwapMemory(JNIEnv *env, jobject srcObj, jlong srcOffset, jobject dstObj,
 	U_8 *dstBytes = NULL;
 	U_8 *dstAddr = NULL;
 
+	jlong srcOffset1 = srcOffset;
+	jlong dstOffset1 = dstOffset;
 
 	PORT_ACCESS_FROM_ENV(env);
-	j9tty_printf(PORTLIB, "JVM_CopySwapMemory srcObj=%p, srcOffset=%zu, dstObj=%p, dstOffset=%zu, size=%zu, elemSize=%zu",
+	j9tty_printf(PORTLIB, "JVM_CopySwapMemory srcObj=%p, srcOffset=%zu, dstObj=%p, dstOffset=%zu, size=%zu, elemSize=%zu\n",
 			srcObj, srcOffset, dstObj, dstOffset, size, elemSize);
 
 
@@ -136,7 +138,8 @@ JVM_CopySwapMemory(JNIEnv *env, jobject srcObj, jlong srcOffset, jobject dstObj,
 		/* The java caller has added Unsafe.arrayBaseOffset() to the offset. Remove it
 		 * here as GetPrimitiveArrayCritical returns a pointer to the first element.
 		 */
-		srcOffset -= J9VMTHREAD_CONTIGUOUS_INDEXABLE_HEADER_SIZE((J9VMThread*)env);
+		srcOffset -= J9VMTHREAD_UNSAFE_INDEXABLE_HEADER_SIZE((J9VMThread*)env);
+		srcOffset1 -= J9VMTHREAD_CONTIGUOUS_INDEXABLE_HEADER_SIZE((J9VMThread*)env);
 	}
 	if (NULL != dstObj) {
 		dstBytes = (*env)->GetPrimitiveArrayCritical(env, dstObj, NULL);
@@ -144,12 +147,13 @@ JVM_CopySwapMemory(JNIEnv *env, jobject srcObj, jlong srcOffset, jobject dstObj,
 		/* The java caller has added Unsafe.arrayBaseOffset() to the offset. Remove it
 		 * here as GetPrimitiveArrayCritical returns a pointer to the first element.
 		 */
-		dstOffset -= J9VMTHREAD_CONTIGUOUS_INDEXABLE_HEADER_SIZE((J9VMThread*)env);
+		dstOffset -= J9VMTHREAD_UNSAFE_INDEXABLE_HEADER_SIZE((J9VMThread*)env);
+		dstOffset1 -= J9VMTHREAD_CONTIGUOUS_INDEXABLE_HEADER_SIZE((J9VMThread*)env);
 	}
 	dstAddr += (UDATA)dstOffset;
 
-	j9tty_printf(PORTLIB, "memmove dstAddr=%p, srcAddr=%p, size=%zu",
-			dstAddr, srcBytes + (UDATA)srcOffset, size);
+	j9tty_printf(PORTLIB, "memmove dstAddr=%p, dstBytes=%p, dstOffset=%zu, dstOffset1=%zu, srcAddr=%p, srcBytes=%p, srcOffset=%zu, srcOffset1=%zu, size=%zu\n",
+			dstAddr, dstBytes, dstOffset, dstOffset1, srcBytes + (UDATA)srcOffset, srcBytes, srcOffset, srcOffset1, size);
 
 	/* First copy the bytes unmodified to the new location (memmove handles the overlap case) */
 	memmove(dstAddr, srcBytes + (UDATA)srcOffset, (size_t)size);

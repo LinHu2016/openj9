@@ -209,12 +209,12 @@ public:
 			GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
 			if (_vmThread->isVirtualLargeObjectHeapEnabled && indexableObjectModel->isInlineContiguousArraylet((J9IndexableObject *)objectPtr)) {
 				_gcEnv._shouldFixupDataAddrForContiguous = indexableObjectModel->shouldFixupDataAddrForContiguous((J9IndexableObject *)objectPtr);
-
-				if (_gcEnv._shouldFixupDataAddrForContiguous) {
-					PORT_ACCESS_FROM_JAVAVM(_vmThread->javaVM);
-					j9tty_printf(PORTLIB, "preObjectMoveForCompact objectPtr=%p\n", objectPtr);
-				}
-
+//
+//				if (_gcEnv._shouldFixupDataAddrForContiguous) {
+//					PORT_ACCESS_FROM_JAVAVM(_vmThread->javaVM);
+//					j9tty_printf(PORTLIB, "preObjectMoveForCompact objectPtr=%p\n", objectPtr);
+//				}
+//
 			} else {
 				_gcEnv._shouldFixupDataAddrForContiguous = false;
 			}
