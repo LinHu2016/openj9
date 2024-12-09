@@ -67,6 +67,10 @@ internalAllocateMemorySpaceWithMaximum(J9JavaVM * javaVM, UDATA minimumSpaceSize
 	} else {
 		MM_EnvironmentBase env(javaVM->omrVM);
 		result = internalAllocateMemorySpaceWithMaximumWithEnv(&env, javaVM, minimumSpaceSize, minimumNewSpaceSize, initialNewSpaceSize, maximumNewSpaceSize, minimumTenureSpaceSize, initialTenureSpaceSize, maximumTenureSpaceSize, memoryMax, baseAddress, tenureFlags);
+
+		PORT_ACCESS_FROM_JAVAVM(javaVM);
+		j9tty_printf(PORTLIB, "internalAllocateMemorySpaceWithMaximum J9JavaVM=%zu, J9VMThread=%zu", sizeof(J9JavaVM),  sizeof(J9VMThread));
+
 	}
 	return result;
 }
