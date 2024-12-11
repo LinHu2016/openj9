@@ -140,19 +140,26 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 	/* set indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet (Balanced GC and off-heap disabled) */
 	vm->indexableObjectLayout = J9IndexableObjectLayout_DataAddr_Arraylet;
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	if (extensions->isVirtualLargeObjectHeapRequested) {
+	/* set off-heap enabled as default for balanced GC */
+	extensions->isVirtualLargeObjectHeapEnabled = true;
+
+	if (extensions->virtualLargeObjectHeap._wasSpecified) {
+		extensions->isVirtualLargeObjectHeapEnabled = extensions->virtualLargeObjectHeap._valueSpecified;
+	}
+
+	if (extensions->isVirtualLargeObjectHeapEnabled) {
 		/* Create off-heap */
 		MM_SparseVirtualMemory *largeObjectVirtualMemory = MM_SparseVirtualMemory::newInstance(env, OMRMEM_CATEGORY_MM_RUNTIME_HEAP, heap);
 		if (NULL != largeObjectVirtualMemory) {
 			extensions->largeObjectVirtualMemory = largeObjectVirtualMemory;
 			extensions->indexableObjectModel.setEnableVirtualLargeObjectHeap(true);
-			extensions->isVirtualLargeObjectHeapEnabled = true;
 //			vm->isVirtualLargeObjectHeapEnabled = TRUE;
 			/* set indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet (Balanced GC and off-heap enabled) */
 			vm->indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet;
 			/* reset vm->unsafeIndexableHeaderSize for off-heap case */
 			vm->unsafeIndexableHeaderSize = 0;
 		} else {
+			extensions->isVirtualLargeObjectHeapEnabled = false;
 #if defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD)
 			extensions->heapRegionStateTable->kill(env->getForge());
 			extensions->heapRegionStateTable = NULL;
