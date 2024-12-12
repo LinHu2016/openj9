@@ -361,14 +361,6 @@ MM_VerboseHandlerOutputVLHGC::outputMemoryInfoInnerStanza(MM_EnvironmentBase *en
 				stats->_edenFreeHeapSize, stats->_edenHeapSize,
 				((UDATA)(((U_64)stats->_edenFreeHeapSize*100) / (U_64)stats->_edenHeapSize)));
 	}
-#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env->getOmrVM());
-	if (extensions->isVirtualLargeObjectHeapEnabled) {
-		writer->formatAndOutput(env, indent, "<offheap-objects objects=\"%zu\" bytes=\"%zu\" />",
-				extensions->largeObjectVirtualMemory->getSparseDataPool()->getAllocObjectCount(),
-				extensions->largeObjectVirtualMemory->getSparseDataPool()->getFreeListPoolAllocBytes());
-	}
-#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	if (0 != stats->_arrayletReferenceObjects) {
 		writer->formatAndOutput(env, indent, "<arraylet-reference objects=\"%zu\" leaves=\"%zu\" largest=\"%zu\" />",
 				stats->_arrayletReferenceObjects, stats->_arrayletReferenceLeaves, stats->_largestReferenceArraylet);
@@ -391,6 +383,15 @@ MM_VerboseHandlerOutputVLHGC::outputMemoryInfoInnerStanza(MM_EnvironmentBase *en
 		writer->formatAndOutput(env, indent, "<numa common=\"%zu\" local=\"%zu\" non-local=\"%zu\" non-local-percent=\"%zu\" />",
 				stats->_commonNumaNodeBytes, stats->_localNumaNodeBytes, stats->_nonLocalNumaNodeBytes,  nonLocalPercent);
 	}
+
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env->getOmrVM());
+	if (extensions->isVirtualLargeObjectHeapEnabled) {
+		writer->formatAndOutput(env, indent, "<offheap-objects objects=\"%zu\" bytes=\"%zu\" />",
+				extensions->largeObjectVirtualMemory->getSparseDataPool()->getAllocObjectCount(),
+				extensions->largeObjectVirtualMemory->getSparseDataPool()->getFreeListPoolAllocBytes());
+	}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	MM_VerboseHandlerJava::outputFinalizableInfo(_manager, env, indent);
 	outputContinuationObjectInfo(env, indent);
