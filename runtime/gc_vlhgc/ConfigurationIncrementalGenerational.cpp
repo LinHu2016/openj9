@@ -136,6 +136,9 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 
 #if defined(J9VM_ENV_DATA64)
 	extensions->indexableObjectModel.setIsDataAddressPresent(true);
+	J9JavaVM *vm = (J9JavaVM *)extensions->getOmrVM()->_language_vm;
+	/* set indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet (Balanced GC and off-heap disabled) */
+	vm->indexableObjectLayout = J9IndexableObjectLayout_DataAddr_Arraylet;
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	if (extensions->isVirtualLargeObjectHeapRequested) {
 		/* Create off-heap */
@@ -144,9 +147,10 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 			extensions->largeObjectVirtualMemory = largeObjectVirtualMemory;
 			extensions->indexableObjectModel.setEnableVirtualLargeObjectHeap(true);
 			extensions->isVirtualLargeObjectHeapEnabled = true;
-			/* reset vm->isVirtualLargeObjectHeapEnabled and vm->unsafeIndexableHeaderSize for off-heap case */
-			J9JavaVM *vm = (J9JavaVM *)extensions->getOmrVM()->_language_vm;
-			vm->isVirtualLargeObjectHeapEnabled = TRUE;
+//			vm->isVirtualLargeObjectHeapEnabled = TRUE;
+			/* set indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet (Balanced GC and off-heap enabled) */
+			vm->indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet;
+			/* reset vm->unsafeIndexableHeaderSize for off-heap case */
 			vm->unsafeIndexableHeaderSize = 0;
 		} else {
 #if defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD)

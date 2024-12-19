@@ -207,7 +207,8 @@ public:
 #if defined(J9VM_ENV_DATA64)
 		if (objectModel->isIndexable(objectPtr)) {
 			GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
-			if (_vmThread->isVirtualLargeObjectHeapEnabled && indexableObjectModel->isInlineContiguousArraylet((J9IndexableObject *)objectPtr)) {
+//			if (_vmThread->isVirtualLargeObjectHeapEnabled && indexableObjectModel->isInlineContiguousArraylet((J9IndexableObject *)objectPtr)) {
+			if (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && indexableObjectModel->isInlineContiguousArraylet((J9IndexableObject *)objectPtr)) {
 				_gcEnv._shouldFixupDataAddrForContiguous = indexableObjectModel->shouldFixupDataAddrForContiguous((J9IndexableObject *)objectPtr);
 			} else {
 				_gcEnv._shouldFixupDataAddrForContiguous = false;
