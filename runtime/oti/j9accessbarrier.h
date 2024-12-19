@@ -112,7 +112,7 @@ typedef struct J9IndexableObject* mm_j9array_t;
 	(J9JAVAVM_COMPRESS_OBJECT_REFERENCES(javaVM) \
 		? (&(((elemType*)J9_CONVERT_POINTER_FROM_TOKEN_VM__(javaVM, ((U_32*)(((UDATA)(array)) + (javaVM)->discontiguousIndexableHeaderSize))[((U_32)index)/((javaVM)->arrayletLeafSize/sizeof(elemType))]))[((U_32)index)%((javaVM)->arrayletLeafSize/sizeof(elemType))])) \
 		: (&(((elemType*)(((UDATA*)(((UDATA)(array)) + (javaVM)->discontiguousIndexableHeaderSize))[((U_32)index)/((javaVM)->arrayletLeafSize/sizeof(elemType))]))[((U_32)index)%((javaVM)->arrayletLeafSize/sizeof(elemType))])))
-
+/*
 #define J9JAVAARRAYCONTIGUOUS_BASE_EA(vmThread, array, index, elemType) \
 	(J9VMTHREAD_COMPRESS_OBJECT_REFERENCES(vmThread) \
 		? (&((elemType*)((((J9IndexableObjectContiguousCompressed *)(array)) + 1)))[index]) \
@@ -122,6 +122,22 @@ typedef struct J9IndexableObject* mm_j9array_t;
 	(J9JAVAVM_COMPRESS_OBJECT_REFERENCES(javaVM) \
 		? (&((elemType*)((((J9IndexableObjectContiguousCompressed *)(array)) + 1)))[index]) \
 		: (&((elemType*)((((J9IndexableObjectContiguousFull *)(array)) + 1)))[index]))
+*/
+#define J9JAVAARRAYCONTIGUOUS_BASE_EA(vmThread, array, index, elemType) \
+	(&((elemType*)((((UDATA)(array)) + (vmThread)->contiguousIndexableHeaderSize)))[(index)])
+
+#define J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType) \
+	(&((elemType*)((((UDATA)(array)) + (javaVM)->contiguousIndexableHeaderSize)))[(index)])
+
+#define J9ISCONTIGUOUSARRAY(vmThread, array) \
+	(J9VMTHREAD_COMPRESS_OBJECT_REFERENCES(vmThread) \
+		? (0 != ((J9IndexableObjectContiguousCompressed *)(array))->size) \
+		: (0 != ((J9IndexableObjectContiguousFull *)(array))->size))
+
+#define J9ISCONTIGUOUSARRAY_VM(javaVM, array) \
+	(J9JAVAVM_COMPRESS_OBJECT_REFERENCES(javaVM) \
+		? (0 != ((J9IndexableObjectContiguousCompressed *)(array))->size) \
+		: (0 != ((J9IndexableObjectContiguousFull *)(array))->size))
 
 #if defined(J9VM_ENV_DATA64)
 #define J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPDISABLED_EA(vmThread, array, index, elemType) \
@@ -144,6 +160,7 @@ typedef struct J9IndexableObject* mm_j9array_t;
 		? (&((elemType*)((((J9IndexableObjectWithDataAddressContiguousCompressed *)(array))->dataAddr)))[index]) \
 		: (&((elemType*)((((J9IndexableObjectWithDataAddressContiguousFull *)(array))->dataAddr)))[index]))
 
+/*
 #define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
 	(((vmThread)->isIndexableDataAddrPresent) \
 		? (((vmThread)->isVirtualLargeObjectHeapEnabled) \
@@ -157,6 +174,35 @@ typedef struct J9IndexableObject* mm_j9array_t;
 				? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA_VM(javaVM, array, index, elemType) \
 				: J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPDISABLED_EA_VM(javaVM, array, index, elemType)) \
 		: J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType))
+*/
+/*
+ * if standard GC (J9IndexableObjectLayout_NoDataAddr_NoArraylet)
+ * 		contiguous-base
+ * 	else if off-heap enabled (J9IndexableObjectLayout_DataAddr_NoArraylet)
+ * 		contiguous-via-dataAddr
+ * 	else balancedGC with off-heap disabled or Metronome GC (J9IndexableObjectLayout_NoDataAddr_Arraylet or J9IndexableObjectLayout_DataAddr_Arraylet)
+ * 		if contigious
+ * 			contiguous-base
+ * 		else
+ * 			discontigous-base
+ */
+#define J9JAVAARRAY_EA(vmThread, array, index, elemType) \
+((J9IndexableObjectLayout_NoDataAddr_NoArraylet == (vmThread)->indexableObjectLayout) \
+	? J9JAVAARRAYCONTIGUOUS_BASE_EA(vmThread, array, index, elemType) \
+	: ((J9IndexableObjectLayout_DataAddr_NoArraylet == (vmThread)->indexableObjectLayout) \
+		? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA(vmThread, array, index, elemType) \
+		: (J9ISCONTIGUOUSARRAY(vmThread, array) \
+			? J9JAVAARRAYCONTIGUOUS_BASE_EA(vmThread, array, index, elemType) \
+			: J9JAVAARRAYDISCONTIGUOUS_EA(vmThread, array, index, elemType))))
+
+#define J9JAVAARRAY_EA_VM(javaVM, array, index, elemType) \
+	((J9IndexableObjectLayout_NoDataAddr_NoArraylet == (javaVM)->indexableObjectLayout) \
+		? J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType) \
+		: ((J9IndexableObjectLayout_DataAddr_NoArraylet == (javaVM)->indexableObjectLayout) \
+			? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA_VM(javaVM, array, index, elemType) \
+			: (J9ISCONTIGUOUSARRAY_VM(javaVM, array) \
+				? J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType) \
+				: J9JAVAARRAYDISCONTIGUOUS_EA_VM(javaVM, array, index, elemType))))
 
 #else /* defined(J9VM_ENV_DATA64) */
 #define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
@@ -165,21 +211,10 @@ typedef struct J9IndexableObject* mm_j9array_t;
 #define J9JAVAARRAYCONTIGUOUS_EA_VM(javaVM, array, index, elemType) \
 	J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType)
 
-#endif /* defined(J9VM_ENV_DATA64) */
-
-#define J9ISCONTIGUOUSARRAY(vmThread, array) \
-	(J9VMTHREAD_COMPRESS_OBJECT_REFERENCES(vmThread) \
-		? (0 != ((J9IndexableObjectContiguousCompressed *)(array))->size) \
-		: (0 != ((J9IndexableObjectContiguousFull *)(array))->size))
-
-#define J9ISCONTIGUOUSARRAY_VM(javaVM, array) \
-	(J9JAVAVM_COMPRESS_OBJECT_REFERENCES(javaVM) \
-		? (0 != ((J9IndexableObjectContiguousCompressed *)(array))->size) \
-		: (0 != ((J9IndexableObjectContiguousFull *)(array))->size))
-
 /* TODO: queries compressed twice - optimize? */
 #define J9JAVAARRAY_EA(vmThread, array, index, elemType) (J9ISCONTIGUOUSARRAY(vmThread, array) ? J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) : J9JAVAARRAYDISCONTIGUOUS_EA(vmThread, array, index, elemType))
 #define J9JAVAARRAY_EA_VM(javaVM, array, index, elemType) (J9ISCONTIGUOUSARRAY_VM(javaVM, array) ? J9JAVAARRAYCONTIGUOUS_EA_VM(javaVM, array, index, elemType) : J9JAVAARRAYDISCONTIGUOUS_EA_VM(javaVM, array, index, elemType))
+#endif /* defined(J9VM_ENV_DATA64) */
 
 /*
  * Private helpers for reference field types
