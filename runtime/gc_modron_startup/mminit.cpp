@@ -2972,7 +2972,9 @@ gcInitializeDefaults(J9JavaVM* vm)
 #if defined(J9VM_ENV_DATA64)
 	vm->isIndexableDualHeaderShapeEnabled = TRUE;
 	vm->isIndexableDataAddrPresent = FALSE;
-	vm->isVirtualLargeObjectHeapEnabled = FALSE;
+//	vm->isVirtualLargeObjectHeapEnabled = FALSE;
+	/* set indexableObjectLayout = J9IndexableObjectLayout_NoDataAddr_NoArraylet as default (standard GC)*/
+	vm->indexableObjectLayout = J9IndexableObjectLayout_NoDataAddr_NoArraylet;
 #endif /* defined(J9VM_ENV_DATA64) */
 
 	/* enable estimateFragmentation for all GCs as default for java, but not the estimated result would not affect concurrentgc kickoff by default */
@@ -3173,6 +3175,13 @@ gcInitializeDefaults(J9JavaVM* vm)
 	}
 	warnIfPageSizeNotSatisfied(vm,extensions);
 	j9mem_free_memory(memoryParameterTable);
+
+
+	//Debug
+	j9tty_printf(PORTLIB, "gcInitializeDefaults() indexableObjectLayout=%zu, contiguousIndexableHeaderSize=%zu, discontiguousIndexableHeaderSize=%zu\n",
+			vm->indexableObjectLayout,  vm->contiguousIndexableHeaderSize, vm->discontiguousIndexableHeaderSize);
+
+
 	return J9VMDLLMAIN_OK;
 
 error:
@@ -3325,11 +3334,6 @@ initializeIndexableObjectHeaderSizes(J9JavaVM* vm)
 #else /* defined(J9VM_ENV_DATA64) */
 	setIndexableObjectHeaderSizeWithoutDataAddress(vm);
 #endif /* defined(J9VM_ENV_DATA64) */
-	if (MM_GCExtensions::getExtensions(vm)->isVirtualLargeObjectHeapEnabled) {
-		vm->unsafeIndexableHeaderSize = 0;
-	} else {
-		vm->unsafeIndexableHeaderSize = vm->contiguousIndexableHeaderSize;
-	}
 }
 
 #if defined(J9VM_ENV_DATA64)
