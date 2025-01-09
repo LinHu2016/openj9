@@ -5549,7 +5549,7 @@ typedef struct J9VMThread {
 #if defined(J9VM_ENV_DATA64)
 //	U_32 isIndexableDataAddrPresent;
 //	U_32 isVirtualLargeObjectHeapEnabled;
-	U_32 indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
+	UDATA indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
 #endif /* defined(J9VM_ENV_DATA64) */
 	void* gpInfo;
 	void* jitVMwithThreadInfo;
@@ -5669,8 +5669,8 @@ typedef struct J9VMThread {
 } J9VMThread;
 
 #if defined(J9VM_ENV_DATA64)
-#define J9VMTHREAD_ARRAYLET_ENABLED(vmThread) (J9IndexableObjectLayout_ArrayletMask & (vmThread)->indexableObjectLayout)
-#define J9VMTHREAD_IS_INDEXBLEDATAADDRPRESENT(vmThread) (J9IndexableObjectLayout_DataAddrMask & (vmThread)->indexableObjectLayout)
+#define J9VMTHREAD_IS_ARRAYLET_ENABLED(vmThread) (J9IndexableObjectLayout_ArrayletMask & (vmThread)->indexableObjectLayout)
+#define J9VMTHREAD_IS_INDEXBLE_DATAADDR_PRESENT(vmThread) (J9IndexableObjectLayout_DataAddrMask & (vmThread)->indexableObjectLayout)
 #endif
 #define J9VMTHREAD_ALIGNMENT  0x100
 #define J9VMTHREAD_RESERVED_C_STACK_FRACTION  8
@@ -6117,9 +6117,9 @@ typedef struct J9JavaVM {
 	UDATA contiguousIndexableHeaderSize;
 	UDATA discontiguousIndexableHeaderSize;
 #if defined(J9VM_ENV_DATA64)
-	U_32 isIndexableDataAddrPresent;
+	UDATA isIndexableDataAddrPresent;
 //	U_32 isVirtualLargeObjectHeapEnabled;
-	U_32 indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
+	UDATA indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
 	U_32 isIndexableDualHeaderShapeEnabled;
 #endif /* defined(J9VM_ENV_DATA64) */
 	struct J9VMThread* exclusiveVMAccessQueueHead;
