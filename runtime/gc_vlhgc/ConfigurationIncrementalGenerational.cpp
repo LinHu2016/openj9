@@ -147,7 +147,6 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 			extensions->largeObjectVirtualMemory = largeObjectVirtualMemory;
 			extensions->indexableObjectModel.setEnableVirtualLargeObjectHeap(true);
 			extensions->isVirtualLargeObjectHeapEnabled = true;
-//			vm->isVirtualLargeObjectHeapEnabled = TRUE;
 			/* set indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet (Balanced GC and off-heap enabled) */
 			vm->indexableObjectLayout = J9IndexableObjectLayout_DataAddr_NoArraylet;
 			/* reset vm->unsafeIndexableHeaderSize for off-heap case */

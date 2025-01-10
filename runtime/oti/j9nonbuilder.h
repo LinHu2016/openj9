@@ -5547,9 +5547,7 @@ typedef struct J9VMThread {
 	UDATA contiguousIndexableHeaderSize;
 	UDATA discontiguousIndexableHeaderSize;
 #if defined(J9VM_ENV_DATA64)
-//	U_32 isIndexableDataAddrPresent;
-//	U_32 isVirtualLargeObjectHeapEnabled;
-	UDATA indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
+	U_32 indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
 #endif /* defined(J9VM_ENV_DATA64) */
 	void* gpInfo;
 	void* jitVMwithThreadInfo;
@@ -6118,8 +6116,7 @@ typedef struct J9JavaVM {
 	UDATA discontiguousIndexableHeaderSize;
 #if defined(J9VM_ENV_DATA64)
 	UDATA isIndexableDataAddrPresent;
-//	U_32 isVirtualLargeObjectHeapEnabled;
-	UDATA indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
+	U_32 indexableObjectLayout; /* can be J9IndexableObjectLayout_NoDataAddr_NoArraylet,J9IndexableObjectLayout_DataAddr_NoArraylet, J9IndexableObjectLayout_NoDataAddr_Arraylet, J9IndexableObjectLayout_DataAddr_Arraylet */
 	U_32 isIndexableDualHeaderShapeEnabled;
 #endif /* defined(J9VM_ENV_DATA64) */
 	struct J9VMThread* exclusiveVMAccessQueueHead;

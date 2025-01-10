@@ -154,33 +154,6 @@ typedef struct J9IndexableObject* mm_j9array_t;
 		? (&((elemType*)((((J9IndexableObjectWithDataAddressContiguousCompressed *)(array))->dataAddr)))[index]) \
 		: (&((elemType*)((((J9IndexableObjectWithDataAddressContiguousFull *)(array))->dataAddr)))[index]))
 
-/*
-#define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
-	(((vmThread)->isIndexableDataAddrPresent) \
-		? (((vmThread)->isVirtualLargeObjectHeapEnabled) \
-				? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA(vmThread, array, index, elemType) \
-				: J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPDISABLED_EA(vmThread, array, index, elemType)) \
-		: J9JAVAARRAYCONTIGUOUS_BASE_EA(vmThread, array, index, elemType))
-
-#define J9JAVAARRAYCONTIGUOUS_EA_VM(javaVM, array, index, elemType) \
-	(((javaVM)->isIndexableDataAddrPresent) \
-		? (((javaVM)->isVirtualLargeObjectHeapEnabled) \
-				? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA_VM(javaVM, array, index, elemType) \
-				: J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPDISABLED_EA_VM(javaVM, array, index, elemType)) \
-		: J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType))
-*/
-/*
-#define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
-	((J9IndexableObjectLayout_DataAddr_Arraylet == (vmThread)->indexableObjectLayout) \
-		? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPDISABLED_EA(vmThread, array, index, elemType) \
-		: (&((elemType*)((((UDATA)(array)) + (vmThread)->contiguousIndexableHeaderSize)))[(index)]))
-
-#define J9JAVAARRAYCONTIGUOUS_EA_VM(javaVM, array, index, elemType) \
-	((J9IndexableObjectLayout_DataAddr_Arraylet == (javaVM)->indexableObjectLayout) \
-		? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPDISABLED_EA_VM(javaVM, array, index, elemType) \
-		: (&((elemType*)((((UDATA)(array)) + (javaVM)->contiguousIndexableHeaderSize)))[(index)]))
-*/
-
 #define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
 	(&((elemType*)((((UDATA)(array)) + (vmThread)->contiguousIndexableHeaderSize)))[(index)])
 
@@ -199,21 +172,17 @@ typedef struct J9IndexableObject* mm_j9array_t;
  * 			discontigous vc
  */
 #define J9JAVAARRAY_EA(vmThread, array, index, elemType) \
-((J9IndexableObjectLayout_NoDataAddr_NoArraylet == (vmThread)->indexableObjectLayout) \
-	? (J9ISCONTIGUOUSARRAY(vmThread, array) \
+	((J9IndexableObjectLayout_NoDataAddr_NoArraylet == (vmThread)->indexableObjectLayout) \
 		? J9JAVAARRAYCONTIGUOUS_BASE_EA(vmThread, array, index, elemType) \
-		: J9JAVAARRAYDISCONTIGUOUS_EA(vmThread, array, index, elemType)) \
-	: ((J9IndexableObjectLayout_DataAddr_NoArraylet == (vmThread)->indexableObjectLayout) \
-		? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA(vmThread, array, index, elemType) \
-		: (J9ISCONTIGUOUSARRAY(vmThread, array) \
-			? J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
-			: J9JAVAARRAYDISCONTIGUOUS_EA(vmThread, array, index, elemType))))
+		: ((J9IndexableObjectLayout_DataAddr_NoArraylet == (vmThread)->indexableObjectLayout) \
+			? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA(vmThread, array, index, elemType) \
+			: (J9ISCONTIGUOUSARRAY(vmThread, array) \
+				? J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
+				: J9JAVAARRAYDISCONTIGUOUS_EA(vmThread, array, index, elemType))))
 
 #define J9JAVAARRAY_EA_VM(javaVM, array, index, elemType) \
 	((J9IndexableObjectLayout_NoDataAddr_NoArraylet == (javaVM)->indexableObjectLayout) \
-		? (J9ISCONTIGUOUSARRAY_VM(javaVM, array) \
-			? J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType) \
-			: J9JAVAARRAYDISCONTIGUOUS_EA_VM(javaVM, array, index, elemType)) \
+		? J9JAVAARRAYCONTIGUOUS_BASE_EA_VM(javaVM, array, index, elemType) \
 		: ((J9IndexableObjectLayout_DataAddr_NoArraylet == (javaVM)->indexableObjectLayout) \
 			? J9JAVAARRAYCONTIGUOUS_WITH_DATAADDRESS_VIRTUALLARGEOBJECTHEAPENABLED_EA_VM(javaVM, array, index, elemType) \
 			: (J9ISCONTIGUOUSARRAY_VM(javaVM, array) \
