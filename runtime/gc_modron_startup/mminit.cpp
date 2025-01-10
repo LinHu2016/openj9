@@ -2972,6 +2972,7 @@ gcInitializeDefaults(J9JavaVM* vm)
 #if defined(J9VM_ENV_DATA64)
 	vm->isIndexableDualHeaderShapeEnabled = TRUE;
 	vm->isIndexableDataAddrPresent = FALSE;
+	/* set indexableObjectLayout = J9IndexableObjectLayout_NoDataAddr_NoArraylet as default (standard GC)*/
 	vm->indexableObjectLayout = J9IndexableObjectLayout_NoDataAddr_NoArraylet;
 #endif /* defined(J9VM_ENV_DATA64) */
 
