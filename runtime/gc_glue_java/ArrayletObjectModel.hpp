@@ -947,17 +947,17 @@ public:
 	 * Checks that the dataAddr field of the indexable object is correct.
 	 * this method is supposed to be called only if offheap is enabled.
 	 *
-	 * @param arrayPtr      Pointer to the indexable object
-	 * @param isValidDataAddrForOffHeapObject	Boolean to determine whether the given indexable object is off heap
-	 * @return if the dataAddr field of the indexable object is correct
+	 * @param arrayPtr[in]						Pointer to the indexable object
+	 * @param isDataAddrForOffHeapObject[out]	set true if the given indexable object is off heap
+	 * @return if the dataAddr field of the indexable object is correct((not heap object case), return false if indexable object is off heap
 	 */
 	MMINLINE bool
-	isValidDataAddr(J9IndexableObject *arrayPtr, bool isValidDataAddrForOffHeapObject)
+	isValidDataAddr(J9IndexableObject *arrayPtr, bool *isDataAddrForOffHeapObject)
 	{
 		bool isValidDataAddress = true;
 		if (_isIndexableDataAddrPresent) {
 			void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
-			isValidDataAddress = isValidDataAddr(arrayPtr, dataAddr, isValidDataAddrForOffHeapObject);
+			isValidDataAddress = isValidDataAddr(arrayPtr, dataAddr, isDataAddrForOffHeapObject);
 		}
 		return isValidDataAddress;
 	}
@@ -967,11 +967,11 @@ public:
 	 * this method is supposed to be called only if offheap is enabled
 	 *
 	 * @param arrayPtr      Pointer to the indexable object
-	 * @param isValidDataAddrForOffHeapObject	Boolean to determine whether the given indexable object is off heap
-	 * @return if the dataAddr field of the indexable object is correct
+	 * @param isDataAddrForOffHeapObject[out]	set true if the given indexable object is off heap
+	 * @return if the dataAddr field of the indexable object is correct(not heap object case),  return false if indexable object is off heap
 	 */
 	MMINLINE bool
-	isValidDataAddr(J9IndexableObject *arrayPtr, void *dataAddr, bool isValidDataAddrForOffHeapObject)
+	isValidDataAddr(J9IndexableObject *arrayPtr, void *dataAddr, bool *isDataAddrForOffHeapObject)
 	{
 		bool isValidDataAddress = false;
 		uintptr_t dataSizeInBytes = getDataSizeInBytes(arrayPtr);
@@ -981,7 +981,7 @@ public:
 		} else if (dataSizeInBytes < _omrVM->_arrayletLeafSize) {
 			isValidDataAddress = (dataAddr == (void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize()));
 		} else {
-			isValidDataAddress = isValidDataAddrForOffHeapObject;
+			*isDataAddrForOffHeapObject = true;
 		}
 
 		return isValidDataAddress;
