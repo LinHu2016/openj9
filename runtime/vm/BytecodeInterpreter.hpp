@@ -5738,6 +5738,8 @@ ffi_OOM:
 #if JAVA_SPEC_VERSION >= 24
 		switch (_currentThread->currentContinuation->returnState) {
 		case J9VM_CONTINUATION_RETURN_FROM_YIELD:
+			returnSingleFromINL(REGISTER_ARGS, JNI_TRUE, 1);
+			break;
 		case J9VM_CONTINUATION_RETURN_FROM_MONITOR_ENTER:
 			break;
 		case J9VM_CONTINUATION_RETURN_FROM_OBJECT_WAIT:
