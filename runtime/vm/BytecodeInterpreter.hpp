@@ -1183,7 +1183,8 @@ obj:
 			rc = objectMonitorEnterNonBlocking(_currentThread, obj);
 			if (J9_OBJECT_MONITOR_BLOCKING == rc) {
 #if JAVA_SPEC_VERSION >= 24
-				if (IS_JAVA_LANG_VIRTUALTHREAD(_currentThread, _currentThread->threadObject)
+				if (J9_ARE_ANY_BITS_SET(_vm->extendedRuntimeFlags3, J9_EXTENDED_RUNTIME3_YIELD_PINNED_CONTINUATION)
+				&& IS_JAVA_LANG_VIRTUALTHREAD(_currentThread, _currentThread->threadObject)
 				&& (0 == _currentThread->continuationPinCount)
 				&& (0 == _currentThread->callOutCount)
 				) {
@@ -2972,44 +2973,46 @@ done:
 		{
 			if (VM_ObjectMonitor::getMonitorForNotify(_currentThread, receiver, &monitorPtr, true)) {
 #if JAVA_SPEC_VERSION >= 24
-				j9objectmonitor_t lock;
-				j9objectmonitor_t *lockEA = NULL;
-				J9ObjectMonitor *objectMonitor = NULL;
-				if (!LN_HAS_LOCKWORD(_currentThread, receiver)) {
-					objectMonitor = monitorTableAt(_currentThread, receiver);
-				} else {
-					lockEA = J9OBJECT_MONITOR_EA(_currentThread, receiver);
-					lock = J9_LOAD_LOCKWORD(_currentThread, lockEA);
-					if (J9_LOCK_IS_INFLATED(lock)) {
-						objectMonitor = J9_INFLLOCK_OBJECT_MONITOR(lock);
-					}
-				}
-
-				if ((NULL != objectMonitor) && (NULL != objectMonitor->waitingContinuations)) {
-					omrthread_monitor_enter(_vm->blockedVirtualThreadsMutex);
-					J9VMContinuation *head = objectMonitor->waitingContinuations;
-					if (omrthread_monitor_notify == notifyFunction) {
-						objectMonitor->waitingContinuations = head->nextWaitingContinuation;
-						head->nextWaitingContinuation = _vm->blockedContinuations;
-						_vm->blockedContinuations = head;
-						J9VMJAVALANGVIRTUALTHREAD_SET_ONWAITINGLIST(_currentThread, head->vthread, JNI_TRUE);
+				if (J9_ARE_ANY_BITS_SET(_vm->extendedRuntimeFlags3, J9_EXTENDED_RUNTIME3_YIELD_PINNED_CONTINUATION)) {
+					j9objectmonitor_t lock;
+					j9objectmonitor_t *lockEA = NULL;
+					J9ObjectMonitor *objectMonitor = NULL;
+					if (!LN_HAS_LOCKWORD(_currentThread, receiver)) {
+						objectMonitor = monitorTableAt(_currentThread, receiver);
 					} else {
-						J9VMContinuation *next = head;
-						J9VMJAVALANGVIRTUALTHREAD_SET_ONWAITINGLIST(_currentThread, head->vthread, JNI_TRUE);
-						while (NULL != next->nextWaitingContinuation) {
-							J9VMJAVALANGVIRTUALTHREAD_SET_ONWAITINGLIST(_currentThread, next->vthread, JNI_TRUE);
-							next = next->nextWaitingContinuation;
+						lockEA = J9OBJECT_MONITOR_EA(_currentThread, receiver);
+						lock = J9_LOAD_LOCKWORD(_currentThread, lockEA);
+						if (J9_LOCK_IS_INFLATED(lock)) {
+							objectMonitor = J9_INFLLOCK_OBJECT_MONITOR(lock);
 						}
-						next->nextWaitingContinuation = _vm->blockedContinuations;
-						_vm->blockedContinuations = head;
-						objectMonitor->waitingContinuations = NULL;
 					}
-					omrthread_monitor_notify(_vm->blockedVirtualThreadsMutex);
-					omrthread_monitor_exit(_vm->blockedVirtualThreadsMutex);
 
-					if (omrthread_monitor_notify == notifyFunction) {
-						returnVoidFromINL(REGISTER_ARGS, 1);
-						goto done;
+					if ((NULL != objectMonitor) && (NULL != objectMonitor->waitingContinuations)) {
+						omrthread_monitor_enter(_vm->blockedVirtualThreadsMutex);
+						J9VMContinuation *head = objectMonitor->waitingContinuations;
+						if (omrthread_monitor_notify == notifyFunction) {
+							objectMonitor->waitingContinuations = head->nextWaitingContinuation;
+							head->nextWaitingContinuation = _vm->blockedContinuations;
+							_vm->blockedContinuations = head;
+							J9VMJAVALANGVIRTUALTHREAD_SET_ONWAITINGLIST(_currentThread, head->vthread, JNI_TRUE);
+						} else {
+							J9VMContinuation *next = head;
+							J9VMJAVALANGVIRTUALTHREAD_SET_ONWAITINGLIST(_currentThread, head->vthread, JNI_TRUE);
+							while (NULL != next->nextWaitingContinuation) {
+								J9VMJAVALANGVIRTUALTHREAD_SET_ONWAITINGLIST(_currentThread, next->vthread, JNI_TRUE);
+								next = next->nextWaitingContinuation;
+							}
+							next->nextWaitingContinuation = _vm->blockedContinuations;
+							_vm->blockedContinuations = head;
+							objectMonitor->waitingContinuations = NULL;
+						}
+						omrthread_monitor_notify(_vm->blockedVirtualThreadsMutex);
+						omrthread_monitor_exit(_vm->blockedVirtualThreadsMutex);
+
+						if (omrthread_monitor_notify == notifyFunction) {
+							returnVoidFromINL(REGISTER_ARGS, 1);
+							goto done;
+						}
 					}
 				}
 #endif /* JAVA_SPEC_VERSION >= 24 */
@@ -5201,7 +5204,8 @@ done:
 		buildInternalNativeStackFrame(REGISTER_ARGS);
 		updateVMStruct(REGISTER_ARGS);
 #if JAVA_SPEC_VERSION >= 24
-		if (IS_JAVA_LANG_VIRTUALTHREAD(_currentThread, _currentThread->threadObject)
+		if (J9_ARE_ANY_BITS_SET(_vm->extendedRuntimeFlags3, J9_EXTENDED_RUNTIME3_YIELD_PINNED_CONTINUATION)
+		&& IS_JAVA_LANG_VIRTUALTHREAD(_currentThread, _currentThread->threadObject)
 		&& (0 == _currentThread->continuationPinCount)
 		&& (0 == _currentThread->callOutCount)
 		) {
