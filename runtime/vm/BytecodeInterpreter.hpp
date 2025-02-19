@@ -81,6 +81,9 @@
 #if JAVA_SPEC_VERSION >= 21
 #include "ContinuationHelpers.hpp"
 #endif /* JAVA_SPEC_VERSION >= 21 */
+#if JAVA_SPEC_VERSION >= 24
+#include "thrtypes.h"
+#endif /* JAVA_SPEC_VERSION >= 24 */
 
 #if 0
 #define DEBUG_MUST_HAVE_VM_ACCESS(vmThread) Assert_VM_mustHaveVMAccess(vmThread)
@@ -5695,7 +5698,7 @@ ffi_OOM:
 				switch (monitorRC) {
 #if JAVA_SPEC_VERSION >= 16
 				case J9_OBJECT_MONITOR_VALUE_TYPE_IMSE:
-					_currentThread->tempSlot = (UDATA) obj;
+					_currentThread->tempSlot = (UDATA) waitObject;
 					rc = THROW_VALUE_TYPE_ILLEGAL_MONITOR_STATE;
 					break;
 #endif /* JAVA_SPEC_VERSION >= 16 */
