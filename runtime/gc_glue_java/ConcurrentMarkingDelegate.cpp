@@ -25,6 +25,9 @@
 #include "AsyncCallbackHandler.hpp"
 #include "ClassLoaderIterator.hpp"
 #include "ConfigurationDelegate.hpp"
+#if JAVA_SPEC_VERSION >= 24
+#include "ContinuationSlotIterator.hpp"
+#endif /* JAVA_SPEC_VERSION >= 24 */
 #include "FinalizeListManager.hpp"
 #include "Heap.hpp"
 #include "HeapRegionDescriptorStandard.hpp"

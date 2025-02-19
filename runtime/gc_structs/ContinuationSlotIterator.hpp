@@ -29,6 +29,7 @@
 #if !defined(CONTINUATIONSLOTITERATOR_HPP_)
 #define CONTINUATIONSLOTITERATOR_HPP_
 
+#if JAVA_SPEC_VERSION >= 24
 #include "j9.h"
 #include "j9cfg.h"
 #include "modron.h"
@@ -55,6 +56,7 @@ public:
 
 	j9object_t *nextSlot();
 };
+#endif /* JAVA_SPEC_VERSION >= 24 */
 
 #endif /* CONTINUATIONSLOTITERATOR_HPP_ */
 
