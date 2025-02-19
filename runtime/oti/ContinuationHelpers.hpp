@@ -93,10 +93,12 @@ public:
 		vmThread->scopedValueCache = scopedValueCache;
 
 #if JAVA_SPEC_VERSION >= 24
-		SWAP_MEMBER(ownedMonitorCount, UDATA, vmThread, continuation);
-		SWAP_MEMBER(monitorEnterRecordPool, J9Pool*, vmThread, continuation);
-		SWAP_MEMBER(monitorEnterRecords, J9MonitorEnterRecord*, vmThread, continuation);
-		SWAP_MEMBER(jniMonitorEnterRecords, J9MonitorEnterRecord*, vmThread, continuation);
+		if (J9_ARE_ANY_BITS_SET(vmThread->javaVM->extendedRuntimeFlags3, J9_EXTENDED_RUNTIME3_YIELD_PINNED_CONTINUATION)) {
+			SWAP_MEMBER(ownedMonitorCount, UDATA, vmThread, continuation);
+			SWAP_MEMBER(monitorEnterRecordPool, J9Pool*, vmThread, continuation);
+			SWAP_MEMBER(monitorEnterRecords, J9MonitorEnterRecord*, vmThread, continuation);
+			SWAP_MEMBER(jniMonitorEnterRecords, J9MonitorEnterRecord*, vmThread, continuation);
+		}
 #endif /* JAVA_SPEC_VERSION >= 24 */
 	}
 
