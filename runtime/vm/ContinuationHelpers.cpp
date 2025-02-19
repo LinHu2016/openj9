@@ -24,6 +24,9 @@
 #include "j9protos.h"
 #include "j9vmnls.h"
 #include "objhelp.h"
+#if JAVA_SPEC_VERSION >= 24
+#include "thrtypes.h"
+#endif /* JAVA_SPEC_VERSION >= 24 */
 #include "ut_j9vm.h"
 #include "vm_api.h"
 #include "AtomicSupport.hpp"
@@ -263,8 +266,9 @@ enterContinuation(J9VMThread *currentThread, j9object_t continuationObject)
 
 	if (started) {
 #if JAVA_SPEC_VERSION >= 24
-		if (J9_ARE_ANY_BITS_SET(vm->extendedRuntimeFlags3, J9_EXTENDED_RUNTIME3_YIELD_PINNED_CONTINUATION)) {
-			continuation->monitorEnterRecordPool = pool_new(sizeof(J9MonitorEnterRecord), 0, 0, 0, J9_GET_CALLSITE(), OMRMEM_CATEGORY_VM, POOL_FOR_PORT(PORTLIB));
+		if (J9_ARE_ANY_BITS_SET(currentThread->javaVM->extendedRuntimeFlags3, J9_EXTENDED_RUNTIME3_YIELD_PINNED_CONTINUATION)) {
+			preparePinnedVirtualThreadForMount(currentThread, continuationObject);
+
 		}
 		VM_OutOfLineINL_Helpers::restoreInternalNativeStackFrame(currentThread);
 		result = FALSE;
@@ -715,10 +719,11 @@ preparePinnedVirtualThreadForMount(J9VMThread *currentThread, j9object_t contObj
 			monitorCount++;
 		}
 	}
-	J9VMJDKINTERNALVMCONTINUATION_SET_BLOCKER(currentThread, continuationObject, NULL);
+	J9VMJDKINTERNALVMCONTINUATION_SET_BLOCKER(currentThread, contObj, NULL);
 
 	/* Added the attached monitor to carrier thread's lockedmonitorcount. */
-	currentThread->osThread->lockedmonitorcount += monitorCount;
+	omrthread_t osThread = currentThread->osThread;
+	osThread->lockedmonitorcount += monitorCount;
 }
 
 UDATA
@@ -729,6 +734,7 @@ preparePinnedVirtualThreadForUnmount(J9VMThread *currentThread, j9object_t syncO
 	j9objectmonitor_t lock = 0;
 	j9object_t continuationObj = NULL;
 	UDATA monitorCount = 0;
+	omrthread_t osThread = currentThread->osThread;
 
 	if (0 < currentThread->ownedMonitorCount) {
 		/* Inflate all owned monitors */
@@ -785,7 +791,7 @@ preparePinnedVirtualThreadForUnmount(J9VMThread *currentThread, j9object_t syncO
 			}
 
 			detachMonitorInfo(currentThread, objectMonitor);
-			monitorCount++
+			monitorCount++;
 		}
 	}
 
@@ -830,7 +836,7 @@ preparePinnedVirtualThreadForUnmount(J9VMThread *currentThread, j9object_t syncO
 	}
 
 	/* Subtract the detached monitor from carrier thread's lockedmonitorcount. */
-	currentThread->osThread->lockedmonitorcount -= monitorCount;
+	osThread->lockedmonitorcount -= monitorCount;
 	/* Clear the blocking object on carrier thread. */
 	J9VMTHREAD_SET_BLOCKINGENTEROBJECT(currentThread, currentThread, NULL);
 
