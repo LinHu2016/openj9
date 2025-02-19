@@ -273,6 +273,17 @@ public:
 
 		return threadObject;
 	}
+
+#if JAVA_SPEC_VERSION >= 24
+	static VMINLINE bool
+	isYieldableVirtualThread(J9VMThread *vmThread)
+	{
+		return (J9_ARE_ANY_BITS_SET(vmThread->javaVM->extendedRuntimeFlags3, J9_EXTENDED_RUNTIME3_YIELD_PINNED_CONTINUATION)
+				&& IS_JAVA_LANG_VIRTUALTHREAD(vmThread, vmThread->threadObject)
+				&& (0 == vmThread->continuationPinCount)
+				&& (0 == vmThread->callOutCount));
+	}
+#endif /* JAVA_SPEC_VERSION >= 24 */
 };
 
 #endif /* CONTINUATIONHELPERS_HPP_ */
