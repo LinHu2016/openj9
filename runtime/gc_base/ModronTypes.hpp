@@ -55,6 +55,9 @@
 #include "JVMTIObjectTagTableIterator.hpp"
 #endif /* J9VM_OPT_JVMTI */
 
+#if JAVA_SPEC_VERSION >= 24
+#include "ContinuationSlotIterator.hpp"
+#endif /* JAVA_SPEC_VERSION >= 24 */
 #include "MixedObjectIterator.hpp"
 #include "ObjectHeapIterator.hpp"
 #include "PointerArrayIterator.hpp"
