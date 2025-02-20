@@ -29,7 +29,6 @@
 #if !defined(CONTINUATIONSLOTITERATOR_HPP_)
 #define CONTINUATIONSLOTITERATOR_HPP_
 
-#if JAVA_SPEC_VERSION >= 24
 #include "j9.h"
 #include "j9cfg.h"
 #include "modron.h"
@@ -42,21 +41,24 @@
 class GC_ContinuationSlotIterator
 {
 	J9VMThread *_vmThread;
+#if JAVA_SPEC_VERSION >= 24
 	j9object_t *_vthread;
 	J9MonitorEnterRecord *_monitorRecord;
 	J9MonitorEnterRecord *_jniMonitorRecord;
+#endif /* JAVA_SPEC_VERSION >= 24 */
 
 public:
-	GC_ContinuationSlotIterator(J9VMThread *vmThread, J9VMContinuation *continuation) :
-		_vmThread(vmThread),
-		_vthread(&continuation->vthread),
-		_monitorRecord(continuation->monitorEnterRecords),
-		_jniMonitorRecord(continuation->jniMonitorEnterRecords)
+	GC_ContinuationSlotIterator(J9VMThread *vmThread, J9VMContinuation *continuation)
+		: _vmThread(vmThread)
+#if JAVA_SPEC_VERSION >= 24
+		, _vthread(&continuation->vthread)
+		, _monitorRecord(continuation->monitorEnterRecords)
+		, _jniMonitorRecord(continuation->jniMonitorEnterRecords)
+#endif /* JAVA_SPEC_VERSION >= 24 */
 	{};
 
 	j9object_t *nextSlot();
 };
-#endif /* JAVA_SPEC_VERSION >= 24 */
 
 #endif /* CONTINUATIONSLOTITERATOR_HPP_ */
 
