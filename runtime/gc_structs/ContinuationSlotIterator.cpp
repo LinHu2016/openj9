@@ -29,6 +29,7 @@
 #include "j9.h"
 #include "j9cfg.h"
 
+#if JAVA_SPEC_VERSION >= 24
 #include "ContinuationSlotIterator.hpp"
 
 /**
@@ -39,7 +40,6 @@ j9object_t *
 GC_ContinuationSlotIterator::nextSlot()
 {
 	j9object_t *ret = NULL;
-#if JAVA_SPEC_VERSION >= 24
 	if (_monitorRecord != NULL) {
 		J9MonitorEnterRecord *currentMonitorRecord = _monitorRecord;
 		_monitorRecord = currentMonitorRecord->next;
@@ -52,6 +52,6 @@ GC_ContinuationSlotIterator::nextSlot()
 		ret = _vthread;
 		_vthread = NULL;
 	}
-#endif /* JAVA_SPEC_VERSION >= 24 */
 	return ret;
 }
+#endif /* JAVA_SPEC_VERSION >= 24 */
