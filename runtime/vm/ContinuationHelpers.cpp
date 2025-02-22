@@ -619,4 +619,266 @@ releaseVThreadInspector(J9VMThread *currentThread, jobject thread)
 		}
 	}
 }
+
+#if JAVA_SPEC_VERSION >= 24
+void
+detachMonitorInfo(J9VMThread *currentThread, J9ObjectMonitor *objectMonitor)
+{
+	J9ThreadAbstractMonitor *monitor = (J9ThreadAbstractMonitor *)objectMonitor->monitor;
+	monitor->owner = (J9Thread*)1;
+	objectMonitor->ownerContinuation = currentThread->currentContinuation;
+}
+
+void
+updateMonitorInfo(J9VMThread *currentThread, J9ObjectMonitor *objectMonitor)
+{
+	J9ThreadAbstractMonitor *monitor = (J9ThreadAbstractMonitor *)objectMonitor->monitor;
+	monitor->owner = currentThread->osThread;
+	objectMonitor->ownerContinuation = NULL;
+}
+
+void
+preparePinnedVirtualThreadForMount(J9VMThread *currentThread, j9object_t continuationObject)
+{
+	UDATA monitorCount = 0;
+	if (0 < currentThread->ownedMonitorCount) {
+		/* Inflate all owned monitors. */
+		J9MonitorEnterRecord *monitorRecords = currentThread->monitorEnterRecords;
+		while (NULL != monitorRecords) {
+			j9object_t object = monitorRecords->object;
+			j9objectmonitor_t lock = 0;
+			J9ObjectMonitor *objectMonitor = NULL;
+
+			if (!LN_HAS_LOCKWORD(currentThread, object)) {
+				objectMonitor = monitorTablePeek(currentThread->javaVM, object);
+			} else {
+				lock = J9OBJECT_MONITOR(currentThread, object);
+				objectMonitor = J9_INFLLOCK_OBJECT_MONITOR(lock);
+			}
+
+			updateMonitorInfo(currentThread, objectMonitor);
+			monitorCount++;
+			monitorRecords = monitorRecords->next;
+		}
+
+		/* Repeat for JNI monitor records. */
+		monitorRecords = currentThread->jniMonitorEnterRecords;
+		while (NULL != monitorRecords) {
+			j9object_t object = monitorRecords->object;
+			j9objectmonitor_t lock = 0;
+			J9ObjectMonitor *objectMonitor = NULL;
+
+			if (!LN_HAS_LOCKWORD(currentThread, object)) {
+				objectMonitor = monitorTablePeek(currentThread->javaVM, object);
+			} else {
+				lock = J9OBJECT_MONITOR(currentThread, object);
+				objectMonitor = J9_INFLLOCK_OBJECT_MONITOR(lock);
+			}
+
+			updateMonitorInfo(currentThread, objectMonitor);
+			monitorCount++;
+			monitorRecords = monitorRecords->next;
+		}
+	}
+
+	J9VMJDKINTERNALVMCONTINUATION_SET_BLOCKER(currentThread, continuationObject, NULL);
+
+	/* Add the attached monitor to the carrier thread's lockedmonitorcount. */
+	currentThread->osThread->lockedmonitorcount += monitorCount;
+}
+
+UDATA
+preparePinnedVirtualThreadForUnmount(J9VMThread *currentThread, j9object_t syncObj, BOOLEAN isObjectWait)
+{
+	UDATA result = J9_OBJECT_MONITOR_YIELD_VIRTUAL;
+	J9ObjectMonitor *syncObjectMonitor = NULL;
+	j9objectmonitor_t lock = 0;
+	j9object_t continuationObj = NULL;
+	UDATA monitorCount = 0;
+
+	if (0 < currentThread->ownedMonitorCount) {
+		/* Inflate all owned monitors. */
+		J9MonitorEnterRecord *monitorRecords = currentThread->monitorEnterRecords;
+		while (NULL != monitorRecords) {
+			j9object_t object = monitorRecords->object;
+			J9ObjectMonitor *objectMonitor = NULL;
+
+			if (!LN_HAS_LOCKWORD(currentThread, object)) {
+				objectMonitor = monitorTablePeek(currentThread->javaVM, object);
+				if (NULL != objectMonitor) {
+					lock = J9_LOAD_LOCKWORD(currentThread, &objectMonitor->alternateLockword);
+				} else {
+					lock = 0;
+				}
+			} else {
+				lock = J9OBJECT_MONITOR(currentThread, object);
+			}
+
+			if (!J9_LOCK_IS_INFLATED(lock)) {
+				objectMonitor = objectMonitorInflate(currentThread, object, lock);
+				if (NULL == objectMonitor) {
+					result = J9_OBJECT_MONITOR_OOM;
+					goto done;
+				}
+			}
+
+			detachMonitorInfo(currentThread, objectMonitor);
+			monitorCount++;
+			monitorRecords = monitorRecords->next;
+		}
+
+		/* Repeat for JNI monitor records. */
+		monitorRecords = currentThread->jniMonitorEnterRecords;
+		while (NULL != monitorRecords) {
+			j9object_t object = monitorRecords->object;
+			J9ObjectMonitor *objectMonitor = NULL;
+
+			if (!LN_HAS_LOCKWORD(currentThread, object)) {
+				objectMonitor = monitorTablePeek(currentThread->javaVM, object);
+				if (NULL != objectMonitor) {
+					lock = J9_LOAD_LOCKWORD(currentThread, &objectMonitor->alternateLockword);
+				} else {
+					lock = 0;
+				}
+			} else {
+				lock = J9OBJECT_MONITOR(currentThread, object);
+			}
+
+			if (!J9_LOCK_IS_INFLATED(lock)) {
+				objectMonitor = objectMonitorInflate(currentThread, object, lock);
+				if (NULL == objectMonitor) {
+					result = J9_OBJECT_MONITOR_OOM;
+					goto done;
+				}
+			}
+
+			detachMonitorInfo(currentThread, objectMonitor);
+			monitorCount++;
+			monitorRecords = monitorRecords->next;
+		}
+	}
+
+	if (!LN_HAS_LOCKWORD(currentThread, syncObj)) {
+		syncObjectMonitor = monitorTablePeek(currentThread->javaVM, syncObj);
+		if (NULL != syncObjectMonitor) {
+			lock = J9_LOAD_LOCKWORD(currentThread, &syncObjectMonitor->alternateLockword);
+		} else {
+			lock = 0;
+		}
+	} else {
+		lock = J9OBJECT_MONITOR(currentThread, syncObj);
+	}
+
+	if (!J9_LOCK_IS_INFLATED(lock)) {
+		syncObjectMonitor = objectMonitorInflate(currentThread, syncObj, lock);
+		if (NULL == syncObjectMonitor) {
+			result = J9_OBJECT_MONITOR_OOM;
+			goto done;
+		}
+	} else {
+		syncObjectMonitor = J9_INFLLOCK_OBJECT_MONITOR(lock);
+	}
+
+	continuationObj = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, currentThread->threadObject);
+	J9VMJDKINTERNALVMCONTINUATION_SET_BLOCKER(currentThread, continuationObj, syncObj);
+
+	if (isObjectWait) {
+		J9VMContinuation *continuation = currentThread->currentContinuation;
+		omrthread_monitor_t monitor = syncObjectMonitor->monitor;
+
+		/* Record wait monitor state. */
+		continuation->waitingMonitorEnterCount = monitor->count;
+
+		/* Reset monitor entry count to 1.*/
+		monitor->count = 1;
+
+		/* Add Continuation struct to the monitor's waiting list. */
+		omrthread_monitor_exit(monitor);
+		omrthread_monitor_enter(currentThread->javaVM->blockedVirtualThreadsMutex);
+		currentThread->currentContinuation->nextWaitingContinuation = syncObjectMonitor->waitingContinuations;
+		syncObjectMonitor->waitingContinuations = currentThread->currentContinuation;
+		omrthread_monitor_exit(currentThread->javaVM->blockedVirtualThreadsMutex);
+	} else {
+		syncObjectMonitor->virtualThreadWaitCount += 1;
+	}
+
+	/* Subtract the detached monitor from the carrier thread's lockedmonitorcount. */
+	currentThread->osThread->lockedmonitorcount -= monitorCount;
+
+	/* Clear the blocking object on the carrier thread. */
+	J9VMTHREAD_SET_BLOCKINGENTEROBJECT(currentThread, currentThread, NULL);
+
+done:
+	return result;
+}
+
+jobject
+takeVirtualThreadListToUnblock(J9VMThread *currentThread, J9JavaVM *vm)
+{
+	j9object_t unblockedList = NULL;
+	jobject result = NULL;
+	J9InternalVMFunctions const * const vmFuncs = vm->internalVMFunctions;
+
+	vmFuncs->internalEnterVMFromJNI(currentThread);
+	while (NULL == unblockedList) {
+		if (NULL != vm->blockedContinuations) {
+			omrthread_monitor_enter(vm->blockedVirtualThreadsMutex);
+restart:
+			J9VMContinuation *listHead = vm->blockedContinuations;
+			J9VMContinuation *next = NULL;
+			vm->blockedContinuations = NULL;
+			while (NULL != listHead) {
+				bool unblocked = false;
+				next = listHead->nextWaitingContinuation;
+				if (J9VMJAVALANGVIRTUALTHREAD_ONWAITINGLIST(currentThread, listHead->vthread)) {
+					unblocked = true;
+				} else {
+					j9object_t continuationObj = J9VMJAVALANGVIRTUALTHREAD_CONT(currentThread, listHead->vthread);
+					j9object_t syncObject = J9VMJDKINTERNALVMCONTINUATION_BLOCKER(currentThread, continuationObj);
+					J9ObjectMonitor *syncObjectMonitor = NULL;
+					j9objectmonitor_t lock = 0;
+					if (!LN_HAS_LOCKWORD(currentThread, syncObject)) {
+						syncObjectMonitor = vmFuncs->monitorTablePeek(vm, syncObject);
+						if (NULL != syncObjectMonitor){
+							lock = J9_LOAD_LOCKWORD_VM(vm, &syncObjectMonitor->alternateLockword);
+						}
+					} else {
+						lock = J9OBJECT_MONITOR(currentThread, syncObject);
+					}
+					J9ThreadAbstractMonitor *monitor = getInflatedObjectMonitor(vm, syncObject, lock);
+					if (0 == monitor->count) {
+						unblocked = true;
+						if (syncObjectMonitor->virtualThreadWaitCount >= 1) {
+							syncObjectMonitor->virtualThreadWaitCount -= 1;
+						}
+						J9VMJAVALANGVIRTUALTHREAD_SET_ONWAITINGLIST(currentThread, listHead->vthread, JNI_TRUE);
+					}
+				}
+
+				if (unblocked) {
+					J9VMJAVALANGVIRTUALTHREAD_SET_NEXT(currentThread, listHead->vthread, unblockedList);
+					unblockedList = listHead->vthread;
+				} else {
+					listHead->nextWaitingContinuation = vm->blockedContinuations;
+					vm->blockedContinuations = listHead;
+				}
+				listHead = next;
+			}
+			if (NULL == unblockedList) {
+				vmFuncs->internalExitVMToJNI(currentThread);
+				omrthread_monitor_wait(vm->blockedVirtualThreadsMutex);
+				vmFuncs->internalEnterVMFromJNI(currentThread);
+				goto restart;
+			} else {
+				omrthread_monitor_exit(vm->blockedVirtualThreadsMutex);
+				result = vmFuncs->j9jni_createLocalRef((JNIEnv *)currentThread, unblockedList);
+				break;
+			}
+		}
+	}
+	vmFuncs->internalExitVMToJNI(currentThread);
+
+	return result;
+}
+#endif /* JAVA_SPEC_VERSION >= 24 */
 } /* extern "C" */
