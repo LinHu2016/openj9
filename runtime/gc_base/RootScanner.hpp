@@ -43,6 +43,9 @@
 #include "Task.hpp"
 #include "VMClassSlotIterator.hpp"
 
+#if JAVA_SPEC_VERSION >= 24
+class GC_ContinuationSlotIterator;
+#endif /* JAVA_SPEC_VERSION >= 24 */
 class GC_SlotObject;
 class MM_MemoryPool;
 class MM_CollectorLanguageInterfaceImpl;
@@ -573,6 +576,10 @@ public:
 		return true;
 	}
 #endif /* defined(J9VM_ENV_DATA64) */
+
+#if JAVA_SPEC_VERSION >= 24
+	virtual void doContinuationSlot(J9Object **slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator);
+#endif /* JAVA_SPEC_VERSION >= 24 */
 	/**
 	 * Called for each object stack slot. Subclasses may override.
 	 * 
