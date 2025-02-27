@@ -84,6 +84,7 @@
 #include "SparseVirtualMemory.hpp"
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #include "SlotObject.hpp"
+#include "StackSlotValidator.hpp"
 #include "SublistPool.hpp"
 #include "SublistPuddle.hpp"
 #include "ParallelTask.hpp"
@@ -1216,22 +1217,40 @@ MM_WriteOnceCompactor::fixupMixedObject(MM_EnvironmentVLHGC* env, J9Object *obje
 }
 
 void
-MM_WriteOnceCompactor::doSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slot)
+MM_WriteOnceCompactor::doSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr)
 {
-	J9Object *pointer = *slot;
+	J9Object *pointer = *slotPtr;
 	if (isHeapObject(pointer)) {
 		J9Object *forwardedPtr = getForwardingPtr(pointer);
 		if (pointer != forwardedPtr) {
-			*slot = forwardedPtr;
+			*slotPtr = forwardedPtr;
 		}
 		_interRegionRememberedSet->rememberReferenceForCompact(env, fromObject, forwardedPtr);
 	}
 }
 
+#if JAVA_SPEC_VERSION >= 24
 void
-MM_WriteOnceCompactor::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slot)
+MM_WriteOnceCompactor::doContinuationSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator)
 {
-	doSlot(env, fromObject, slot);
+	if (isHeapObject(*slotPtr)) {
+		doSlot(env, fromObject, slotPtr);
+	} else if (NULL != *slotPtr) {
+		Assert_MM_true(continuationslotiterator_state_monitor_records == continuationSlotIterator->getState());
+	}
+}
+#endif /* JAVA_SPEC_VERSION >= 24 */
+
+void
+MM_WriteOnceCompactor::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr, J9StackWalkState *walkState, const void *stackLocation)
+{
+	if (isHeapObject(*slotPtr)) {
+		Assert_MM_validStackSlot(MM_StackSlotValidator(0, *slotPtr, stackLocation, walkState).validate(env));
+		doSlot(env, fromObject, slotPtr);
+	} else if (NULL != *slotPtr) {
+		/* stack object - just validate */
+		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, *slotPtr, stackLocation, walkState).validate(env));
+	}
 }
 
 /**
@@ -1241,7 +1260,7 @@ void
 stackSlotIteratorForWriteOnceCompactor(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4WriteOnceCompactor *data = (StackIteratorData4WriteOnceCompactor *)localData;
-	data->writeOnceCompactor->doStackSlot(data->env, data->fromObject, slotPtr);
+	data->writeOnceCompactor->doStackSlot(data->env, data->fromObject, slotPtr, walkState, stackLocation);
 }
 
 void
@@ -1268,7 +1287,7 @@ MM_WriteOnceCompactor::fixupContinuationNativeSlots(MM_EnvironmentVLHGC* env, J9
 		GC_ContinuationSlotIterator continuationSlotIterator(currentThread, continuation);
 
 		while (J9Object **slotPtr = continuationSlotIterator.nextSlot()) {
-			doSlot(env, objectPtr, slotPtr);
+			doContinuationSlot(env, objectPtr, slotPtr, &continuationSlotIterator);
 		}
 #endif /* JAVA_SPEC_VERSION >= 24 */
 
