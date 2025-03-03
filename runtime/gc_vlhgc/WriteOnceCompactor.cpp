@@ -1245,7 +1245,6 @@ void
 MM_WriteOnceCompactor::doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object** slotPtr, J9StackWalkState *walkState, const void *stackLocation)
 {
 	if (isHeapObject(*slotPtr)) {
-		Assert_MM_validStackSlot(MM_StackSlotValidator(0, *slotPtr, stackLocation, walkState).validate(env));
 		doSlot(env, fromObject, slotPtr);
 	} else if (NULL != *slotPtr) {
 		/* stack object - just validate */

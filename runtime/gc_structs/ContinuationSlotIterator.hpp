@@ -41,6 +41,7 @@
  */
 class GC_ContinuationSlotIterator
 {
+public:
 	/**
 	 * State constants representing the current stage of the iteration process
 	 */
@@ -51,6 +52,7 @@ class GC_ContinuationSlotIterator
 		state_end
 	};
 
+protected:
 	J9VMThread *_vmThread;
 	State _state;
 
