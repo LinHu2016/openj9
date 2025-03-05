@@ -2315,8 +2315,7 @@ MM_CopyForwardScheme::scanOwnableSynchronizerObjectSlots(MM_EnvironmentVLHGC *en
 void
 MM_CopyForwardScheme::doSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object **slotPtr)
 {
-	/* the reservingContext is base on related Continuation object */
-	MM_AllocationContextTarok *reservingContext = getContextForHeapAddress(fromObject);
+	MM_AllocationContextTarok *reservingContext = (MM_AllocationContextTarok *)env->getAllocationContext();
 	copyAndForward(env, reservingContext, fromObject, slotPtr);
 }
 
@@ -2327,7 +2326,7 @@ MM_CopyForwardScheme::doContinuationSlot(MM_EnvironmentVLHGC *env, J9Object *fro
 	if (isHeapObject(*slotPtr)) {
 		doSlot(env, fromObject, slotPtr);
 	} else if (NULL != *slotPtr) {
-		Assert_MM_true(GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState());
+		Assert_MM_true(continuationslotiterator_state_monitor_records == continuationSlotIterator->getState());
 	}
 }
 #endif /* JAVA_SPEC_VERSION >= 24 */
@@ -3867,7 +3866,7 @@ private:
 			MM_AllocationContextTarok *reservingContext = (MM_AllocationContextTarok *)MM_EnvironmentVLHGC::getEnvironment(thread)->getAllocationContext();
 			_copyForwardScheme->copyAndForward(MM_EnvironmentVLHGC::getEnvironment(_env), reservingContext, slotPtr);
 		} else if (NULL != *slotPtr) {
-			Assert_MM_true(GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState());
+			Assert_MM_true(continuationslotiterator_state_monitor_records == continuationSlotIterator->getState());
 		}
 	}
 #endif /* JAVA_SPEC_VERSION >= 24 */
@@ -4626,7 +4625,7 @@ private:
 		if (_copyForwardScheme->isHeapObject(*slotPtr)) {
 			verifyObject(slotPtr);
 		} else if (NULL != *slotPtr) {
-			Assert_MM_true(GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState());
+			Assert_MM_true(continuationslotiterator_state_monitor_records == continuationSlotIterator->getState());
 		}
 	}
 #endif /* JAVA_SPEC_VERSION >= 24 */
