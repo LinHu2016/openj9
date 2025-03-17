@@ -352,10 +352,30 @@ MM_ScavengerDelegate::doContinuationSlot(MM_EnvironmentStandard *env, omrobjectp
 #endif /* JAVA_SPEC_VERSION >= 24 */
 
 void
-MM_ScavengerDelegate::doStackSlot(MM_EnvironmentStandard *env, omrobjectptr_t *slotPtr, MM_ScavengeScanReason reason, bool *shouldRemember, void *walkState, const void* stackLocation)
+MM_ScavengerDelegate::doStackSlot(MM_EnvironmentStandard *env, omrobjectptr_t *slotPtr, MM_ScavengeScanReason reason, bool *shouldRemember, J9Object *fromObject, void *walkState, const void* stackLocation)
 {
 	if (_extensions->scavenger->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
+		bool assertion = MM_StackSlotValidator(MM_StackSlotValidator::COULD_BE_FORWARDED, *slotPtr, stackLocation, walkState).validate(env);
+		if (!assertion) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "Error ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", fromObject, *slotPtr, walkState, env);
+			Assert_MM_validStackSlot(assertion);
+		} else {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", fromObject, *slotPtr, walkState, env);
+		}
 		doSlot(env, slotPtr, reason, shouldRemember);
+	} else if (NULL != *slotPtr) {
+		/* stack object - just validate */
+		bool assertion = MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, *slotPtr, stackLocation, walkState).validate(env);
+		if (!assertion) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "Error ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", fromObject, *slotPtr, walkState, env);
+//			Assert_MM_validStackSlot(assertion);
+		} else {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", fromObject, *slotPtr, walkState, env);
+		}
 	}
 }
 
@@ -366,7 +386,7 @@ void
 stackSlotIteratorForScavenge(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)
 {
 	StackIteratorData4Scavenge *data = (StackIteratorData4Scavenge *)localData;
-	data->scavengerDelegate->doStackSlot(data->env, slotPtr, data->reason, data->shouldRemember, walkState, stackLocation);
+	data->scavengerDelegate->doStackSlot(data->env, slotPtr, data->reason, data->shouldRemember, data->fromObject, walkState, stackLocation);
 }
 
 bool
@@ -391,16 +411,23 @@ MM_ScavengerDelegate::scanContinuationNativeSlots(MM_EnvironmentStandard *env, o
 		localData.env = env;
 		localData.reason = reason;
 		localData.shouldRemember = &shouldRemember;
+		localData.fromObject = objectPtr;
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_ScavengerDelegate::scanContinuationNativeSlots ContinuationObject: %p, currentThread=%p\n", objectPtr, currentThread);
 
 		GC_VMThreadStackSlotIterator::scanContinuationSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForScavenge, false, false);
+		j9tty_printf(PORTLIB, "scanContinuationStackSlots currentThread=%p end\n", currentThread);
 
 #if JAVA_SPEC_VERSION >= 24
 		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
 		GC_ContinuationSlotIterator continuationSlotIterator(currentThread, continuation);
 
 		while (J9Object **slotPtr = continuationSlotIterator.nextSlot()) {
+			j9tty_printf(PORTLIB, "doContinuationSlot slot: %p, currentThread=%p\n", *slotPtr, currentThread);
 			doContinuationSlot(env, slotPtr,reason, &shouldRemember, &continuationSlotIterator);
 		}
+		j9tty_printf(PORTLIB, "doContinuationSlot currentThread=%p end\n", currentThread);
 #endif /* JAVA_SPEC_VERSION >= 24 */
 
 		if (isConcurrentGC) {

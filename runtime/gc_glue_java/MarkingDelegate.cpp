@@ -266,7 +266,27 @@ void
 MM_MarkingDelegate::doStackSlot(MM_EnvironmentBase *env, omrobjectptr_t objectPtr, omrobjectptr_t *slotPtr, void *walkState, const void* stackLocation)
 {
 	if (_markingScheme->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
+		bool assertion = MM_StackSlotValidator(0, *slotPtr, stackLocation, walkState).validate(env);
+		if (!assertion) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "Error ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", objectPtr, *slotPtr, walkState, env);
+			Assert_MM_validStackSlot(assertion);
+		} else {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", objectPtr, *slotPtr, walkState, env);
+		}
 		doSlot(env, objectPtr, slotPtr);
+	} else if (NULL != *slotPtr) {
+		/* stack object - just validate */
+		bool assertion = MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, *slotPtr, stackLocation, walkState).validate(env);
+		if (!assertion) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "Error ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", objectPtr, *slotPtr, walkState, env);
+//			Assert_MM_validStackSlot(assertion);
+		} else {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "ContinuationObject: %p, slot=%p, walkState: %p, env=%p\n", objectPtr, *slotPtr, walkState, env);
+		}
 	}
 }
 
@@ -300,15 +320,20 @@ MM_MarkingDelegate::scanContinuationNativeSlots(MM_EnvironmentBase *env, omrobje
 		stackFrameClassWalkNeeded = isDynamicClassUnloadingEnabled();
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MarkingDelegate::scanContinuationNativeSlots ContinuationObject: %p, currentThread=%p\n", objectPtr, currentThread);
 		GC_VMThreadStackSlotIterator::scanContinuationSlots(currentThread, objectPtr, (void *)&localData, stackSlotIteratorForMarkingDelegate, stackFrameClassWalkNeeded, false);
+		j9tty_printf(PORTLIB, "scanContinuationStackSlots currentThread=%p, end\n", currentThread);
 
 #if JAVA_SPEC_VERSION >= 24
 		J9VMContinuation *continuation = J9VMJDKINTERNALVMCONTINUATION_VMREF(currentThread, objectPtr);
 		GC_ContinuationSlotIterator continuationSlotIterator(currentThread, continuation);
 
 		while (J9Object **slotPtr = continuationSlotIterator.nextSlot()) {
+			j9tty_printf(PORTLIB, "doContinuationSlot slot: %p, currentThread=%p\n", *slotPtr, currentThread);
 			doContinuationSlot(env, objectPtr, slotPtr, &continuationSlotIterator);
 		}
+		j9tty_printf(PORTLIB, "doContinuationSlot currentThread=%p end\n", currentThread);
 #endif /* JAVA_SPEC_VERSION >= 24 */
 
 		if (isConcurrentGC) {

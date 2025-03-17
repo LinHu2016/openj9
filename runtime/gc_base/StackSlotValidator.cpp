@@ -45,10 +45,14 @@ MM_StackSlotValidator::reportStackSlot(MM_EnvironmentBase* env, const char* mess
 	J9VMThread* walkThread = _walkState->walkThread;
 	Trc_MM_StackSlotValidator_reportStackSlot_Entry(env->getLanguageVMThread(), walkThread);
 
-	char* threadName = getOMRVMThreadName(walkThread->omrVMThread);
-	j9tty_printf(PORTLIB, "%p: %s in thread %s\n", walkThread, message, NULL == threadName ? "NULL" : threadName);
-	Trc_MM_StackSlotValidator_thread(env->getLanguageVMThread(), message, NULL == threadName ? "NULL" : threadName);
+	char* threadName = NULL;
+	if (NULL != walkThread->omrVMThread) {
+		threadName = getOMRVMThreadName(walkThread->omrVMThread);
+	}
 	
+	j9tty_printf(PORTLIB, "%p: %s in thread %s\n", walkThread, message, NULL == threadName ? "Continuation: ?" : threadName);
+	Trc_MM_StackSlotValidator_thread(env->getLanguageVMThread(), message, NULL == threadName ? "Continuation: ?" : threadName);
+
 	j9tty_printf(PORTLIB, "%p:\tO-Slot=%p\n", walkThread, _stackLocation);
 	Trc_MM_StackSlotValidator_OSlot(env->getLanguageVMThread(), _stackLocation);
 	
@@ -100,8 +104,10 @@ MM_StackSlotValidator::reportStackSlot(MM_EnvironmentBase* env, const char* mess
 	j9tty_printf(PORTLIB, "%p:\tstack=%p-%p\n", walkThread, walkThread->stackObject + 1, walkThread->stackObject->end);
 	Trc_MM_StackSlotValidator_stack(env->getLanguageVMThread(), walkThread->stackObject + 1, walkThread->stackObject->end);
 
-	releaseOMRVMThreadName(walkThread->omrVMThread);
-	
+	if (NULL != walkThread->omrVMThread) {
+		releaseOMRVMThreadName(walkThread->omrVMThread);
+	}
+
 	Trc_MM_StackSlotValidator_reportStackSlot_Exit(env->getLanguageVMThread());
 }
 
