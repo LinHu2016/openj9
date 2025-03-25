@@ -49,10 +49,17 @@ MM_StackSlotValidator::reportStackSlot(MM_EnvironmentBase* env, const char* mess
 	if (NULL != walkThread->omrVMThread) {
 		threadName = getOMRVMThreadName(walkThread->omrVMThread);
 	}
-	
-	j9tty_printf(PORTLIB, "%p: %s in thread %s\n", walkThread, message, NULL == threadName ? "Continuation: ?" : threadName);
-	Trc_MM_StackSlotValidator_thread(env->getLanguageVMThread(), message, NULL == threadName ? "Continuation: ?" : threadName);
 
+#if JAVA_SPEC_VERSION >= 19
+	if ((NULL == walkThread->omrVMThread) && (NULL != walkThread->currentContinuation)) {
+		j9tty_printf(PORTLIB, "%p: %s in J9VMContinuation %p\n", walkThread, message, walkThread->currentContinuation);
+		Trc_MM_StackSlotValidator_thread(env->getLanguageVMThread(), message, "check walkThread->currentContinuation" );
+	} else
+#endif /* JAVA_SPEC_VERSION >= 19 */
+	{
+		j9tty_printf(PORTLIB, "%p: %s in thread %s\n", walkThread, message, NULL == threadName ? "NULL" : threadName);
+		Trc_MM_StackSlotValidator_thread(env->getLanguageVMThread(), message, NULL == threadName ? "NULL" : threadName);
+	}
 	j9tty_printf(PORTLIB, "%p:\tO-Slot=%p\n", walkThread, _stackLocation);
 	Trc_MM_StackSlotValidator_OSlot(env->getLanguageVMThread(), _stackLocation);
 	
