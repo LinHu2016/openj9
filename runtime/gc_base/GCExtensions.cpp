@@ -350,8 +350,12 @@ MM_GCExtensions::needScanStacksForContinuationObject(J9VMThread *vmThread, j9obj
 		ContinuationState continuationState = *continuationStatePtr;
 		Assert_MM_false(beingMounted);
 		Assert_MM_false(VM_ContinuationHelpers::isConcurrentlyScanned(continuationState));
+
 		needScan = VM_ContinuationHelpers::isActive(continuationState) && !VM_ContinuationHelpers::isFullyMounted(continuationState);
 	}
+	PORT_ACCESS_FROM_VMC(vmThread);
+	j9tty_printf(PORTLIB,"needScanStacksForContinuationObject = %zu, objectPtr=%p, continuationState=%zu, isConcurrentGC=%zu, isGlobalGC=%zu, beingMounted=%zu\n",
+			needScan, objectPtr, *continuationStatePtr, isConcurrentGC, isGlobalGC, beingMounted);
 #endif /* JAVA_SPEC_VERSION >= 19 */
 	return needScan;
 }
