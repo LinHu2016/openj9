@@ -27,6 +27,7 @@
 #include "j9nonbuilder.h"
 #include "objectdescription.h"
 
+#include "BaseNonVirtual.hpp"
 #include "GCExtensions.hpp"
 #include "Heap.hpp"
 
@@ -37,7 +38,7 @@ class MM_EnvironmentBase;
 
 //class MM_MarkingScheme;
 
-class MM_ScanContinuationSlotsBase
+class MM_ScanContinuationSlotsBase : public MM_BaseNonVirtual
 {
 protected:
 	MM_Heap *_heap;
@@ -71,7 +72,8 @@ public:
 	 * Constructor.
 	 */
 	MMINLINE MM_ScanContinuationSlotsBase()
-		: _heap(NULL)
+		: MM_BaseNonVirtual()
+		, _heap(NULL)
 	{}
 };
 

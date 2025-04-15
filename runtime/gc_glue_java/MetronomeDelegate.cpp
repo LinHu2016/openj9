@@ -158,6 +158,8 @@ MM_MetronomeDelegate::getSplitArraysProcessed(MM_EnvironmentRealtime *env)
 bool
 MM_MetronomeDelegate::initialize(MM_EnvironmentBase *env)
 {
+	MM_ScanContinuationSlotsBase::initialize(env);
+
 	_scheduler = _realtimeGC->_sched;
 	_markingScheme = _realtimeGC->getMarkingScheme();
 
@@ -1636,7 +1638,7 @@ MM_MetronomeDelegate::unsetUnmarkedImpliesCleared()
 }
 
 void
-MM_MetronomeDelegate::doSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr)
+MM_MetronomeDelegate::doSlot(MM_EnvironmentBase *env, J9Object **slotPtr)
 {
 	J9Object *object = *slotPtr;
 	if (MUTATOR_THREAD == env->getThreadType()) {
@@ -1649,31 +1651,31 @@ MM_MetronomeDelegate::doSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr)
 	}
 }
 
-#if JAVA_SPEC_VERSION >= 24
-void
-MM_MetronomeDelegate::doContinuationSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator)
-{
-	if (_markingScheme->isHeapObject(*slotPtr)) {
-		doSlot(env, slotPtr);
-	} else if (NULL != *slotPtr) {
-		Assert_MM_true(GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState());
-	}
-}
-#endif /* JAVA_SPEC_VERSION >= 24 */
-
-void
-MM_MetronomeDelegate::doStackSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, J9StackWalkState *walkState, const void *stackLocation)
-{
-	J9Object *object = *slotPtr;
-	if (_markingScheme->isHeapObject(object)) {
-		/* heap object - validate and mark */
-		Assert_MM_validStackSlot(MM_StackSlotValidator(0, object, stackLocation, walkState).validate(env));
-		doSlot(env, slotPtr);
-	} else if (NULL != object) {
-		/* stack object - just validate */
-		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, object, stackLocation, walkState).validate(env));
-	}
-}
+//#if JAVA_SPEC_VERSION >= 24
+//void
+//MM_MetronomeDelegate::doContinuationSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator)
+//{
+//	if (_markingScheme->isHeapObject(*slotPtr)) {
+//		doSlot(env, slotPtr);
+//	} else if (NULL != *slotPtr) {
+//		Assert_MM_true(GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState());
+//	}
+//}
+//#endif /* JAVA_SPEC_VERSION >= 24 */
+//
+//void
+//MM_MetronomeDelegate::doStackSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, J9StackWalkState *walkState, const void *stackLocation)
+//{
+//	J9Object *object = *slotPtr;
+//	if (_markingScheme->isHeapObject(object)) {
+//		/* heap object - validate and mark */
+//		Assert_MM_validStackSlot(MM_StackSlotValidator(0, object, stackLocation, walkState).validate(env));
+//		doSlot(env, slotPtr);
+//	} else if (NULL != object) {
+//		/* stack object - just validate */
+//		Assert_MM_validStackSlot(MM_StackSlotValidator(MM_StackSlotValidator::NOT_ON_HEAP, object, stackLocation, walkState).validate(env));
+//	}
+//}
 
 void
 stackSlotIteratorForRealtimeGC(J9JavaVM *javaVM, J9Object **slotPtr, void *localData, J9StackWalkState *walkState, const void *stackLocation)

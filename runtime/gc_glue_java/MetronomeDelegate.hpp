@@ -45,7 +45,7 @@ class MM_RealtimeMarkingSchemeRootMarker;
 class MM_RealtimeRootScanner;
 class MM_Scheduler;
 
-class MM_MetronomeDelegate : public MM_BaseNonVirtual
+class MM_MetronomeDelegate : public MM_ScanContinuationSlotsBase
 {
 private:
 	MM_GCExtensions *_extensions;
@@ -61,16 +61,18 @@ public:
 	static int J9THREAD_PROC metronomeAlarmThreadWrapper(void *userData);
 	static uintptr_t signalProtectedFunction(J9PortLibrary *privatePortLibrary, void *userData);
 
-	MMINLINE void doSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr);
-#if JAVA_SPEC_VERSION >= 24
-	void doContinuationSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator);
-#endif /* JAVA_SPEC_VERSION >= 24 */
-	void doStackSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, J9StackWalkState *walkState, const void *stackLocation);
+	virtual void doSlot(MM_EnvironmentBase *env, J9Object **slotPtr);
+//#if JAVA_SPEC_VERSION >= 24
+//	void doContinuationSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator);
+//#endif /* JAVA_SPEC_VERSION >= 24 */
+//	void doStackSlot(MM_EnvironmentRealtime *env, J9Object **slotPtr, J9StackWalkState *walkState, const void *stackLocation);
 
-	MM_MetronomeDelegate(MM_EnvironmentBase *env) :
-		_extensions(MM_GCExtensions::getExtensions(env)),
-		_realtimeGC(NULL),
-		_javaVM((J9JavaVM *)env->getOmrVM()->_language_vm) {}
+	MM_MetronomeDelegate(MM_EnvironmentBase *env)
+		: MM_ScanContinuationSlotsBase()
+		, _extensions(MM_GCExtensions::getExtensions(env))
+		, _realtimeGC(NULL)
+		, _javaVM((J9JavaVM *)env->getOmrVM()->_language_vm)
+	{}
 
 #if defined(J9VM_GC_DYNAMIC_CLASS_UNLOADING)
  	bool _unmarkedImpliesClasses; /**< if true the mark bit can be used to check is class alive or not */
