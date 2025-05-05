@@ -282,10 +282,11 @@ public:
 	 *
 	 * @param env[in] The current thread.
 	 * @param fraction[in] the remainder of array size from region size.
-	 * @return True if need to allocate new reserved region for sharing.
+	 * @return allocation context for SharedArrayReservedRegion, return NULL if there is no free space for sharing
 	 */
-	bool allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction);
+	void* allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure);
 
+	bool allocateFromSharedReservedRegionForNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, MM_AllocationContextBalanced *requestingContext, bool payTax);
 	/**
 	 * Remove the remainder bytes(need to share the reserved region) of large array from the sheard bytes
 	 * and check if need to recycle a shared reserved region.
@@ -294,7 +295,7 @@ public:
 	 * @param fraction[in] the remainder of array size from region size.
 	 * @return True if need to recycle a shared reserved region.
 	 */
-	bool recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction);
+	bool recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction, bool needLock=false);
 
 	/**
 	 * Get total shared reserved region count.
@@ -328,7 +329,7 @@ public:
 		_arrayReservedRegionCount -= 1;
 	}
 
-	void recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock = false);
+	void recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock, bool shared = false);
 
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	
@@ -477,6 +478,8 @@ private:
 	 * @return The address of the leaf
 	 */
 	void *lockedAllocateArrayletLeaf(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, MM_HeapRegionDescriptorVLHGC *freeRegionForArrayletLeaf);
+
+	void *lockedSharedReserveRegionAllocateFromNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, MM_AllocationContextBalanced *requestingContext);
 
 	/**
 	 * Common implementation for flush() and flushForShutdown()
