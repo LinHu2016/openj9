@@ -164,6 +164,14 @@ private:
 
 protected:
 public:
+	struct RecycleArrayletLeafRegionsData {
+		MM_EnvironmentVLHGC *env;
+		MM_CopyForwardScheme *copyForwardScheme;
+		RecycleArrayletLeafRegionsData(MM_EnvironmentVLHGC *envVLH, MM_CopyForwardScheme *scheme)
+			: env(envVLH)
+			, copyForwardScheme(scheme)
+		{}
+	};
 private:
 
 	/* Temporary verification functions */
@@ -1139,6 +1147,8 @@ public:
 	void doContinuationSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object **slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator);
 #endif /* JAVA_SPEC_VERSION >= 24 */
 	void doStackSlot(MM_EnvironmentVLHGC *env, J9Object *fromObject, J9Object **slotPtr, J9StackWalkState *walkState, const void *stackLocation);
+
+	static UDATA recycleArrayletLeafRegionsFn(void *entry, void *userData);
 
 	friend class MM_CopyForwardGMPCardCleaner;
 	friend class MM_CopyForwardNoGMPCardCleaner;

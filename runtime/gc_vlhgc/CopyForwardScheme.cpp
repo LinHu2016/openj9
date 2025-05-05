@@ -97,6 +97,7 @@
 #include "SlotObject.hpp"
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 #include "SparseVirtualMemory.hpp"
+#include "SparseAddressOrderedFixedSizeDataPool.hpp"
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #include "StackSlotValidator.hpp"
 #include "SublistFragment.hpp"
@@ -430,35 +431,42 @@ MM_CopyForwardScheme::clearGCStats(MM_EnvironmentVLHGC *env)
 void
 MM_CopyForwardScheme::updateLeafRegions(MM_EnvironmentVLHGC *env)
 {
-	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
-	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	if (MM_GCExtensions::getExtensions(env)->isVirtualLargeObjectHeapEnabled) {
+		RecycleArrayletLeafRegionsData data(env, this);
+		MM_SparseVirtualMemory *largeObjectVirtualMemory = MM_GCExtensions::getExtensions(env)->largeObjectVirtualMemory;
 
-	while (NULL != (region = regionIterator.nextRegion())) {
-		if (region->isArrayletLeaf()) {
-			J9Object *spineObject = (J9Object *)region->_allocateData.getSpine();
-			Assert_MM_true(NULL != spineObject);
+		hashTableForEachDo(largeObjectVirtualMemory->getSparseDataPool()->getObjectToSparseDataTable(), recycleArrayletLeafRegionsFn, &data);
+	} else {
+		GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
+		MM_HeapRegionDescriptorVLHGC *region = NULL;
 
-			J9Object *updatedSpineObject = updateForwardedPointer(spineObject);
-			if (updatedSpineObject != spineObject) {
-				MM_HeapRegionDescriptorVLHGC *spineRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(spineObject);
-				MM_HeapRegionDescriptorVLHGC *updatedSpineRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(updatedSpineObject);
+		while (NULL != (region = regionIterator.nextRegion())) {
+			if (region->isArrayletLeaf()) {
+				J9Object *spineObject = (J9Object *)region->_allocateData.getSpine();
+				Assert_MM_true(NULL != spineObject);
 
-				Assert_MM_true(spineRegion->_markData._shouldMark);
-				Assert_MM_true(spineRegion != updatedSpineRegion);
-				Assert_MM_true(updatedSpineRegion->containsObjects());
+				J9Object *updatedSpineObject = updateForwardedPointer(spineObject);
+				if (updatedSpineObject != spineObject) {
+					MM_HeapRegionDescriptorVLHGC *spineRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(spineObject);
+					MM_HeapRegionDescriptorVLHGC *updatedSpineRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(updatedSpineObject);
 
-				/* we need to move the leaf to another region's leaf list since its spine has moved */
-				region->_allocateData.removeFromArrayletLeafList(env);
-				region->_allocateData.addToArrayletLeafList(updatedSpineRegion);
-				region->_allocateData.setSpine((J9IndexableObject *)updatedSpineObject);
-			} else if (!isLiveObject(spineObject)) {
-				Assert_MM_true(isObjectInEvacuateMemory(spineObject));
-				/* the spine is in evacuate space so the arraylet is dead => recycle the leaf */
-				/* remove arraylet leaf from list */
-				region->_allocateData.removeFromArrayletLeafList(env);
-				/* recycle */
-				region->_allocateData.setSpine(NULL);
-				region->getSubSpace()->recycleRegion(env, region);
+					Assert_MM_true(spineRegion->_markData._shouldMark);
+					Assert_MM_true(spineRegion != updatedSpineRegion);
+					Assert_MM_true(updatedSpineRegion->containsObjects());
+
+					/* we need to move the leaf to another region's leaf list since its spine has moved */
+					region->_allocateData.removeFromArrayletLeafList(env);
+					region->_allocateData.addToArrayletLeafList(updatedSpineRegion);
+					region->_allocateData.setSpine((J9IndexableObject *)updatedSpineObject);
+				} else if (!isLiveObject(spineObject)) {
+					Assert_MM_true(isObjectInEvacuateMemory(spineObject));
+					/* the spine is in evacuate space so the arraylet is dead => recycle the leaf */
+					/* remove arraylet leaf from list */
+					region->_allocateData.removeFromArrayletLeafList(env);
+					/* recycle */
+					region->_allocateData.setSpine(NULL);
+					region->getSubSpace()->recycleRegion(env, region);
+				}
 			}
 		}
 	}
@@ -5813,4 +5821,35 @@ MM_CopyForwardScheme::abandonTLHRemainders(MM_EnvironmentVLHGC *env)
 			copyForwardCompactGroup->discardTLHRemainder(env);
 		}
 	}
+}
+
+/**
+ * callback used when about to recycle ArrayletLeafRegions
+ *
+ * @param[in] entry The entry to free
+ * @param[in] userData Data that can be passed along, RecycleArrayletLeafRegionsData
+ */
+UDATA
+MM_CopyForwardScheme::recycleArrayletLeafRegionsFn(void *entry, void *userData)
+{
+	RecycleArrayletLeafRegionsData *data = (RecycleArrayletLeafRegionsData *) userData;
+	MM_SparseDataTableEntry *sparseDataEntry = (MM_SparseDataTableEntry *)entry;
+
+	J9Object *spineObject = (J9Object *)sparseDataEntry->_proxyObjPtr;
+	if (!data->copyForwardScheme->isLiveObject(spineObject)) {
+		uintptr_t dataSize = sparseDataEntry->_size;
+		const uintptr_t arrayletLeafSize = data->env->getOmrVM()->_arrayletLeafSize;
+		uintptr_t arrayletLeafCount = MM_Math::roundToCeiling(arrayletLeafSize, dataSize) / arrayletLeafSize;
+
+		GC_HeapRegionIteratorVLHGC regionIterator(data->copyForwardScheme->_regionManager);
+		MM_HeapRegionDescriptorVLHGC *region = NULL;
+		while ((arrayletLeafCount > 0) && (NULL != (region = regionIterator.nextRegion()))) {
+			if (region->isArrayletLeaf()) {
+				region->getSubSpace()->recycleRegion(data->env, region);
+				arrayletLeafCount -= 1;
+			}
+		}
+		Assert_MM_true(0 == arrayletLeafCount);
+	}
+	return JNI_OK;
 }
