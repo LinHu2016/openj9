@@ -183,6 +183,7 @@ MM_AllocationContextBalanced::allocateTLH(MM_EnvironmentBase *env, MM_AllocateDe
 		result = lockedReplenishAndAllocate(env, objectAllocationInterface, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_TLH);
 	}
 	unlockCommon();
+
 	/* if that still fails, try to invoke the collector */
 	if (shouldCollectOnFailure && (NULL == result)) {
 		result = _subspace->replenishAllocationContextFailed(env, _subspace, this, objectAllocationInterface, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_TLH);
@@ -256,6 +257,7 @@ MM_AllocationContextBalanced::allocateObject(MM_EnvironmentBase *env, MM_Allocat
 		result = lockedReplenishAndAllocate(env, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_OBJECT);
 	}
 	unlockCommon();
+
 	/* if that still fails, try to invoke the collector */
 	if (shouldCollectOnFailure && (NULL == result)) {
 		result = _subspace->replenishAllocationContextFailed(env, _subspace, this, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_OBJECT);
@@ -321,6 +323,7 @@ MM_AllocationContextBalanced::allocateArrayletLeaf(MM_EnvironmentBase *env, MM_A
 	lockCommon();
 	result = lockedReplenishAndAllocate(env, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_LEAF);
 	unlockCommon();
+
 	/* if that fails, try to invoke the collector */
 	if (shouldCollectOnFailure && (NULL == result)) {
 		result = _subspace->replenishAllocationContextFailed(env, _subspace, this, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_LEAF);
@@ -372,13 +375,37 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 			((MM_AllocationContextBalanced *)spineContext)->lockCommon();
 		}
 
-		leafAllocateData->addToArrayletLeafList(spineRegion);
+		leafAllocateData->addToArrayletLeafList(env, spineRegion);
 
 		if (this != spineContext) {
 			/* The common allocation context is always an instance of AllocationContextBalanced */
 			((MM_AllocationContextBalanced *)spineContext)->unlockCommon();
 		}
 	}
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+	else {
+		/*
+		 * For now, only a single list of reserved regions owned by the common AC is maintained.
+		 * This is a sub-optimal approach, since due to different order of how regions are reserved and released
+		 * (objects don't die in order they are allocated) it may lead to imbalance of how many regions are committed in each AC.
+		 * In future, allocations should remember (somewhere in Off-heap meta structures) how many regions came from each AC
+		 * \and release exact same number back to each AC.
+		 */
+		MM_AllocationContextTarok *commonContext = (MM_AllocationContextTarok *)env->getCommonAllocationContext();
+		if (this != commonContext) {
+			/* The common allocation context is always an instance of AllocationContextBalanced */
+			((MM_AllocationContextBalanced *)commonContext)->lockCommon();
+		}
+
+		leafAllocateData->pushRegionToArrayReservedRegionList(env, ((MM_AllocationContextBalanced *)commonContext)->getArrayReservedRegionListAddress());
+		((MM_AllocationContextBalanced *)commonContext)->incrementArrayReservedRegionCount();
+
+		if (this != commonContext) {
+			/* The common allocation context is always an instance of AllocationContextBalanced */
+			((MM_AllocationContextBalanced *)commonContext)->unlockCommon();
+		}
+	}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	freeRegionForArrayletLeaf->resetAge(env, (U_64)_subspace->getBytesRemainingBeforeTaxation());
 	/* store the base address of the leaf for the memset and the return */
@@ -1074,4 +1101,67 @@ MM_AllocationContextBalanced::setNumaAffinityForThread(MM_EnvironmentBase *env)
 
 	return success;
 }
+
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+bool
+MM_AllocationContextBalanced::needAllocateLeafRegionFraction(MM_EnvironmentBase *env, float fraction)
+{
+	bool ret = false;
+	Assert_MM_true((0 < fraction) && (1.0 > fraction));
+	if (0.0 == _fractionLeafRegion) {
+		_fractionLeafRegion = fraction;
+		ret = true;
+	} else {
+		_fractionLeafRegion += fraction;
+		if (1.0 <= _fractionLeafRegion) {
+			_fractionLeafRegion -= 1.0;
+			ret = true;
+		}
+	}
+	return ret;
+}
+
+bool
+MM_AllocationContextBalanced::needRecycleLeafRegionFraction(MM_EnvironmentBase *env, float fraction)
+{
+	bool ret = false;
+	Assert_MM_true((0 < fraction) && (1.0 > fraction));
+	_fractionLeafRegion -= fraction;
+	if (0.0 >= _fractionLeafRegion) {
+		ret = true;
+		if (0.0 > _fractionLeafRegion) {
+			_fractionLeafRegion += 1.0;
+		}
+	}
+	return ret;
+}
+
+void
+MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock)
+{
+	MM_HeapRegionDescriptorVLHGC **head = getArrayReservedRegionListAddress();
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+
+	if (needLock) {
+		lockCommon();
+	}
+
+	while ((reservedRegionCount > 0) && (NULL != (region = *head))) {
+		region->_allocateData.popRegionFromArrayReservedRegionList(env, head);
+		decrementArrayReservedRegionCount();
+
+		/* Restore/Recommit the reserved region that have been previously decommitted. */
+		 MM_GCExtensions::getExtensions(env)->heap->commitMemory(region->getLowAddress(), _heapRegionManager->getRegionSize());
+
+		region->getSubSpace()->recycleRegion(env, region);
+		reservedRegionCount -= 1;
+	}
+
+	if (needLock) {
+		unlockCommon();
+	}
+
+	Assert_MM_true(0 == reservedRegionCount);
+}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
