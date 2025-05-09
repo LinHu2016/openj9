@@ -59,8 +59,10 @@
 #include "SparseVirtualMemory.hpp"
 #include "SparseAddressOrderedFixedSizeDataPool.hpp"
 #include "SweepHeapSectioningVLHGC.hpp"
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 #include "SweepPoolManagerVLHGC.hpp"
 #include "SweepPoolManagerAddressOrderedList.hpp"
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #include "SweepPoolState.hpp"
 
 
@@ -1007,39 +1009,15 @@ MM_ParallelSweepSchemeVLHGC::recycleFreeRegions(MM_EnvironmentVLHGC *env)
 	/* now, see if we can free up any arraylet leaves due to dead spines */
 	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
-	
-	if (MM_GCExtensions::getExtensions(env)->isVirtualLargeObjectHeapEnabled) {
-		const uintptr_t arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
-		MM_SparseVirtualMemory *largeObjectVirtualMemory = MM_GCExtensions::getExtensions(env)->largeObjectVirtualMemory;
-		uintptr_t arrayletLeafCount = 0;
-		J9HashTableState walkState;
 
-		MM_SparseDataTableEntry *sparseDataEntry = (MM_SparseDataTableEntry *)hashTableStartDo(largeObjectVirtualMemory->getSparseDataPool()->getObjectToSparseDataTable(), &walkState);
-		while (NULL != sparseDataEntry) {
-			J9Object *spineObject = (J9Object *)sparseDataEntry->_proxyObjPtr;
+	while(NULL != (region = regionIterator.nextRegion())) {
+		/* Region must be marked for sweep */
+		if (!region->_sweepData._alreadySwept && region->hasValidMarkMap()) {
+			MM_MemoryPool *regionPool = region->getMemoryPool();
+			Assert_MM_true(NULL != regionPool);
 
-			if (!_cycleState._markMap->isBitSet(spineObject)) {
-				/* Arraylet is dead */
-				uintptr_t dataSize = sparseDataEntry->_size;
-				arrayletLeafCount += MM_Math::roundToCeiling(arrayletLeafSize, dataSize) / arrayletLeafSize;
-			}
-			sparseDataEntry = (MM_SparseDataTableEntry *)hashTableNextDo(&walkState);
-		}
-
-		while ((arrayletLeafCount > 0) && (NULL != (region = regionIterator.nextRegion()))) {
-			if (region->isArrayletLeaf()) {
-				region->getSubSpace()->recycleRegion(env, region);
-				arrayletLeafCount -= 1;
-			}
-		}
-		Assert_MM_true(0 == arrayletLeafCount);
-
-	} else {
-		while(NULL != (region = regionIterator.nextRegion())) {
-			/* Region must be marked for sweep */
-			if (!region->_sweepData._alreadySwept && region->hasValidMarkMap()) {
-				MM_MemoryPool *regionPool = region->getMemoryPool();
-				Assert_MM_true(NULL != regionPool);
+			if (!_extensions->isVirtualLargeObjectHeapEnabled) {
+				/* recycling of regions reserved for offheap objects is already done in root clearable phase at the end of GMP. */
 				MM_HeapRegionDescriptorVLHGC *walkRegion = region;
 				MM_HeapRegionDescriptorVLHGC *next = walkRegion->_allocateData.getNextArrayletLeafRegion();
 				/* Try to walk list from this head */
@@ -1060,13 +1038,12 @@ MM_ParallelSweepSchemeVLHGC::recycleFreeRegions(MM_EnvironmentVLHGC *env)
 						walkRegion->getSubSpace()->recycleRegion(env, walkRegion);
 					}
 				}
-
-				/* recycle if empty */
-				if (region->getSize() == regionPool->getActualFreeMemorySize()) {
-					Assert_MM_true(NULL == region->_allocateData.getSpine());
-					Assert_MM_true(NULL == region->_allocateData.getNextArrayletLeafRegion());
-					region->getSubSpace()->recycleRegion(env, region);
-				}
+			}
+			/* recycle if empty */
+			if (region->getSize() == regionPool->getActualFreeMemorySize()) {
+				Assert_MM_true(NULL == region->_allocateData.getSpine());
+				Assert_MM_true(NULL == region->_allocateData.getNextArrayletLeafRegion());
+				region->getSubSpace()->recycleRegion(env, region);
 			}
 		}
 	}

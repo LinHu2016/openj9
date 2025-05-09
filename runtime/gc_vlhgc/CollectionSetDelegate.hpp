@@ -75,11 +75,33 @@ public:
 
 	protected:
 	private:
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+		float _fractionReservedRegion; /**< for calculating fraction of Reserved Regions */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	public:
 		RegionReclaimableStats() {};
 
 		void reset() { memset(this, 0, sizeof(RegionReclaimableStats)); }
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+		void resetFractionReservedRegion() { _fractionReservedRegion = 0.0; }
+
+		bool calculateFractionReservedRegion(float fraction)
+		{
+			bool ret = false;
+			if (0.0 == _fractionReservedRegion) {
+				_fractionReservedRegion = fraction;
+				ret = true;
+			} else {
+				_fractionReservedRegion += fraction;
+				if (1.0 <= _fractionReservedRegion) {
+					_fractionReservedRegion -= 1.0;
+					ret = true;
+				}
+			}
+			return ret;
+		}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	protected:
 	private:
