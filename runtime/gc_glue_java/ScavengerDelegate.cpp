@@ -344,6 +344,10 @@ void
 MM_ScavengerDelegate::doContinuationSlot(MM_EnvironmentStandard *env, omrobjectptr_t *slotPtr, MM_ScavengeScanReason reason, bool *shouldRemember, GC_ContinuationSlotIterator *continuationSlotIterator)
 {
 	if (_extensions->scavenger->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
+//		if (GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState()) {
+//			PORT_ACCESS_FROM_ENV(env);
+//			j9tty_printf(PORTLIB, "MM_ScavengerDelegate::doContinuationSlot slotPtr=%p, monitorObject=%p\n", slotPtr, *slotPtr);
+//		}
 		doSlot(env, slotPtr, reason, shouldRemember);
 	} else if (NULL != *slotPtr) {
 		Assert_MM_true(GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState());

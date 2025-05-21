@@ -785,9 +785,9 @@ detachMonitorInfo(J9VMThread *currentThread, j9object_t lockObject)
 
 	J9ThreadAbstractMonitor *monitor = (J9ThreadAbstractMonitor *)objectMonitor->monitor;
 	Trc_VM_detachMonitorInfo_Detach(currentThread, currentThread->currentContinuation, objectMonitor, monitor, monitor->owner, monitor->count, currentThread->osThread);
-	monitor->owner = (J9Thread *)J9_OBJECT_MONITOR_OWNER_DETACHED;
-	Assert_VM_notNull(currentThread->currentContinuation);
 	objectMonitor->ownerContinuation = currentThread->currentContinuation;
+	Assert_VM_notNull(currentThread->currentContinuation);
+	monitor->owner = (J9Thread *)J9_OBJECT_MONITOR_OWNER_DETACHED;
 
 	return objectMonitor;
 }
@@ -896,7 +896,7 @@ preparePinnedVirtualThreadForMount(J9VMThread *currentThread, j9object_t continu
 {
 	UDATA monitorCount = 0;
 
-	if (currentThread->ownedMonitorCount > 0) {
+	if (currentThread->ownedMonitorCount >= 0) {
 		/* Update all owned monitors. */
 		J9ObjectMonitor *head = currentThread->currentContinuation->enteredMonitors;
 		while (NULL != head) {

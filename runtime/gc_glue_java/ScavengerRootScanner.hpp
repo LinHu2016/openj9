@@ -133,6 +133,10 @@ public:
 	doVMThreadSlot(omrobjectptr_t *slotPtr, GC_VMThreadIterator *vmThreadIterator)
 	{
 		MM_EnvironmentStandard *envStandard = MM_EnvironmentStandard::getEnvironment(_env);
+//		if (vmthreaditerator_state_monitor_records == vmThreadIterator->getState()) {
+//			PORT_ACCESS_FROM_JAVAVM(_javaVM);
+//			j9tty_printf(PORTLIB, "MM_ScavengerRootScanner::doVMThreadSlot slotPtr=%p, monitorObject=%p, isHeapObject=%zu\n", slotPtr, *slotPtr, _scavenger->isHeapObject(*slotPtr));
+//		}
 		if (_scavenger->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
 			_scavenger->copyAndForwardThreadSlot(envStandard, slotPtr);
 		} else if (NULL != *slotPtr) {

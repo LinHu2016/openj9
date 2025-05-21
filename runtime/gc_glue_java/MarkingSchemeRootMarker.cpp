@@ -70,6 +70,10 @@ void
 MM_MarkingSchemeRootMarker::doVMThreadSlot(omrobjectptr_t *slotPtr, GC_VMThreadIterator *vmThreadIterator)
 {
 	omrobjectptr_t object = *slotPtr;
+	if (vmthreaditerator_state_monitor_records == vmThreadIterator->getState()) {
+		PORT_ACCESS_FROM_JAVAVM(_javaVM);
+		j9tty_printf(PORTLIB, "MM_MarkingSchemeRootMarker::doVMThreadSlot slotPtr=%p, monitorObject=%p, isHeapObject=%zu\n", slotPtr, object, _markingScheme->isHeapObject(object));
+	}
 	if (_markingScheme->isHeapObject(object) && !_extensions->heap->objectIsInGap(object)) {
 		doSlot(slotPtr);
 	} else if (NULL != object) {

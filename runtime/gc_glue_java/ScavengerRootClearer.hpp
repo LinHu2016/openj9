@@ -206,11 +206,15 @@ public:
 		omrobjectptr_t objectPtr = (omrobjectptr_t )monitor->userData;
 		_env->getGCEnvironment()->_scavengerJavaStats._monitorReferenceCandidates += 1;
 		
+//		PORT_ACCESS_FROM_JAVAVM(_javaVM);
+//		j9tty_printf(PORTLIB, "MM_ScavengerRootClearer::doMonitorReference monitor=%p, objectMonitor=%p, objectPtr=%p\n", monitor, objectMonitor, objectPtr);
+
 		if (_scavenger->isObjectInEvacuateMemory(objectPtr)) {
 			MM_ForwardedHeader forwardedHeader(objectPtr, compressed);
 			omrobjectptr_t forwardPtr = forwardedHeader.getForwardedObject();
 			if (NULL != forwardPtr) {
 				monitor->userData = (uintptr_t)forwardPtr;
+//				j9tty_printf(PORTLIB, "forwarded forwardPtr=%p, objectPtr=%p\n", forwardPtr, objectPtr);
 			} else {
 				_env->getGCEnvironment()->_scavengerJavaStats._monitorReferenceCleared += 1;
 				monitorReferenceIterator->removeSlot();
@@ -218,6 +222,7 @@ public:
 				 * monitor is not internal to the GC
 				 */
 				_javaVM->internalVMFunctions->objectMonitorDestroy(_javaVM, (J9VMThread *)_env->getLanguageVMThread(), (omrthread_monitor_t)monitor);
+//				j9tty_printf(PORTLIB, "objectMonitorDestroy monitor=%p, objectPtr=%p, J9VMThread=%p\n", monitor, objectPtr, _env->getLanguageVMThread());
 			}
 		}
 	}

@@ -389,11 +389,16 @@ MM_MarkingSchemeRootClearer::doMonitorReference(J9ObjectMonitor *objectMonitor, 
 	J9ThreadAbstractMonitor *monitor = (J9ThreadAbstractMonitor*)objectMonitor->monitor;
 	_env->getGCEnvironment()->_markJavaStats._monitorReferenceCandidates += 1;
 
+	PORT_ACCESS_FROM_JAVAVM(_javaVM);
+	j9tty_printf(PORTLIB, "MM_MarkingSchemeRootClearer::doMonitorReference objectMonitor=%p, monitor=%p, monitor->userData=%p, monitor->owner=%p\n",
+			objectMonitor, monitor, monitor->userData, monitor->owner);
+
 	if (!_markingScheme->isMarked((omrobjectptr_t )monitor->userData)) {
 		monitorReferenceIterator->removeSlot();
 		_env->getGCEnvironment()->_markJavaStats._monitorReferenceCleared += 1;
 		/* We must call objectMonitorDestroy (as opposed to omrthread_monitor_destroy) when the
 		 * monitor is not internal to the GC */
+		j9tty_printf(PORTLIB, "objectMonitorDestroy monitor=%p, monitor->userData=%p, J9VMThread=%p\n", monitor, monitor->userData, _env->getLanguageVMThread());
 		_javaVM->internalVMFunctions->objectMonitorDestroy(_javaVM, (J9VMThread *)_env->getLanguageVMThread(), (omrthread_monitor_t)monitor);
 	}
 }

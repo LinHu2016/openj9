@@ -24,6 +24,7 @@
 #include "j9consts.h"
 #include "j9protos.h"
 #include "ut_j9vm.h"
+#include "j9port.h"
 #include "j9protos.h"
 #include "j9consts.h"
 #include "vm_internal.h"
@@ -226,6 +227,31 @@ restart:
 		objectMonitor = J9_INFLLOCK_OBJECT_MONITOR(lock);
 		monitor = (J9ThreadAbstractMonitor *)objectMonitor->monitor;
 		Assert_VM_notNull(monitor);
+		if (IS_J9_OBJECT_MONITOR_OWNER_DETACHED(monitor->owner)) {
+			PORT_ACCESS_FROM_JAVAVM(vmStruct->javaVM);
+			j9tty_printf(PORTLIB, "objectMonitorExit vmStruct: %p, object: %p, monitor=%p, objectMonitor: %p, objectMonitor->ownerContinuation: %p, owner = 0x1, lock: %p, LN_HAS_LOCKWORD: %zu, monitorTableAt(vmStruct, object)=%p\n",
+					vmStruct, object, monitor, objectMonitor, objectMonitor->ownerContinuation, lock, LN_HAS_LOCKWORD(vmStruct, object), monitorTableAt(vmStruct, object));
+
+			J9MonitorTableListEntry *monitorTableList = vmStruct->javaVM->monitorTableList;
+			J9ObjectMonitor *objectMonitor1 = NULL;
+			J9ThreadAbstractMonitor *monitor1 = NULL;
+			while (NULL != monitorTableList) {
+				J9HashTable *table = monitorTableList->monitorTable;
+				j9tty_printf(PORTLIB, "objectMonitorExit table=%p\n", table);
+				if (NULL != table) {
+					J9HashTableState walkState;
+					objectMonitor1 = (J9ObjectMonitor *)hashTableStartDo(table, &walkState);
+					while (NULL != objectMonitor1)  {
+						monitor1 = (J9ThreadAbstractMonitor *)objectMonitor1->monitor;
+						j9tty_printf(PORTLIB, "objectMonitorExit objectMonitor1=%p, objectMonitor1->monitor=%p, monitor->owner=%p, objectMonitor1->ownerContinuation=%p\n",
+								objectMonitor1, monitor1, monitor1->owner, objectMonitor1->ownerContinuation);
+						objectMonitor1 = (J9ObjectMonitor *)hashTableNextDo(&walkState);
+					}
+				}
+				monitorTableList = monitorTableList->next;
+			}
+
+		}
 		Assert_VM_false(IS_J9_OBJECT_MONITOR_OWNER_DETACHED(monitor->owner));
 
 #ifdef OMR_THR_ADAPTIVE_SPIN
