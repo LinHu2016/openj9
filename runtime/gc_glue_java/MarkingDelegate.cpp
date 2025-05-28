@@ -255,10 +255,10 @@ void
 MM_MarkingDelegate::doContinuationSlot(MM_EnvironmentBase *env, omrobjectptr_t *slotPtr, GC_ContinuationSlotIterator *continuationSlotIterator)
 {
 	if (_markingScheme->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
-		if (GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState()) {
-			PORT_ACCESS_FROM_ENV(env);
-			j9tty_printf(PORTLIB, "MM_MarkingDelegate::doContinuationSlot slotPtr=%p, monitorObject=%p\n", slotPtr, *slotPtr);
-		}
+//		if (GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState()) {
+//			PORT_ACCESS_FROM_ENV(env);
+//			j9tty_printf(PORTLIB, "MM_MarkingDelegate::doContinuationSlot slotPtr=%p, monitorObject=%p\n", slotPtr, *slotPtr);
+//		}
 		doSlot(env, slotPtr);
 	} else if (NULL != *slotPtr) {
 		Assert_MM_true(GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState());
@@ -300,7 +300,8 @@ MM_MarkingDelegate::scanContinuationNativeSlotsNoSync(MM_EnvironmentBase *env, J
 #if JAVA_SPEC_VERSION >= 24
 	GC_ContinuationSlotIterator continuationSlotIterator(currentThread, continuation);
 
-	while (J9Object **slotPtr = continuationSlotIterator.nextSlot()) {
+	J9Object **slotPtr = NULL;
+	while (NULL != (slotPtr = continuationSlotIterator.nextSlot())) {
 		doContinuationSlot(env, slotPtr, &continuationSlotIterator);
 	}
 #endif /* JAVA_SPEC_VERSION >= 24 */
