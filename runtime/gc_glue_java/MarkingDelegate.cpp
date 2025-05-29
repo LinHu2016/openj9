@@ -257,6 +257,7 @@ MM_MarkingDelegate::doContinuationSlot(MM_EnvironmentBase *env, omrobjectptr_t *
 	if (_markingScheme->isHeapObject(*slotPtr) && !_extensions->heap->objectIsInGap(*slotPtr)) {
 //		if (GC_ContinuationSlotIterator::state_monitor_records == continuationSlotIterator->getState()) {
 //			PORT_ACCESS_FROM_ENV(env);
+//			printf("%p\n", PORTLIB);
 //			j9tty_printf(PORTLIB, "MM_MarkingDelegate::doContinuationSlot slotPtr=%p, monitorObject=%p\n", slotPtr, *slotPtr);
 //		}
 		doSlot(env, slotPtr);

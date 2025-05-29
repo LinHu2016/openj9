@@ -229,8 +229,8 @@ restart:
 		Assert_VM_notNull(monitor);
 		if (IS_J9_OBJECT_MONITOR_OWNER_DETACHED(monitor->owner)) {
 			PORT_ACCESS_FROM_JAVAVM(vmStruct->javaVM);
-			j9tty_printf(PORTLIB, "objectMonitorExit vmStruct: %p, object: %p, monitor=%p, objectMonitor: %p, objectMonitor->ownerContinuation: %p, owner = 0x1, lock: %p, LN_HAS_LOCKWORD: %zu, monitorTableAt(vmStruct, object)=%p\n",
-					vmStruct, object, monitor, objectMonitor, objectMonitor->ownerContinuation, lock, LN_HAS_LOCKWORD(vmStruct, object), monitorTableAt(vmStruct, object));
+			j9tty_printf(PORTLIB, "objectMonitorExit vmStruct: %p, object: %p, monitor=%p, objectMonitor: %p, objectMonitor->ownerContinuation: %p, owner = 0x1, lock: %p, LN_HAS_LOCKWORD: %zu, monitorTableAt(vmStruct, object)=%p, monitor->count=%zu, monitor->pinCount=%zu\n",
+					vmStruct, object, monitor, objectMonitor, objectMonitor->ownerContinuation, lock, LN_HAS_LOCKWORD(vmStruct, object), monitorTableAt(vmStruct, object), monitor->count, monitor->pinCount);
 
 			J9MonitorTableListEntry *monitorTableList = vmStruct->javaVM->monitorTableList;
 			J9ObjectMonitor *objectMonitor1 = NULL;
@@ -243,14 +243,20 @@ restart:
 					objectMonitor1 = (J9ObjectMonitor *)hashTableStartDo(table, &walkState);
 					while (NULL != objectMonitor1)  {
 						monitor1 = (J9ThreadAbstractMonitor *)objectMonitor1->monitor;
-						j9tty_printf(PORTLIB, "objectMonitorExit objectMonitor1=%p, objectMonitor1->monitor=%p, monitor->owner=%p, objectMonitor1->ownerContinuation=%p\n",
-								objectMonitor1, monitor1, monitor1->owner, objectMonitor1->ownerContinuation);
+						j9tty_printf(PORTLIB, "objectMonitorExit objectMonitor1=%p, objectMonitor1->monitor=%p, monitor->owner=%p, objectMonitor1->ownerContinuation=%p, monitor->count=%zu, monitor->pinCount=%zu\n",
+								objectMonitor1, monitor1, monitor1->owner, objectMonitor1->ownerContinuation, monitor->count, monitor->pinCount);
 						objectMonitor1 = (J9ObjectMonitor *)hashTableNextDo(&walkState);
 					}
 				}
 				monitorTableList = monitorTableList->next;
 			}
 
+		} else if (monitor->owner != vmStruct->osThread) {
+			PORT_ACCESS_FROM_JAVAVM(vmStruct->javaVM);
+			j9tty_printf(PORTLIB, "objectMonitorExit (owner != osThread)?=%zu vmStruct: %p, object: %p, monitor=%p, monitor->count=%zu, monitor->pinCount=%zu, owner = %p, objectMonitor: %p, objectMonitor->ownerContinuation: %p, vmStruct->osThread=%p\n",
+					(monitor->owner != vmStruct->osThread), vmStruct, object, monitor, monitor->count, monitor->pinCount, monitor->owner, objectMonitor, objectMonitor->ownerContinuation, vmStruct->osThread);
+
+			Assert_VM_true(monitor->owner == vmStruct->osThread);
 		}
 		Assert_VM_false(IS_J9_OBJECT_MONITOR_OWNER_DETACHED(monitor->owner));
 
