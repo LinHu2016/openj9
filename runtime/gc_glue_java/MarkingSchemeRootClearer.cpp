@@ -390,8 +390,8 @@ MM_MarkingSchemeRootClearer::doMonitorReference(J9ObjectMonitor *objectMonitor, 
 	_env->getGCEnvironment()->_markJavaStats._monitorReferenceCandidates += 1;
 
 	PORT_ACCESS_FROM_JAVAVM(_javaVM);
-	j9tty_printf(PORTLIB, "MM_MarkingSchemeRootClearer::doMonitorReference objectMonitor=%p, objectMonitor->ownerContinuation=%p, monitor=%p, monitor->userData=%p, monitor->owner=%p, monitor->count=%zu, monitor->pinCount=%zu\n",
-			objectMonitor, objectMonitor->ownerContinuation, monitor, monitor->userData, monitor->owner, monitor->count, monitor->pinCount);
+	j9tty_printf(PORTLIB, "MM_MarkingSchemeRootClearer::doMonitorReference objectMonitor=%p, objectMonitor->ownerContinuation=%p, monitor=%p, monitor->userData=%p, monitor->owner=%p, monitor->count=%d, monitor->pinCount=%zu\n",
+			objectMonitor, objectMonitor->ownerContinuation, monitor, monitor->userData, monitor->owner, (IDATA)monitor->count, monitor->pinCount);
 
 	if (!_markingScheme->isMarked((omrobjectptr_t )monitor->userData)) {
 		monitorReferenceIterator->removeSlot();

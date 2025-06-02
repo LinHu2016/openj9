@@ -784,10 +784,17 @@ detachMonitorInfo(J9VMThread *currentThread, j9object_t lockObject)
 	}
 
 	J9ThreadAbstractMonitor *monitor = (J9ThreadAbstractMonitor *)objectMonitor->monitor;
-	Trc_VM_detachMonitorInfo_Detach(currentThread, currentThread->currentContinuation, objectMonitor, monitor, monitor->owner, monitor->count, currentThread->osThread);
-	objectMonitor->ownerContinuation = currentThread->currentContinuation;
-	Assert_VM_notNull(currentThread->currentContinuation);
-	monitor->owner = (J9Thread *)J9_OBJECT_MONITOR_OWNER_DETACHED;
+
+	/* Check if monitor is already detached. */
+	if (IS_J9_OBJECT_MONITOR_OWNER_DETACHED(monitor->owner)) {
+		Assert_VM_true(objectMonitor->ownerContinuation == currentThread->currentContinuation);
+		objectMonitor = (J9ObjectMonitor *)J9_OBJECT_MONITOR_OWNER_DETACHED;
+	} else {
+		Trc_VM_detachMonitorInfo_Detach(currentThread, currentThread->currentContinuation, objectMonitor, monitor, monitor->owner, monitor->count, currentThread->osThread);
+		monitor->owner = (J9Thread *)J9_OBJECT_MONITOR_OWNER_DETACHED;
+		Assert_VM_notNull(currentThread->currentContinuation);
+		objectMonitor->ownerContinuation = currentThread->currentContinuation;
+	}
 
 	return objectMonitor;
 }
@@ -826,10 +833,13 @@ walkFrameMonitorEnterRecords(J9VMThread *currentThread, J9StackWalkState *walkSt
 			J9ObjectMonitor *mon = detachMonitorInfo(currentThread, obj);
 			if (NULL == mon) {
 				return J9_STACKWALK_RC_NO_MEMORY;
+			} else if (IS_J9_OBJECT_MONITOR_OWNER_DETACHED(mon)) {
+				/* Already processed monitor, skip. */
+			} else {
+				mon->next = objMonitorHead;
+				objMonitorHead = mon;
+				monitorCount++;
 			}
-			mon->next = objMonitorHead;
-			objMonitorHead = mon;
-			monitorCount++;
 		}
 		monitorEnterRecords = monitorEnterRecords->next;
 	}
@@ -857,10 +867,13 @@ walkFrameMonitorEnterRecords(J9VMThread *currentThread, J9StackWalkState *walkSt
 			J9ObjectMonitor *mon = detachMonitorInfo(currentThread, syncObject);
 			if (NULL == mon) {
 				return J9_STACKWALK_RC_NO_MEMORY;
+			} else if (IS_J9_OBJECT_MONITOR_OWNER_DETACHED(mon)) {
+				/* Already processed monitor, skip. */
+			} else {
+				mon->next = objMonitorHead;
+				objMonitorHead = mon;
+				monitorCount++;
 			}
-			mon->next = objMonitorHead;
-			objMonitorHead = mon;
-			monitorCount++;
 		}
 	}
 
@@ -909,9 +922,14 @@ preparePinnedVirtualThreadForMount(J9VMThread *currentThread, j9object_t continu
 		currentThread->currentContinuation->enteredMonitors = NULL;
 	}
 	Assert_VM_true(monitorCount <= currentThread->ownedMonitorCount);
-
+	{
+		PORT_ACCESS_FROM_VMC(currentThread);
+		j9tty_printf(PORTLIB, "preparePinnedVirtualThreadForMount currentThread=%p, continuationObject=%p, isObjectWait=%zu currentThread->osThread=%p, currentThread->osThread->lockedmonitorcount=%d, monitorCount=%zu\n",
+			currentThread, continuationObject, isObjectWait, currentThread->osThread, (IDATA)currentThread->osThread->lockedmonitorcount, monitorCount);
+	}
 	/* Add the attached monitor to the carrier thread's lockedmonitorcount. */
-	currentThread->osThread->lockedmonitorcount += monitorCount;
+//	currentThread->osThread->lockedmonitorcount += monitorCount;
+	VM_AtomicSupport::add(&currentThread->osThread->lockedmonitorcount, monitorCount);
 	if (J9VM_CONTINUATION_RETURN_FROM_YIELD != currentThread->currentContinuation->returnState) {
 		VM_VMHelpers::virtualThreadHideFrames(currentThread, JNI_FALSE);
 		exitVThreadTransitionCritical(currentThread, (jobject)&currentThread->threadObject);
@@ -1065,6 +1083,11 @@ restart:
 
 		enteredMonitorsList = (J9ObjectMonitor*)walkState.userData1;
 		monitorCount = (UDATA)walkState.userData4;
+		{
+			PORT_ACCESS_FROM_VMC(currentThread);
+			j9tty_printf(PORTLIB, "Walk all owned monitors and detach from current carrier thread currentThread=%p, currentThread->ownedMonitorCount=%zu currentThread->osThread=%p, monitorCount=%zu\n",
+				currentThread, currentThread->ownedMonitorCount, currentThread->osThread, monitorCount);
+		}
 
 		/* Inflate all owned monitors. */
 		/* Repeat for JNI monitor records. */
@@ -1085,6 +1108,11 @@ restart:
 			monitorRecords = monitorRecords->next;
 		}
 		continuation->enteredMonitors = enteredMonitorsList;
+		{
+			PORT_ACCESS_FROM_VMC(currentThread);
+			j9tty_printf(PORTLIB, "Repeat for JNI monitor records currentThread=%p, currentThread->jniMonitorEnterRecords=%p currentThread->osThread=%p, monitorCount=%zu\n",
+				currentThread, currentThread->jniMonitorEnterRecords, currentThread->osThread, monitorCount);
+		}
 	}
 	Assert_VM_true(monitorCount <= currentThread->ownedMonitorCount);
 
@@ -1120,9 +1148,15 @@ restart:
 			}
 		}
 	}
-
+	{
+		PORT_ACCESS_FROM_VMC(currentThread);
+		j9tty_printf(PORTLIB, "preparePinnedVirtualThreadForUnmount currentThread=%p, syncObj=%p, isObjectWait=%zu currentThread->osThread=%p, currentThread->osThread->lockedmonitorcount=%d, monitorCount=%zu\n",
+			currentThread, syncObj, isObjectWait, currentThread->osThread, (IDATA)currentThread->osThread->lockedmonitorcount, monitorCount);
+	}
 	/* Subtract the detached monitors from the carrier thread's lockedmonitorcount. */
-	currentThread->osThread->lockedmonitorcount -= monitorCount;
+//	currentThread->osThread->lockedmonitorcount -= monitorCount;
+	VM_AtomicSupport::subtract(&currentThread->osThread->lockedmonitorcount, monitorCount);
+
 
 done:
 	if (NULL != syncObj) {
