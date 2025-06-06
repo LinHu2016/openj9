@@ -273,8 +273,9 @@ private:
 	 * This is typically the same as GCExtensions->tarokeEdenSize, but may be smaller if 
 	 * insufficient memory is available
 	 * @param env[in] the main GC thread
+	 * @param allowTotalHeapResize[in] counting maxHeapExpansionRegions for adjuesting eden size,default is false
 	 */
-	void calculateEdenSize(MM_EnvironmentVLHGC *env);
+	void calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTotalHeapResize = false);
 
 	/**
 	 * Compute what the ideal eden size should be, and return by how many regions eden should change
