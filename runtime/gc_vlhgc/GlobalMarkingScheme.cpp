@@ -1416,16 +1416,21 @@ private:
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
+		const uintptr_t arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
+		uintptr_t dataSize = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr);
+		uintptr_t arrayletLeafCount = MM_Math::roundToCeiling(arrayletLeafSize, dataSize) / arrayletLeafSize;
+
 		env->_markVLHGCStats._offHeapRegionCandidates += 1;
 		if (!_markingScheme->isMarked(objectPtr)) {
 			env->_markVLHGCStats._offHeapRegionsCleared += 1;
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 			if (NULL != dataAddr) {
-				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr));
+				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize);
 
 				PORT_ACCESS_FROM_ENVIRONMENT(env);
-				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap-global freeSparseRegionAndUnmapFromHeapObject objectPtr=%p, byteAmount=%zu\n", objectPtr, _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr));
+				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap-global freeSparseRegionAndUnmapFromHeapObject objectPtr=%p, byteAmount=%zu\n", objectPtr, dataSize);
 
+				_markingScheme->recycleLeafRegionsForVirtualLargeObjectHeap(env, arrayletLeafCount);
 			}
 		}
 	}
@@ -1868,6 +1873,25 @@ MM_GlobalMarkingScheme::flushBuffers(MM_EnvironmentVLHGC *env)
 	env->_workStack.flush(env);
 	env->getGCEnvironment()->_referenceObjectBuffer->flush(env);
 }
+
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+void
+MM_ParallelSweepSchemeVLHGC::recycleLeafRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t arrayletLeafCount)
+{
+	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+
+	while ((arrayletLeafCount > 0) && (NULL != (region = regionIterator.nextRegion()))) {
+		if (region->isArrayletLeaf()) {
+			if (arrayletLeafCount > 0) {
+				region->getSubSpace()->recycleRegion(env, region);
+				arrayletLeafCount -= 1;
+			}
+		}
+	}
+	Assert_MM_true(0 == arrayletLeafCount);
+}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 
 bool

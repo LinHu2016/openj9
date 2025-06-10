@@ -428,38 +428,55 @@ MM_CopyForwardScheme::clearGCStats(MM_EnvironmentVLHGC *env)
 	static_cast<MM_CycleStateVLHGC *>(env->_cycleState)->_vlhgcIncrementStats._continuationStats.clear();
 }
 
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+void
+MM_CopyForwardScheme::recycleLeafRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t arrayletLeafCount)
+{
+	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
+	MM_HeapRegionDescriptorVLHGC *region = NULL;
+
+	while ((arrayletLeafCount > 0) && (NULL != (region = regionIterator.nextRegion()))) {
+		if (region->isArrayletLeaf()) {
+			region->getSubSpace()->recycleRegion(env, region);
+			arrayletLeafCount -= 1;
+		}
+	}
+	Assert_MM_true(0 == arrayletLeafCount);
+}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
+
 void
 MM_CopyForwardScheme::updateLeafRegions(MM_EnvironmentVLHGC *env)
 {
 	GC_HeapRegionIteratorVLHGC regionIterator(_regionManager);
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 
-#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	if (_extensions->isVirtualLargeObjectHeapEnabled) {
-		const uintptr_t arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
-		MM_SparseVirtualMemory *largeObjectVirtualMemory = _extensions->largeObjectVirtualMemory;
-		uintptr_t arrayletLeafCount = 0;
-		J9HashTableState walkState;
-
-		MM_SparseDataTableEntry *sparseDataEntry = (MM_SparseDataTableEntry *)hashTableStartDo(largeObjectVirtualMemory->getSparseDataPool()->getObjectToSparseDataTable(), &walkState);
-		while (NULL != sparseDataEntry) {
-			J9Object *spineObject = (J9Object *)sparseDataEntry->_proxyObjPtr;
-			if (!isLiveObject(spineObject)) {
-				Assert_MM_true(isObjectInEvacuateMemory(spineObject));
-				uintptr_t dataSize = sparseDataEntry->_size;
-				arrayletLeafCount += MM_Math::roundToCeiling(arrayletLeafSize, dataSize) / arrayletLeafSize;
-			}
-			sparseDataEntry = (MM_SparseDataTableEntry *)hashTableNextDo(&walkState);
-		}
-		while ((arrayletLeafCount > 0) && (NULL != (region = regionIterator.nextRegion()))) {
-			if (region->isArrayletLeaf()) {
-				region->getSubSpace()->recycleRegion(env, region);
-				arrayletLeafCount -= 1;
-			}
-		}
-		Assert_MM_true(0 == arrayletLeafCount);
-	} else
-#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
+//#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+//	if (_extensions->isVirtualLargeObjectHeapEnabled) {
+//		const uintptr_t arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
+//		MM_SparseVirtualMemory *largeObjectVirtualMemory = _extensions->largeObjectVirtualMemory;
+//		uintptr_t arrayletLeafCount = 0;
+//		J9HashTableState walkState;
+//
+//		MM_SparseDataTableEntry *sparseDataEntry = (MM_SparseDataTableEntry *)hashTableStartDo(largeObjectVirtualMemory->getSparseDataPool()->getObjectToSparseDataTable(), &walkState);
+//		while (NULL != sparseDataEntry) {
+//			J9Object *spineObject = (J9Object *)sparseDataEntry->_proxyObjPtr;
+//			if (!isLiveObject(spineObject)) {
+//				Assert_MM_true(isObjectInEvacuateMemory(spineObject));
+//				uintptr_t dataSize = sparseDataEntry->_size;
+//				arrayletLeafCount += MM_Math::roundToCeiling(arrayletLeafSize, dataSize) / arrayletLeafSize;
+//			}
+//			sparseDataEntry = (MM_SparseDataTableEntry *)hashTableNextDo(&walkState);
+//		}
+//		while ((arrayletLeafCount > 0) && (NULL != (region = regionIterator.nextRegion()))) {
+//			if (region->isArrayletLeaf()) {
+//				region->getSubSpace()->recycleRegion(env, region);
+//				arrayletLeafCount -= 1;
+//			}
+//		}
+//		Assert_MM_true(0 == arrayletLeafCount);
+//	} else
+//#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	{
 		while (NULL != (region = regionIterator.nextRegion())) {
 			if (region->isArrayletLeaf()) {
@@ -1668,7 +1685,9 @@ MM_CopyForwardScheme::copyForwardPostProcess(MM_EnvironmentVLHGC *env)
 	/* Record the completion time of the copy forward cycle */
 	static_cast<MM_CycleStateVLHGC *>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._endTime = j9time_hires_clock();
 
-	updateLeafRegions(env);
+	if (!_extensions->isVirtualLargeObjectHeapEnabled) {
+		updateLeafRegions(env);
+	}
 
 	/* We used memory from the ACs for survivor space - make sure it doesn't hang around as allocation space */
 	clearReservedRegionLists(env);
@@ -4179,7 +4198,12 @@ private:
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
+//	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator)
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
+		const uintptr_t arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
+		uintptr_t dataSize = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr);
+		uintptr_t arrayletLeafCount = MM_Math::roundToCeiling(arrayletLeafSize, dataSize) / arrayletLeafSize;
+
 		env->_copyForwardStats._offHeapRegionCandidates += 1;
 
 		if (!_copyForwardScheme->isLiveObject(objectPtr)) {
@@ -4193,11 +4217,13 @@ private:
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._offHeapRegionsCleared += 1;
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
-				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr));
+				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize);
 
 				PORT_ACCESS_FROM_ENVIRONMENT(env);
-				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap-copyf freeSparseRegionAndUnmapFromHeapObject objectPtr=%p, byteAmount=%zu\n", objectPtr, _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr));
+				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap-copyf freeSparseRegionAndUnmapFromHeapObject objectPtr=%p, byteAmount=%zu\n",
+						objectPtr, dataSize);
 
+				_copyForwardScheme->recycleLeafRegionsForVirtualLargeObjectHeap(env, arrayletLeafCount);
 			} else {
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)fwdOjectPtr);
 				if (NULL != dataAddr) {
