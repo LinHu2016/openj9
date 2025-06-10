@@ -70,6 +70,7 @@
 #include "FinalizeListManager.hpp"
 #include "ForwardedHeader.hpp"
 #include "GlobalAllocationManager.hpp"
+#include "HashTableIterator.hpp"
 #include "Heap.hpp"
 #include "HeapMapIterator.hpp"
 #include "HeapMapWordIterator.hpp"
@@ -4197,8 +4198,7 @@ private:
 	}
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
-//	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator)
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		const uintptr_t arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
 		uintptr_t dataSize = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr);
@@ -4217,7 +4217,7 @@ private:
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._offHeapRegionsCleared += 1;
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
-				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize);
+				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);
 
 				PORT_ACCESS_FROM_ENVIRONMENT(env);
 				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap-copyf freeSparseRegionAndUnmapFromHeapObject objectPtr=%p, byteAmount=%zu\n",

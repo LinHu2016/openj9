@@ -57,6 +57,7 @@
 #include "FinalizeListManager.hpp"
 #endif /* J9VM_GC_FINALIZATION*/
 #include "WriteOnceFixupCardCleaner.hpp"
+#include "HashTableIterator.hpp"
 #include "Heap.hpp"
 #include "HeapLinkedFreeHeader.hpp"
 #include "HeapMapIterator.hpp"
@@ -1728,7 +1729,7 @@ public:
 	}
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator) {
 		J9IndexableObject *fwdOjectPtr = (J9IndexableObject *)_compactScheme->getForwardingPtr(objectPtr);
 		if ((J9IndexableObject *)objectPtr != fwdOjectPtr) {
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous(fwdOjectPtr);

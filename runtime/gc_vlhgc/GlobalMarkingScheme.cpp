@@ -59,6 +59,7 @@
 #include "GlobalMarkCardCleaner.hpp"
 #include "GlobalMarkingScheme.hpp"
 #include "GlobalMarkNoScanCardCleaner.hpp"
+#include "HashTableIterator.hpp"
 #include "Heap.hpp"
 #include "HeapMapIterator.hpp"
 #include "HeapMapWordIterator.hpp"
@@ -1414,7 +1415,7 @@ private:
 	}
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		const uintptr_t arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
 		uintptr_t dataSize = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr);
@@ -1425,7 +1426,7 @@ private:
 			env->_markVLHGCStats._offHeapRegionsCleared += 1;
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 			if (NULL != dataAddr) {
-				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize);
+				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);
 
 				PORT_ACCESS_FROM_ENVIRONMENT(env);
 				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap-global freeSparseRegionAndUnmapFromHeapObject objectPtr=%p, byteAmount=%zu\n", objectPtr, dataSize);
@@ -1876,7 +1877,7 @@ MM_GlobalMarkingScheme::flushBuffers(MM_EnvironmentVLHGC *env)
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 void
-MM_ParallelSweepSchemeVLHGC::recycleLeafRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t arrayletLeafCount)
+MM_GlobalMarkingScheme::recycleLeafRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t arrayletLeafCount)
 {
 	GC_HeapRegionIteratorVLHGC regionIterator(_heapRegionManager);
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
