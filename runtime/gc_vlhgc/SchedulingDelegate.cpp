@@ -154,6 +154,10 @@ MM_SchedulingDelegate::getInitialTaxationThreshold(MM_EnvironmentVLHGC *env)
 	_nextIncrementWillDoPartialGarbageCollection = false;
 	_taxationIndex = 0;
 	_remainingGMPIntermissionIntervals = _extensions->tarokGMPIntermission;
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "getInitialTaxationThreshold calculateEdenSize\n");
+
 	calculateEdenSize(env);
 
 	/* initial value for _averageSurvivorSetRegionCount is arbitrarily chosen as 30% of Eden size (after first Eden is selected) */
@@ -415,6 +419,9 @@ MM_SchedulingDelegate::partialGarbageCollectCompleted(MM_EnvironmentVLHGC *env, 
 
 	/* Check eden size based off of new PGC stats */
 	checkEdenSizeAfterPgc(env, globalSweepHappened);
+
+	j9tty_printf(PORTLIB, "partialGarbageCollectCompleted checkEdenSizeAfterPgc calculateEdenSize\n");
+
 	calculateEdenSize(env);
 	/* Recalculate GMP intermission after (possibly) resizing eden */
 	calculateAutomaticGMPIntermission(env);
@@ -1366,13 +1373,15 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env)
 		maxEdenChange = freeRegions - _edenRegionCount;
 	}
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "calculateEdenSize _edenRegionCount=%zu, freeRegions=%zu, maxEdenChange=%d\n", _edenRegionCount, freeRegions, maxEdenChange);
+
 	if (0 == maxHeapExpansionRegions) {
 		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = 0;
 	} else {
+		intptr_t shrinkDueToNoEnoughFree = maxEdenChange;
 		/* Eden will inform the total heap resizing logic, that it needs to change total heap size in order to maintain same "tenure" size */
-		if (maxEdenChange > maxHeapExpansionRegions) {
-			maxEdenChange = maxHeapExpansionRegions;
-		}
+		maxEdenChange += maxHeapExpansionRegions;
 
 		intptr_t edenChangeWithSurvivorHeadroom = desiredEdenChangeSize;
 
@@ -1383,14 +1392,21 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env)
 			/* If eden is shrinking, only factor adjusting in survivor regions for total heap resizing when eden is not very small.
 			 * Factoring in survivor regions when eden is tiny can lead to some innacuracies, and reduce free non-eden regions, which may impact performance
 			 */
-			edenChangeWithSurvivorHeadroom = desiredEdenChangeSize + (intptr_t)floor(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward));
+//			edenChangeWithSurvivorHeadroom = desiredEdenChangeSize + (intptr_t)floor(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward));
+			edenChangeWithSurvivorHeadroom = desiredEdenChangeSize - (intptr_t)floor(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward));
 		}
-		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxEdenChange, edenChangeWithSurvivorHeadroom);
+
+		j9tty_printf(PORTLIB, "calculateEdenSize maxEdenChange=%d, maxHeapExpansionRegions=%zu, edenChangeWithSurvivorHeadroom=%d, desiredEdenChangeSize=%d, _edenSurvivalRateCopyForward=%f\n",
+				maxEdenChange, maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom, desiredEdenChangeSize, _edenSurvivalRateCopyForward);
+
+		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxEdenChange, edenChangeWithSurvivorHeadroom) - shrinkDueToNoEnoughFree;
 	}
 
 	desiredEdenChangeSize = OMR_MIN(maxEdenChange, desiredEdenChangeSize);
 
 	_edenRegionCount = (uintptr_t)OMR_MAX(0, ((intptr_t)_edenRegionCount + desiredEdenChangeSize));
+
+	j9tty_printf(PORTLIB, "calculateEdenSize _edenRegionCount=%zu, _extensions->globalVLHGCStats._heapSizingData.edenRegionChange=%d, desiredEdenChangeSize=%d\n", _edenRegionCount, _extensions->globalVLHGCStats._heapSizingData.edenRegionChange, desiredEdenChangeSize);
 
 	Trc_MM_SchedulingDelegate_calculateEdenSize_Exit(env->getLanguageVMThread(), (_edenRegionCount * regionSize));
 }
@@ -1696,6 +1712,10 @@ MM_SchedulingDelegate::heapReconfigured(MM_EnvironmentVLHGC *env)
 	Trc_MM_SchedulingDelegate_heapReconfigured_Exit(env->getLanguageVMThread(), _numberOfHeapRegions, _idealEdenRegionCount, _minimumEdenRegionCount);
 	Assert_MM_true(_idealEdenRegionCount >= _minimumEdenRegionCount);
 	
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "heapReconfigured calculateEdenSize\n");
+
+
 	/* recalculate Eden Size after resize heap */
 	calculateEdenSize(env);
 }

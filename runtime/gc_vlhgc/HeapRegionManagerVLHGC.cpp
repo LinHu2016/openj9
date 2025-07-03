@@ -22,6 +22,9 @@
 
 #include "CardTable.hpp"
 #include "GCExtensionsBase.hpp"
+
+#include "GCExtensions.hpp"
+
 #include "MemoryManager.hpp"
 #include "HeapRegionManagerVLHGC.hpp"
 #include "HeapMemorySnapshot.hpp"
@@ -214,5 +217,11 @@ MM_HeapRegionManagerVLHGC::getHeapMemorySnapshot(MM_GCExtensionsBase *extensions
 	snapshot->_totalRegionReservedSize -= (snapshot->_totalRegionEdenSize - allocateEdenTotal);
 	snapshot->_freeRegionEdenSize += (snapshot->_totalRegionEdenSize - allocateEdenTotal);
 	snapshot->_freeRegionReservedSize = snapshot->_totalRegionReservedSize;
+
+	PORT_ACCESS_FROM_JAVAVM(((MM_GCExtensions *)extensions)->getJavaVM());
+	j9tty_printf(PORTLIB, "getHeapMemorySnapshot snapshot->_freeRegionEdenSize=%d, snapshot->_freeRegionReservedSize=%d, snapshot->_totalRegionEdenSize=%d, regionSize=%zu\n",
+		snapshot->_freeRegionEdenSize, snapshot->_freeRegionReservedSize, snapshot->_totalRegionEdenSize, regionSize);
+
+
 	return snapshot;
 }
