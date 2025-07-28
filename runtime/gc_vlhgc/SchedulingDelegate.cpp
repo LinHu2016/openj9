@@ -1691,9 +1691,9 @@ MM_SchedulingDelegate::heapReconfigured(MM_EnvironmentVLHGC *env)
 	
 	/* recalculate Eden Size after resize heap */
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
-	j9tty_printf(PORTLIB, "MM_SchedulingDelegate::heapReconfigured calculateEdenSize recalculate Eden Size after resize heap\n");
+	j9tty_printf(PORTLIB, "MM_SchedulingDelegate::heapReconfigured no recalculate Eden Size after resize heap\n");
 
-	calculateEdenSize(env);
+//	calculateEdenSize(env);
 }
 
 uintptr_t
