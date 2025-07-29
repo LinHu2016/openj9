@@ -422,7 +422,7 @@ MM_SchedulingDelegate::partialGarbageCollectCompleted(MM_EnvironmentVLHGC *env, 
 
 	j9tty_printf(PORTLIB, "MM_SchedulingDelegate::partialGarbageCollectCompleted calculateEdenSize \n");
 
-	calculateEdenSize(env);
+	calculateEdenSize(env, true);
 	/* Recalculate GMP intermission after (possibly) resizing eden */
 	calculateAutomaticGMPIntermission(env);
 	estimateMacroDefragmentationWork(env);
@@ -1329,7 +1329,7 @@ MM_SchedulingDelegate::updateSurvivalRatesAfterCopyForward(double thisEdenSurviv
 }
 
 void 
-MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env)
+MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTotalHeapResize)
 {
 	uintptr_t regionSize = _regionManager->getRegionSize();
 	uintptr_t previousEdenSize = _edenRegionCount * regionSize;
@@ -1358,28 +1358,32 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env)
 
 	Trc_MM_SchedulingDelegate_calculateEdenSize_dynamic(env->getLanguageVMThread(), desiredEdenCount, _edenSurvivalRateCopyForward, _nonEdenSurvivalCountCopyForward, freeRegions, edenMinimumCount, edenMaximumCount);
 
-	/* Make sure that the total heap can expand enough to satisfy the desired change in eden size
-	 * If heap is fully expanded (or close to) make sure that there are enough free regions to satisfy given eden size change
-	 */
-	/* Proportionally adjust survivor area. */
-	intptr_t edenChangeWithSurvivorHeadroom = desiredEdenChangeSize + (intptr_t)ceil(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward));
-
-	PORT_ACCESS_FROM_ENVIRONMENT(env);
-	j9tty_printf(PORTLIB, "calculateEdenSize edenChangeWithSurvivorHeadroom=%d, desiredEdenChangeSize=%d, SurvivorHeadroom=%d, maxHeapExpansionRegions=%d, _edenRegionCount - freeRegions=%d, _edenRegionCount=%zu, freeRegions=%zu\n",
-			edenChangeWithSurvivorHeadroom, desiredEdenChangeSize, (intptr_t)ceil(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward)), maxHeapExpansionRegions, (intptr_t)(_edenRegionCount - freeRegions), _edenRegionCount, freeRegions);
-
-	/* Inform the total heap resizing logic, that it needs to change total heap size in order to maintain same "tenure" size. */
-	if (freeRegions > _edenRegionCount) {
-		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom);
-	} else {
-		 /* PGC has not recovered enough regions to accommodate even for the current Eden size.
-		  * So, lets expand heap by that deficit (capped to the maximum that heap expansion allows), plus whatever the new Eden size requires)
-		  */
-		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom + (intptr_t)(_edenRegionCount - freeRegions));
-	}
-
 	/* Eden size can not be bigger than free region size. */
-	intptr_t maxEdenChange = freeRegions - _edenRegionCount + maxHeapExpansionRegions;
+	intptr_t maxEdenChange = freeRegions - _edenRegionCount;
+	if (allowTotalHeapResize) {
+
+		/* Make sure that the total heap can expand enough to satisfy the desired change in eden size
+		 * If heap is fully expanded (or close to) make sure that there are enough free regions to satisfy given eden size change
+		 */
+		/* Proportionally adjust survivor area. */
+		intptr_t edenChangeWithSurvivorHeadroom = desiredEdenChangeSize + (intptr_t)ceil(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward));
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "calculateEdenSize edenChangeWithSurvivorHeadroom=%d, desiredEdenChangeSize=%d, SurvivorHeadroom=%d, maxHeapExpansionRegions=%d, _edenRegionCount - freeRegions=%d, _edenRegionCount=%zu, freeRegions=%zu\n",
+				edenChangeWithSurvivorHeadroom, desiredEdenChangeSize, (intptr_t)ceil(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward)), maxHeapExpansionRegions, (intptr_t)(_edenRegionCount - freeRegions), _edenRegionCount, freeRegions);
+
+		/* Inform the total heap resizing logic, that it needs to change total heap size in order to maintain same "tenure" size. */
+		if (freeRegions > _edenRegionCount) {
+			_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom);
+		} else {
+			 /* PGC has not recovered enough regions to accommodate even for the current Eden size.
+			  * So, lets expand heap by that deficit (capped to the maximum that heap expansion allows), plus whatever the new Eden size requires)
+			  */
+			_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom + (intptr_t)(_edenRegionCount - freeRegions));
+		}
+
+		maxEdenChange += maxHeapExpansionRegions;
+	}
 
 	desiredEdenChangeSize = OMR_MIN(maxEdenChange, desiredEdenChangeSize);
 	Assert_MM_true(0 <= ((intptr_t)_edenRegionCount + desiredEdenChangeSize));
@@ -1693,7 +1697,7 @@ MM_SchedulingDelegate::heapReconfigured(MM_EnvironmentVLHGC *env)
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
 	j9tty_printf(PORTLIB, "MM_SchedulingDelegate::heapReconfigured no recalculate Eden Size after resize heap\n");
 
-//	calculateEdenSize(env);
+	calculateEdenSize(env);
 }
 
 uintptr_t

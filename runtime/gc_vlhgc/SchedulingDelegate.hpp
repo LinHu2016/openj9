@@ -274,7 +274,7 @@ private:
 	 * insufficient memory is available
 	 * @param env[in] the main GC thread
 	 */
-	void calculateEdenSize(MM_EnvironmentVLHGC *env);
+	void calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTotalHeapResize = false);
 
 	/**
 	 * Compute what the ideal eden size should be, and return by how many regions eden should change
