@@ -4173,16 +4173,23 @@ private:
 
 				uintptr_t reservedRegionCount = dataSize / regionSize;
 				float fraction = (float)(dataSize % regionSize)/(float)regionSize;
-				if ((0 != fraction) && ((MM_AllocationContextBalanced *)env->_objectAllocationInterface)->needRecycleLeafRegionFraction(env, fraction)) {
+
+				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+				if ((0 != fraction) && commonContext->needRecycleLeafRegionFraction(env, fraction)) {
+//				if ((0 != fraction) && ((MM_AllocationContextBalanced *)env->_objectAllocationInterface)->needRecycleLeafRegionFraction(env, fraction)) {
 					reservedRegionCount += 1;
 				}
+
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "MM_CopyForwardSchemeRootClearer::doObjectInVirtualLargeObjectHeap reservedRegionCount=%zu, fraction=%f, dataSize=%zu, regionSize=%zu\n",
+						reservedRegionCount, fraction, dataSize, regionSize);
 
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._offHeapRegionsCleared += 1;
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);
 				/* recycleLeafRegions for off-heap case */
-				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+//				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
 				commonContext->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
 			} else {
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)fwdOjectPtr);
