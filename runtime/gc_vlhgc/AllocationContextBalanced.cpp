@@ -1108,6 +1108,7 @@ MM_AllocationContextBalanced::needAllocateLeafRegionFraction(MM_EnvironmentBase 
 {
 	bool ret = false;
 	Assert_MM_true((0 < fraction) && (1.0 > fraction));
+	lockCommon();
 	if (0.0 == _fractionLeafRegion) {
 		_fractionLeafRegion = fraction;
 		ret = true;
@@ -1118,6 +1119,7 @@ MM_AllocationContextBalanced::needAllocateLeafRegionFraction(MM_EnvironmentBase 
 			ret = true;
 		}
 	}
+	unlockCommon();
 	return ret;
 }
 
@@ -1126,6 +1128,7 @@ MM_AllocationContextBalanced::needRecycleLeafRegionFraction(MM_EnvironmentBase *
 {
 	bool ret = false;
 	Assert_MM_true((0 < fraction) && (1.0 > fraction));
+	lockCommon();
 	_fractionLeafRegion -= fraction;
 	if (0.0 >= _fractionLeafRegion) {
 		ret = true;
@@ -1133,6 +1136,7 @@ MM_AllocationContextBalanced::needRecycleLeafRegionFraction(MM_EnvironmentBase *
 			_fractionLeafRegion += 1.0;
 		}
 	}
+	unlockCommon();
 	return ret;
 }
 
@@ -1145,6 +1149,9 @@ MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM
 	if (needLock) {
 		lockCommon();
 	}
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "recycleReservedRegionsForVirtualLargeObjectHeap recycleReservedRegionCount=%zu, needLock=%zu, ReservedRegionCount=%d\n", reservedRegionCount, needLock, getArrayReservedRegionCount());
 
 	while ((reservedRegionCount > 0) && (NULL != (region = *head))) {
 		region->_allocateData.popRegionFromArrayReservedRegionList(env, head);

@@ -1431,12 +1431,18 @@ private:
 				uintptr_t dataSize = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr);
 				uintptr_t reservedRegionCount = dataSize / regionSize;
 				float fraction = (float)(dataSize % regionSize)/(float)regionSize;
-				if ((0 != fraction) && ((MM_AllocationContextBalanced *)env->_objectAllocationInterface)->needRecycleLeafRegionFraction(env, fraction)) {
+				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+				if ((0 != fraction) && commonContext->needRecycleLeafRegionFraction(env, fraction)) {
+//				if ((0 != fraction) && ((MM_AllocationContextBalanced *)env->_objectAllocationInterface)->needRecycleLeafRegionFraction(env, fraction)) {
 					reservedRegionCount += 1;
 				}
 
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "MM_GlobalMarkingSchemeRootClearer::doObjectInVirtualLargeObjectHeap reservedRegionCount=%zu, fraction=%f, dataSize=%zu, regionSize=%zu\n",
+						reservedRegionCount, fraction, dataSize, regionSize);
+
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);
-				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+//				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
 				commonContext->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
 			}
 		}
