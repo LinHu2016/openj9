@@ -574,13 +574,13 @@ MM_CollectionSetDelegate::rateOfReturnCalculationBeforeSweep(MM_EnvironmentVLHGC
 				uintptr_t dataSize = sparseDataEntry->_size;
 
 				arrayReservedRegionCount = dataSize / regionSize;
-				float fraction = (float)(dataSize % regionSize) / (float)regionSize;
+				uintptr_t fraction = dataSize % regionSize;
 
 				MM_HeapRegionDescriptorVLHGC *parentRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->regionDescriptorForAddress((void *)spineObject);
 				Assert_MM_true(parentRegion->containsObjects());
 				SetSelectionData *stats = &_setSelectionDataTable[MM_CompactGroupManager::getCompactGroupNumber(env, parentRegion)];
 
-				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(fraction)) {
+				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(regionSize, fraction)) {
 					arrayReservedRegionCount += 1;
 				}
 
@@ -658,13 +658,13 @@ MM_CollectionSetDelegate::rateOfReturnCalculationAfterSweep(MM_EnvironmentVLHGC 
 				uintptr_t dataSize = sparseDataEntry->_size;
 
 				arrayReservedRegionCount = dataSize / regionSize;
-				float fraction = (float) (dataSize % regionSize) / (float)regionSize;
+				uintptr_t fraction = dataSize % regionSize;
 
 				MM_HeapRegionDescriptorVLHGC *parentRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->regionDescriptorForAddress((void *)spineObject);
 				Assert_MM_true(parentRegion->containsObjects());
 				SetSelectionData *stats = &_setSelectionDataTable[MM_CompactGroupManager::getCompactGroupNumber(env, parentRegion)];
 
-				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(fraction)) {
+				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(regionSize, fraction)) {
 					arrayReservedRegionCount += 1;
 				}
 
@@ -700,6 +700,13 @@ MM_CollectionSetDelegate::rateOfReturnCalculationAfterSweep(MM_EnvironmentVLHGC 
 					Assert_MM_true(stats->_reclaimStats._regionCountBefore == stats->_reclaimStats._regionCountAfter);
 				} else {
 					Assert_MM_true(stats->_reclaimStats._regionCountBefore >= stats->_reclaimStats._reclaimableRegionCountBefore);
+
+					if (stats->_reclaimStats._regionCountBefore < stats->_reclaimStats._regionCountAfter) {
+						PORT_ACCESS_FROM_ENVIRONMENT(env);
+						j9tty_printf(PORTLIB, "rateOfReturnCalculationAfterSweep compactGroup=%zu,_regionCountBefore=%zu, _regionCountAfter=%zu\n",
+								compactGroup, stats->_reclaimStats._regionCountBefore, stats->_reclaimStats._regionCountAfter);
+					}
+
 					Assert_MM_true(stats->_reclaimStats._regionCountBefore >= stats->_reclaimStats._regionCountAfter);
 					Assert_MM_true(stats->_reclaimStats._reclaimableRegionCountBefore >= stats->_reclaimStats._reclaimableRegionCountAfter);
 

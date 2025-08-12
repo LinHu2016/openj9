@@ -93,7 +93,7 @@ MM_AllocationContextBalanced::initialize(MM_EnvironmentBase *env)
 
 	_cachedReplenishPoint = this;
 	_heapRegionManager = MM_GCExtensions::getExtensions(env)->heapRegionManager;
-	
+
 	return true;
 }
 
@@ -1104,39 +1104,55 @@ MM_AllocationContextBalanced::setNumaAffinityForThread(MM_EnvironmentBase *env)
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 bool
-MM_AllocationContextBalanced::needAllocateLeafRegionFraction(MM_EnvironmentBase *env, float fraction)
+MM_AllocationContextBalanced::needAllocateReservedRegionFraction(MM_EnvironmentBase *env, uintptr_t fraction)
 {
+	const uintptr_t regionSize = _heapRegionManager->getRegionSize();
+	Assert_MM_true((0 < fraction) && (regionSize > fraction));
+
 	bool ret = false;
-	Assert_MM_true((0 < fraction) && (1.0 > fraction));
-	lockCommon();
-	if (0.0 == _fractionLeafRegion) {
-		_fractionLeafRegion = fraction;
+	fraction = MM_Math::roundToCeiling(J9_GC_MINIMUM_OBJECT_SIZE, fraction);
+
+	if (regionSize == fraction) {
 		ret = true;
 	} else {
-		_fractionLeafRegion += fraction;
-		if (1.0 <= _fractionLeafRegion) {
-			_fractionLeafRegion -= 1.0;
+		lockCommon();
+		if (0 == _fractionReservedRegion) {
+			_fractionReservedRegion = fraction;
 			ret = true;
+		} else {
+			_fractionReservedRegion += fraction;
+			if ((intptr_t)regionSize <= _fractionReservedRegion) {
+				_fractionReservedRegion -= regionSize;
+				ret = true;
+			}
 		}
+		unlockCommon();
 	}
-	unlockCommon();
 	return ret;
 }
 
 bool
-MM_AllocationContextBalanced::needRecycleLeafRegionFraction(MM_EnvironmentBase *env, float fraction)
+MM_AllocationContextBalanced::needRecycleReservedRegionFraction(MM_EnvironmentBase *env, uintptr_t fraction)
 {
+	const uintptr_t regionSize = _heapRegionManager->getRegionSize();
+	Assert_MM_true((0 < fraction) && (regionSize > fraction));
+
 	bool ret = false;
-	Assert_MM_true((0 < fraction) && (1.0 > fraction));
-	lockCommon();
-	_fractionLeafRegion -= fraction;
-	if (0.0 >= _fractionLeafRegion) {
+	fraction = MM_Math::roundToCeiling(J9_GC_MINIMUM_OBJECT_SIZE, fraction);
+
+	if (regionSize == fraction) {
 		ret = true;
-		if (0.0 > _fractionLeafRegion) {
-			_fractionLeafRegion += 1.0;
+	} else {
+		lockCommon();
+		_fractionReservedRegion -= fraction;
+		if (0 >= _fractionReservedRegion) {
+			ret = true;
+			if (0 > _fractionReservedRegion) {
+				_fractionReservedRegion += regionSize;
+			}
 		}
+		unlockCommon();
 	}
-	unlockCommon();
 	return ret;
 }
 

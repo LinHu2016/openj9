@@ -574,13 +574,13 @@ MM_ProjectedSurvivalCollectionSetDelegate::rateOfReturnCalculationBeforeSweep(MM
 				uintptr_t dataSize = sparseDataEntry->_size;
 
 				arrayReservedRegionCount = dataSize / regionSize;
-				float fraction = (float)(dataSize % regionSize) / (float)regionSize;
+				uintptr_t fraction = dataSize % regionSize;
 
 				MM_HeapRegionDescriptorVLHGC *parentRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->regionDescriptorForAddress((void *)spineObject);
 				Assert_MM_true(parentRegion->containsObjects());
 				SetSelectionData *stats = &_setSelectionDataTable[MM_CompactGroupManager::getCompactGroupNumber(env, parentRegion)];
 
-				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(fraction)) {
+				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(regionSize, fraction)) {
 					arrayReservedRegionCount += 1;
 				}
 
@@ -657,13 +657,13 @@ MM_ProjectedSurvivalCollectionSetDelegate::rateOfReturnCalculationAfterSweep(MM_
 				uintptr_t dataSize = sparseDataEntry->_size;
 
 				arrayReservedRegionCount = dataSize / regionSize;
-				float fraction = (float)(dataSize % regionSize) / (float)regionSize;
+				uintptr_t fraction = dataSize % regionSize;
 
 				MM_HeapRegionDescriptorVLHGC *parentRegion = (MM_HeapRegionDescriptorVLHGC *)_regionManager->regionDescriptorForAddress((void *)spineObject);
 				Assert_MM_true(parentRegion->containsObjects());
 				SetSelectionData *stats = &_setSelectionDataTable[MM_CompactGroupManager::getCompactGroupNumber(env, parentRegion)];
 
-				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(fraction)) {
+				if ((0 != fraction) && stats->_reclaimStats.calculateFractionReservedRegion(regionSize, fraction)) {
 					arrayReservedRegionCount += 1;
 				}
 

@@ -72,7 +72,7 @@ private:
 	UDATA _freeProcessorNodeCount;	/**< The length, in elements, of the _freeProcessorNodes array (always at least 1 after startup) */
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	float _fractionLeafRegion;
+	intptr_t _fractionReservedRegion;
 	MM_HeapRegionDescriptorVLHGC *_arrayReservedRegionList; /** for Off-heap case only, adding and removing via region->_allocateData.pushRegionToArrayReservedRegionList/popRegionFromArrayReservedRegionList */
 	uintptr_t _arrayReservedRegionCount;
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
@@ -276,8 +276,8 @@ public:
 	virtual bool setNumaAffinityForThread(MM_EnvironmentBase *env);
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	bool needAllocateLeafRegionFraction(MM_EnvironmentBase *env, float fraction);
-	bool needRecycleLeafRegionFraction(MM_EnvironmentBase *env, float fraction);
+	bool needAllocateReservedRegionFraction(MM_EnvironmentBase *env, uintptr_t fraction);
+	bool needRecycleReservedRegionFraction(MM_EnvironmentBase *env, uintptr_t fraction);
 
 	MM_HeapRegionDescriptorVLHGC **getArrayReservedRegionListAddress()
 	{
@@ -330,7 +330,7 @@ protected:
 		, _freeProcessorNodes(NULL)
 		, _freeProcessorNodeCount(0)
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-		, _fractionLeafRegion(0.0)
+		, _fractionReservedRegion(0)
 		, _arrayReservedRegionList(NULL)
 		, _arrayReservedRegionCount(0)
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
