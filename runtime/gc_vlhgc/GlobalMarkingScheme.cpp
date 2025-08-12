@@ -1430,10 +1430,9 @@ private:
 
 				uintptr_t dataSize = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr);
 				uintptr_t reservedRegionCount = dataSize / regionSize;
-				float fraction = (float)(dataSize % regionSize)/(float)regionSize;
+				uintptr_t fraction = dataSize % regionSize;
 				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
-				if ((0 != fraction) && commonContext->needRecycleLeafRegionFraction(env, fraction)) {
-//				if ((0 != fraction) && ((MM_AllocationContextBalanced *)env->_objectAllocationInterface)->needRecycleLeafRegionFraction(env, fraction)) {
+				if ((0 != fraction) && commonContext->needRecycleReservedRegionFraction(env, fraction)) {
 					reservedRegionCount += 1;
 				}
 
@@ -1442,7 +1441,6 @@ private:
 						reservedRegionCount, fraction, dataSize, regionSize);
 
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);
-//				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
 				commonContext->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
 			}
 		}
