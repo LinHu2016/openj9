@@ -963,6 +963,11 @@ MM_MemorySubSpaceTarok::checkResize(MM_EnvironmentBase *env, MM_AllocateDescript
 	intptr_t edenChangeRegions = _extensions->globalVLHGCStats._heapSizingData.edenRegionChange;
 	intptr_t edenChangeRegionsBytes = edenChangeRegions * (intptr_t)_heapRegionManager->getRegionSize();
 
+	{
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::checkResize edenChangeRegions=%d, heapSizeChangeRegions=%d\n",
+				edenChangeRegions, heapSizeChange/(intptr_t)_heapRegionManager->getRegionSize());
+	}
 	Trc_MM_MemorySubSpaceTarok_checkResize_2(env->getLanguageVMThread(), heapSizeChange, edenChangeRegionsBytes);
 
 	ExpandReason nonEdenHeapLastExpandReason = _extensions->heap->getResizeStats()->getLastExpandReason();
@@ -995,6 +1000,14 @@ MM_MemorySubSpaceTarok::checkResize(MM_EnvironmentBase *env, MM_AllocateDescript
 
 	/* Adjust the heap size by both the required amount for eden AND non-eden. Non-eden size should generally be kept the same size, so that GMP kickoff, and incremental defragmentation timing stays accurate */
 	heapSizeChange += edenChangeRegionsBytes;
+	if (edenChangeRegionsBytes > heapSizeChange) {
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::checkResize edenChangeRegionsBytes=%d, heapSizeChange=%d\n",
+				edenChangeRegionsBytes, heapSizeChange);
+
+		Trc_MM_MemorySubSpaceTarok_checkResize(env->getLanguageVMThread(), heapSizeChange, edenChangeRegionsBytes);
+	}
 
 	if (0 > heapSizeChange) {
 		_contractionSize = (uintptr_t)(heapSizeChange * -1);
@@ -1046,10 +1059,19 @@ MM_MemorySubSpaceTarok::calculateHeapSizeChange(MM_EnvironmentBase *env, MM_Allo
 	 */
 	double hybridHeapScore = calculateCurrentHybridHeapOverhead(env);
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::calculateHeapSizeChange sizeInRegionsRequired=%zu, expandToSatisfy=%d, hybridHeapScore=%f, _extensions->heapExpansionGCRatioThreshold._valueSpecified=%zu, _extensions->heapContractionGCRatioThreshold._valueSpecified=%zu\n",
+			sizeInRegionsRequired, expandToSatisfy, hybridHeapScore,
+			_extensions->heapExpansionGCRatioThreshold._valueSpecified,
+			_extensions->heapContractionGCRatioThreshold._valueSpecified);
+
 	/* Based on the hybrid overhead of gc cpu, and free memory, decide if heap should expand or contract */
 	if ((hybridHeapScore > (double)_extensions->heapExpansionGCRatioThreshold._valueSpecified) || expandToSatisfy) {
 		/* Try to expand the heap. Note: We enter this block even if readyToResizeAtGlobalEnd might be false, since expansion might be necessary if free space is very small and allocation failure will occur */
 		sizeChange = (intptr_t)calculateExpansionSize(env, allocDescription, _systemGC, expandToSatisfy, sizeInRegionsRequired);
+
+		j9tty_printf(PORTLIB, "after calculateExpansionSize sizeChange=%d\n", sizeChange);
+
 	} else if ((hybridHeapScore < (double)_extensions->heapContractionGCRatioThreshold._valueSpecified) && _extensions->globalVLHGCStats._heapSizingData.readyToResizeAtGlobalEnd) {
 		/* Try to contract the heap */
 		sizeChange = calculateContractionSize(env, allocDescription, _systemGC, true);
@@ -1061,6 +1083,10 @@ MM_MemorySubSpaceTarok::calculateHeapSizeChange(MM_EnvironmentBase *env, MM_Allo
 		 * We need to inform the calculateContractionSize() that it should not try to get the hybrid heap score within acceptable bounds, but rather, should
 		 * just make sure -Xsoftmx is being respected
 		 */
+		j9tty_printf(PORTLIB, "before calculateContractionSize false sizeChange=%d, _extensions->heapContractionGCRatioThreshold._valueSpecified=%zu, hybridHeapScore=%f\n",
+				sizeChange,
+				_extensions->heapContractionGCRatioThreshold._valueSpecified,
+				hybridHeapScore);
 		sizeChange = calculateContractionSize(env, allocDescription, _systemGC, false);
 	}
 
@@ -1076,6 +1102,11 @@ MM_MemorySubSpaceTarok::calculateHybridHeapOverhead(MM_EnvironmentBase *env, int
 	if (0 == heapChange) {
 		/* Do not trigger this tracepoint for heapChange != 0, since this function is run dozens of time when changing heap size */
 		Trc_MM_MemorySubSpaceTarok_calculateHybridHeapOverhead(env->getLanguageVMThread(), gcPercentage, freeMemComponant);
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::calculateHybridHeapOverhead( gcPercentage=%f, freeMemComponant=%f, heapChange=%d\n",
+				gcPercentage, freeMemComponant, heapChange);
+
 	}
 	return MM_Math::weightedAverage(gcPercentage, freeMemComponant, GMP_OVERHEAD_WEIGHT);
 }
