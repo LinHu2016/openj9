@@ -271,10 +271,11 @@ private:
 	/**
 	 * Following a GC, recalculate the Eden size for the next PGC.
 	 * This is typically the same as GCExtensions->tarokeEdenSize, but may be smaller if
-	 * insufficient memory is available
+	 * insufficient memory is available.
 	 * @param env[in] the main GC thread
+	 * @param allowTotalHeapResize[in] count maxHeapExpansionRegions for adjusting eden size, default is false
 	 */
-	void calculateEdenSize(MM_EnvironmentVLHGC *env);
+	void calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTotalHeapResize = false);
 
 	/**
 	 * Compute what the ideal eden size should be, and return by how many regions eden should change
@@ -658,6 +659,11 @@ public:
 	 * Adjust internal structures to reflect the change in heap size.
 	 */
 	void heapReconfigured(MM_EnvironmentVLHGC *env);
+
+	void reCalculateEdenSize(MM_EnvironmentVLHGC *env)
+	{
+		calculateEdenSize(env);
+	}
 
 	double getAvgEdenSurvivalRateCopyForward(MM_EnvironmentVLHGC *env) { return _edenSurvivalRateCopyForward; }
 
