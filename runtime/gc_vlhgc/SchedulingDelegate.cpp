@@ -1363,6 +1363,14 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env)
 	 * eden size can not be bigger than free region size.
 	 */
 	maxEdenChange = freeRegions - _edenRegionCount;
+	/* Eden size can not be bigger than free region size. */
+	intptr_t maxEdenChange = freeRegions - _edenRegionCount;
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "calculateEdenSize allowTotalHeapResize=%zu, maxEdenChange=%d, freeRegions=%zu, _edenRegionCount=%zu, desiredEdenChangeSize=%d\n",
+			allowTotalHeapResize, maxEdenChange, freeRegions, _edenRegionCount, desiredEdenChangeSize);
+
+	if (allowTotalHeapResize) {
 
 	if (0 == maxHeapExpansionRegions) {
 		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = 0;
@@ -1370,6 +1378,11 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env)
 		/* Eden will inform the total heap resizing logic, that it needs to change total heap size in order to maintain same "tenure" size */
 		maxEdenChange += maxHeapExpansionRegions;
 		intptr_t edenChangeWithSurvivorHeadroom = desiredEdenChangeSize;
+
+
+		j9tty_printf(PORTLIB, "calculateEdenSize edenChangeWithSurvivorHeadroom=%d, desiredEdenChangeSize=%d, SurvivorHeadroom=%d, maxHeapExpansionRegions=%d, _edenRegionCount - freeRegions=%d, _edenRegionCount=%zu, freeRegions=%zu\n",
+				edenChangeWithSurvivorHeadroom, desiredEdenChangeSize, (intptr_t)ceil(((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward)), maxHeapExpansionRegions, (intptr_t)(_edenRegionCount - freeRegions), _edenRegionCount, freeRegions);
+
 
 		/* Total heap needs to be aware that by changing eden size, the amount of survivor space might also need to change */
 		if (0 < desiredEdenChangeSize) {
@@ -1692,6 +1705,8 @@ MM_SchedulingDelegate::heapReconfigured(MM_EnvironmentVLHGC *env)
 	Assert_MM_true(_idealEdenRegionCount >= _minimumEdenRegionCount);
 	
 	/* recalculate Eden Size after resize heap */
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_SchedulingDelegate::heapReconfigured recalculate Eden Size after resize heap\n");
 	calculateEdenSize(env);
 }
 

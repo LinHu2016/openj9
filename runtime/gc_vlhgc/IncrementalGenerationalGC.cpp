@@ -2602,3 +2602,13 @@ MM_IncrementalGenerationalGC::getBytesScannedInGlobalMarkPhase()
 	}
 	return bytesScanned;
 }
+
+
+void
+MM_IncrementalGenerationalGC::verifyHeapSizing(MM_EnvironmentVLHGC *env)
+{
+//	Assert_MM_true(((MM_GlobalAllocationManagerTarok *)_extensions->globalAllocationManager)->getFreeRegionCount() >= _schedulingDelegate.getCurrentEdenSizeInRegions(env));
+	Assert_GC_true_with_message2(env, (((MM_GlobalAllocationManagerTarok *)_extensions->globalAllocationManager)->getFreeRegionCount() >= _schedulingDelegate.getCurrentEdenSizeInRegions(env)),
+				"verifyHeapSizing freeRegionCount(%zu) is less than EdenRegionCount(%zu)\n",
+				((MM_GlobalAllocationManagerTarok *)_extensions->globalAllocationManager)->getFreeRegionCount(), _schedulingDelegate.getCurrentEdenSizeInRegions(env));
+}
