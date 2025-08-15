@@ -993,12 +993,17 @@ MM_IncrementalGenerationalGC::partialGarbageCollectPreWork(MM_EnvironmentVLHGC *
 void
 MM_IncrementalGenerationalGC::partialGarbageCollectPostWork(MM_EnvironmentVLHGC *env, MM_AllocateDescription *allocDescription)
 {
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_IncrementalGenerationalGC::partialGarbageCollectPostWork postProcessPGCUsingCopyForward\n");
+
 	/* This call does report events, but does not collect statistics. */
 	postProcessPGCUsingCopyForward(env, allocDescription);
 
 	env->_cycleState->_workPackets = NULL;
 	env->_cycleState->_markMap = NULL;
 
+	j9tty_printf(PORTLIB, "MM_IncrementalGenerationalGC::partialGarbageCollectPostWork attemptHeapResize\n");
 	if (attemptHeapResize(env, allocDescription)) {
 		/* Check was it successful contraction */
 		if (env->_cycleState->_activeSubSpace->wasContractedThisGC(_extensions->globalVLHGCStats.gcCount)) {
@@ -1010,6 +1015,7 @@ MM_IncrementalGenerationalGC::partialGarbageCollectPostWork(MM_EnvironmentVLHGC 
 
 	incrementRegionAges(env, _taxationThreshold, true);
 
+	verifyHeapSizing(env);
 	reportGCCycleFinalIncrementEnding(env);
 	reportGCIncrementEnd(env);
 	reportPGCEnd(env);
@@ -1239,6 +1245,8 @@ MM_IncrementalGenerationalGC::runGlobalGarbageCollection(MM_EnvironmentVLHGC *en
 	/* Global Collection - we max out ages on all live regions to remove them from the nursery collection set */
 	setRegionAgesToMax(env);
 	Assert_MM_true(0 == static_cast<MM_CycleStateVLHGC*>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats.getStallTime());
+	verifyHeapSizing(env);
+
 	reportGCCycleFinalIncrementEnding(env);
 	/* TODO: TEMPORARY: This is a temporary call that should be deleted once the new verbose format is in place */
 	/* NOTE: May want to move any tracepoints up into this routine */
@@ -2602,7 +2610,6 @@ MM_IncrementalGenerationalGC::getBytesScannedInGlobalMarkPhase()
 	}
 	return bytesScanned;
 }
-
 
 void
 MM_IncrementalGenerationalGC::verifyHeapSizing(MM_EnvironmentVLHGC *env)
