@@ -384,26 +384,31 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 	}
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	else {
-		/*
-		 * For now, only a single list of reserved regions owned by the common AC is maintained.
-		 * This is a sub-optimal approach, since due to different order of how regions are reserved and released
-		 * (objects don't die in order they are allocated) it may lead to imbalance of how many regions are committed in each AC.
-		 * In future, allocations should remember (somewhere in Off-heap meta structures) how many regions came from each AC
-		 * \and release exact same number back to each AC.
-		 */
-		MM_AllocationContextTarok *commonContext = (MM_AllocationContextTarok *)env->getCommonAllocationContext();
-		if (this != commonContext) {
-			/* The common allocation context is always an instance of AllocationContextBalanced */
-			((MM_AllocationContextBalanced *)commonContext)->lockCommon();
-		}
-
-		leafAllocateData->pushRegionToArrayReservedRegionList(env, ((MM_AllocationContextBalanced *)commonContext)->getArrayReservedRegionListAddress());
-		((MM_AllocationContextBalanced *)commonContext)->incrementArrayReservedRegionCount();
-
-		if (this != commonContext) {
-			/* The common allocation context is always an instance of AllocationContextBalanced */
-			((MM_AllocationContextBalanced *)commonContext)->unlockCommon();
-		}
+//		/*
+//		 * For now, only a single list of reserved regions owned by the common AC is maintained.
+//		 * This is a sub-optimal approach, since due to different order of how regions are reserved and released
+//		 * (objects don't die in order they are allocated) it may lead to imbalance of how many regions are committed in each AC.
+//		 * In future, allocations should remember (somewhere in Off-heap meta structures) how many regions came from each AC
+//		 * \and release exact same number back to each AC.
+//		 */
+//		MM_AllocationContextTarok *commonContext = (MM_AllocationContextTarok *)env->getCommonAllocationContext();
+//		if (this != commonContext) {
+//			/* The common allocation context is always an instance of AllocationContextBalanced */
+//			((MM_AllocationContextBalanced *)commonContext)->lockCommon();
+//		}
+//
+//		leafAllocateData->pushRegionToArrayReservedRegionList(env, ((MM_AllocationContextBalanced *)commonContext)->getArrayReservedRegionListAddress());
+//		((MM_AllocationContextBalanced *)commonContext)->incrementArrayReservedRegionCount();
+//
+//		if (this != commonContext) {
+//			/* The common allocation context is always an instance of AllocationContextBalanced */
+//			((MM_AllocationContextBalanced *)commonContext)->unlockCommon();
+//		}
+		leafAllocateData->pushRegionToArrayReservedRegionList(env, getArrayReservedRegionListAddress());
+		incrementArrayReservedRegionCount();
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "lockedAllocateArrayletLeaf context=%p, *getArrayReservedRegionListAddress()=%p, getArrayReservedRegionCount()=%zu\n", this, *getArrayReservedRegionListAddress(), getArrayReservedRegionCount());
+//
 	}
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
@@ -1121,7 +1126,7 @@ MM_AllocationContextBalanced::needAllocateReservedRegionFraction(MM_EnvironmentB
 			ret = true;
 		} else {
 			_fractionReservedRegion += fraction;
-			if (regionSize <= _fractionReservedRegion) {
+			if ((intptr_t)regionSize <= _fractionReservedRegion) {
 				_fractionReservedRegion -= regionSize;
 				ret = true;
 			}
@@ -1167,7 +1172,7 @@ MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM
 	}
 
 	PORT_ACCESS_FROM_ENVIRONMENT(env);
-	j9tty_printf(PORTLIB, "recycleReservedRegionsForVirtualLargeObjectHeap recycleReservedRegionCount=%zu, needLock=%zu, ReservedRegionCount=%d\n", reservedRegionCount, needLock, getArrayReservedRegionCount());
+	j9tty_printf(PORTLIB, "recycleReservedRegionsForVirtualLargeObjectHeap context=%p, recycleReservedRegionCount=%zu, needLock=%zu, ReservedRegionCount=%d, *head=%p\n", this, reservedRegionCount, needLock, getArrayReservedRegionCount(), *head);
 
 	while ((reservedRegionCount > 0) && (NULL != (region = *head))) {
 		region->_allocateData.popRegionFromArrayReservedRegionList(env, head);

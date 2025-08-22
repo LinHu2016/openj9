@@ -357,7 +357,10 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 	uintptr_t arrayReservedRegionCount = 0;
 	uintptr_t fraction = 0;
-	Trc_MM_getSparseAddressAndDecommitLeaves_Entry(envBase->getLanguageVMThread(), spine, (void *)bytesRemaining, arrayReservedRegionCount, (void *)regionSize);
+	MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
+	MM_AllocationContextBalanced *context = (MM_AllocationContextBalanced *) env->getAllocationContext();
+//	MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+Trc_MM_getSparseAddressAndDecommitLeaves_Entry(envBase->getLanguageVMThread(), spine, (void *)bytesRemaining, arrayReservedRegionCount, (void *)regionSize);
 	while (0 < bytesRemaining) {
 		/* Allocate the next arraylet leaf - leaves are allocated solely for the purpose of
 		   decommitting the memory later on in this function. */
@@ -365,10 +368,8 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		bool needAllocateLeaf = true;
 		if (regionSize > bytesRemaining) {
 			fraction = bytesRemaining;
-			MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
-			MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
-			if (!commonContext->needAllocateReservedRegionFraction(envBase, fraction)) {
-//			if (!((MM_AllocationContextBalanced *)envBase->_objectAllocationInterface)->needAllocateLeafRegionFraction(envBase, fraction)) {
+//			if (!commonContext->needAllocateReservedRegionFraction(envBase, fraction)) {
+			if (!context->needAllocateReservedRegionFraction(envBase, fraction)) {
 				needAllocateLeaf = false;
 			}
 		}
@@ -383,6 +384,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 				spine = NULL;
 				break;
 			}
+
 			/* Disable region for reads and writes, since that'll be done through the contiguous double mapped region */
 			void *highAddress = (void *)((uintptr_t)leaf + regionSize);
 			bool ret = extensions->heap->decommitMemory(leaf, regionSize, leaf, highAddress);
@@ -406,7 +408,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 //		Assert_MM_true(arrayReservedRegionCount == arrayoidIndex);
 
 		byteAmount = _dataSize;
-		void *virtualLargeObjectHeapAddress = extensions->largeObjectVirtualMemory->allocateSparseFreeEntryAndMapToHeapObject(spine, byteAmount);
+		void *virtualLargeObjectHeapAddress = extensions->largeObjectVirtualMemory->allocateSparseFreeEntryAndMapToHeapObject(spine, byteAmount, context);
 
 		if (NULL != virtualLargeObjectHeapAddress) {
 			indexableObjectModel->setDataAddrForContiguous((J9IndexableObject *)spine, virtualLargeObjectHeapAddress);
@@ -420,21 +422,18 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		/* fail to reserve regions or allocateSparseFreeEntry, clean up reserved regions */
 		if (0 != fraction) {
 			// rollback fraction
-			MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
-			MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
-			commonContext->needRecycleReservedRegionFraction(envBase, fraction);
-//			((MM_AllocationContextBalanced *)envBase->_objectAllocationInterface)->needRecycleLeafRegionFraction(envBase, fraction);
+//			commonContext->needRecycleReservedRegionFraction(envBase, fraction);
+			context->needRecycleReservedRegionFraction(envBase, fraction);
 		}
 		if (0 < arrayReservedRegionCount) {
-			((MM_HeapRegionManagerVLHGC *)extensions->heapRegionManager)->recycleReservedRegionsForVirtualLargeObjectHeap(envBase, arrayReservedRegionCount);
+			context->recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC::getEnvironment(envBase), arrayReservedRegionCount);
 		}
 	}
 	else {
 		PORT_ACCESS_FROM_ENVIRONMENT(envBase);
-		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
-		MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
-		j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves fraction=%zu, arrayReservedRegionCount=%zu, getArrayReservedRegionCount=%zu\n",
-				fraction, arrayReservedRegionCount, commonContext->getArrayReservedRegionCount());
+		j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves context=%p, getBytesRequested()=%zu, getContiguousBytes()=%zu, fraction=%zu, arrayReservedRegionCount=%zu, getArrayReservedRegionCount=%zu, getFreeRegionCount=%zu, regionSize=%zu\n",
+//				fraction, arrayReservedRegionCount, commonContext->getArrayReservedRegionCount());
+				context, _allocateDescription.getBytesRequested(), _allocateDescription.getContiguousBytes(), fraction, arrayReservedRegionCount, context->getArrayReservedRegionCount(), context->getFreeRegionCount(), regionSize);
 	}
 
 	Trc_MM_getSparseAddressAndDecommitLeaves_Exit(envBase->getLanguageVMThread(), spine, (void *)bytesRemaining);

@@ -571,7 +571,7 @@ public:
 	 *
 	 * @param objectPtr[in] indexable object's spine
 	 */
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator);
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator, void *alloctionContext = NULL);
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)

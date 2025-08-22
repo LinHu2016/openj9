@@ -1729,7 +1729,7 @@ public:
 	}
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator) {
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator, void *allocationContext) {
 		J9IndexableObject *fwdOjectPtr = (J9IndexableObject *)_compactScheme->getForwardingPtr(objectPtr);
 		if ((J9IndexableObject *)objectPtr != fwdOjectPtr) {
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous(fwdOjectPtr);

@@ -1418,7 +1418,7 @@ private:
 	}
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator) {
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator, void *allocationContext) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 
 		env->_markVLHGCStats._offHeapRegionCandidates += 1;
@@ -1431,17 +1431,23 @@ private:
 				uintptr_t dataSize = _extensions->indexableObjectModel.getDataSizeInBytes((J9IndexableObject *)objectPtr);
 				uintptr_t reservedRegionCount = dataSize / regionSize;
 				uintptr_t fraction = dataSize % regionSize;
-				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
-				if ((0 != fraction) && commonContext->needRecycleReservedRegionFraction(env, fraction)) {
+//				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+				MM_AllocationContextBalanced *context = (MM_AllocationContextBalanced *) allocationContext;
+				if (NULL == context) {
+					context = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+				}
+//				if ((0 != fraction) && commonContext->needRecycleReservedRegionFraction(env, fraction)) {
+				if ((0 != fraction) && context->needRecycleReservedRegionFraction(env, fraction)) {
 					reservedRegionCount += 1;
 				}
 
 				PORT_ACCESS_FROM_ENVIRONMENT(env);
-				j9tty_printf(PORTLIB, "MM_GlobalMarkingSchemeRootClearer::doObjectInVirtualLargeObjectHeap reservedRegionCount=%zu, fraction=%f, dataSize=%zu, regionSize=%zu\n",
-						reservedRegionCount, fraction, dataSize, regionSize);
+				j9tty_printf(PORTLIB, "MM_GlobalMarkingSchemeRootClearer::doObjectInVirtualLargeObjectHeap reservedRegionCount=%zu, fraction=%zu, dataSize=%zu, regionSize=%zu, context=%p\n",
+						reservedRegionCount, fraction, dataSize, regionSize, context);
 
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);
-				commonContext->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
+//				commonContext->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
+				context->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
 			}
 		}
 	}

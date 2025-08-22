@@ -4156,7 +4156,7 @@ private:
 	}
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator) {
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator, void *allocationContext) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_copyForwardStats._offHeapRegionCandidates += 1;
 
@@ -4174,21 +4174,27 @@ private:
 				uintptr_t reservedRegionCount = dataSize / regionSize;
 				uintptr_t fraction = dataSize % regionSize;
 
-				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
-				if ((0 != fraction) && commonContext->needRecycleReservedRegionFraction(env, fraction)) {
+//				MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+				MM_AllocationContextBalanced *context = (MM_AllocationContextBalanced *) allocationContext;
+				if (NULL == context) {
+					context = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+				}
+//				if ((0 != fraction) && commonContext->needRecycleReservedRegionFraction(env, fraction)) {
+				if ((0 != fraction) && context->needRecycleReservedRegionFraction(env, fraction)) {
 					reservedRegionCount += 1;
 				}
 
 				PORT_ACCESS_FROM_ENVIRONMENT(env);
-				j9tty_printf(PORTLIB, "MM_CopyForwardSchemeRootClearer::doObjectInVirtualLargeObjectHeap reservedRegionCount=%zu, fraction=%f, dataSize=%zu, regionSize=%zu\n",
-						reservedRegionCount, fraction, dataSize, regionSize);
+				j9tty_printf(PORTLIB, "MM_CopyForwardSchemeRootClearer::doObjectInVirtualLargeObjectHeap reservedRegionCount=%zu, fraction=%zu, dataSize=%zu, regionSize=%zu, context=%p, allocationContext=%p\n",
+						reservedRegionCount, fraction, dataSize, regionSize, context, allocationContext);
 
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._offHeapRegionsCleared += 1;
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);
 				/* recycleLeafRegions for off-heap case */
-				commonContext->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
+//				commonContext->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
+				context->recycleReservedRegionsForVirtualLargeObjectHeap(env, reservedRegionCount);
 			} else {
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)fwdOjectPtr);
 				if (NULL != dataAddr) {

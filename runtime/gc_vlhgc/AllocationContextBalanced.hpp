@@ -72,8 +72,8 @@ private:
 	UDATA _freeProcessorNodeCount;	/**< The length, in elements, of the _freeProcessorNodes array (always at least 1 after startup) */
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-	uintptr_t _fractionReservedRegion;
-	MM_HeapRegionDescriptorVLHGC *_arrayReservedRegionList; /** for Off-heap case only, adding and removing via region->_allocateData.pushRegionToArrayReservedRegionList/popRegionFromArrayReservedRegionList */
+	intptr_t _fractionReservedRegion;
+	MM_HeapRegionDescriptorVLHGC *_arrayReservedRegionList; /**< for Off-heap case only, adding and removing via region->_allocateData.pushRegionToArrayReservedRegionList/popRegionFromArrayReservedRegionList */
 	uintptr_t _arrayReservedRegionCount;
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 /* Methods */

@@ -246,7 +246,7 @@ MM_RootScanner::doStringTableSlot(J9Object **slotPtr, GC_StringTableIterator *st
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 void
-MM_RootScanner::doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator)
+MM_RootScanner::doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, GC_HashTableIterator *sparseDataEntryIterator, void *allocationContext)
 {
 	/* No need to call doSlot() here since there's nothing to update */
 }
@@ -961,7 +961,7 @@ MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 			while (NULL != (sparseDataEntry = (MM_SparseDataTableEntry *)iterator.nextSlot())) {
 				J9Object *spineObject = (J9Object *)sparseDataEntry->_proxyObjPtr;
 				Assert_MM_true(NULL != spineObject);
-				doObjectInVirtualLargeObjectHeap(spineObject, &iterator);
+				doObjectInVirtualLargeObjectHeap(spineObject, &iterator, sparseDataEntry->_allocationContextPtr);
 			}
 		}
 		reportScanningEnded(RootScannerEntity_virtualLargeObjectHeapObjects);
