@@ -25,6 +25,10 @@
 #include "IndexableObjectAllocationModel.hpp"
 #include "Math.hpp"
 #include "MemorySpace.hpp"
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+#include "AllocationContextBalanced.hpp"
+#include "EnvironmentVLHGC.hpp"
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) || defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #include "ArrayletLeafIterator.hpp"
 #include "HeapRegionManager.hpp"
@@ -400,6 +404,13 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			_allocateDescription.setSpine(NULL);
 			spine = NULL;
 		}
+	}
+	else {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		MM_EnvironmentVLHGC *envVLHGC = MM_EnvironmentVLHGC::getEnvironment(env);
+		MM_AllocationContextBalanced *context = (MM_AllocationContextBalanced *) envVLHGC->getAllocationContext();
+		j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves getBytesRequested()=%zu, getContiguousBytes()=%zu, arrayletLeafCount=%zu, getFreeRegionCount=%zu\n",
+				_allocateDescription.getBytesRequested(), _allocateDescription.getContiguousBytes(), arrayletLeafCount, context->getFreeRegionCount());
 	}
 
 	Trc_MM_getSparseAddressAndDecommitLeaves_Exit(env->getLanguageVMThread(), spine, (void *)bytesRemaining);
