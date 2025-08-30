@@ -25,6 +25,10 @@
 #include "IndexableObjectAllocationModel.hpp"
 #include "Math.hpp"
 #include "MemorySpace.hpp"
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+#include "AllocationContextBalanced.hpp"
+#include "EnvironmentVLHGC.hpp"
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) || defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #include "ArrayletLeafIterator.hpp"
 #include "HeapRegionManagerVLHGC.hpp"
@@ -403,6 +407,14 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		if (0 < arrayoidIndex) {
 			((MM_HeapRegionManagerVLHGC *)extensions->heapRegionManager)->recycleReservedRegionsForVirtualLargeObjectHeap(envBase, arrayoidIndex);
 		}
+	}
+	else {
+		PORT_ACCESS_FROM_ENVIRONMENT(envBase);
+		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
+		MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+		MM_AllocationContextBalanced *context = (MM_AllocationContextBalanced *) env->getAllocationContext();
+		j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves getBytesRequested()=%zu, getContiguousBytes()=%zu, arrayReservedRegionCount=%zu, getArrayReservedRegionCount=%zu, getFreeRegionCount=%zu, regionSize=%zu\n",
+				_allocateDescription.getBytesRequested(), _allocateDescription.getContiguousBytes(), arrayReservedRegionCount, commonContext->getArrayReservedRegionCount(), context->getFreeRegionCount(), regionSize);
 	}
 	Trc_MM_getSparseAddressAndDecommitLeaves_Exit(envBase->getLanguageVMThread(), spine, (void *)bytesRemaining);
 

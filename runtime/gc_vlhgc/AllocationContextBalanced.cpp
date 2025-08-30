@@ -1113,6 +1113,9 @@ MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM
 		lockCommon();
 	}
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "recycleReservedRegionsForVirtualLargeObjectHeap recycleReservedRegionCount=%zu, needLock=%zu, ReservedRegionCount=%d\n", reservedRegionCount, needLock, getArrayReservedRegionCount());
+
 	while ((reservedRegionCount > 0) && (NULL != (region = *head))) {
 		region->_allocateData.popRegionFromArrayReservedRegionList(env, head);
 		decrementArrayReservedRegionCount();
