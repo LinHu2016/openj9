@@ -126,6 +126,9 @@ private:
 			regionSize = _minimumRegionSizeInBytes;
 		}
 
+		/* debug set regionSize = _tarokMinimumRegionSizeInBytes; */
+		regionSize = _tarokMinimumRegionSizeInBytes;
+
 		return regionSize;
 	}
 };
