@@ -359,11 +359,11 @@ MM_ConfigurationIncrementalGenerational::initialize(MM_EnvironmentBase *env)
 	}
 
 	if (!extensions->heapExpansionGCRatioThreshold._wasSpecified) {
-		extensions->heapExpansionGCRatioThreshold._valueSpecified = 4;
+		extensions->heapExpansionGCRatioThreshold._valueSpecified = 2;
 	}
 
 	if (!extensions->heapContractionGCRatioThreshold._wasSpecified) {
-		extensions->heapContractionGCRatioThreshold._valueSpecified = 3;
+		extensions->heapContractionGCRatioThreshold._valueSpecified = 1;
 	}
 
 	return result;
