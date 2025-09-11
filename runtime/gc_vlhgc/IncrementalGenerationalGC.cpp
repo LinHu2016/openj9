@@ -57,6 +57,7 @@
 #include "FinalizerSupport.hpp"
 #include "GlobalAllocationManager.hpp"
 #include "HeapRegionIteratorVLHGC.hpp"
+#include "HeapMemorySnapshot.hpp"
 #include "HeapStats.hpp"
 #include "IncrementalGenerationalGC.hpp"
 #include "InterRegionRememberedSet.hpp"
@@ -1330,6 +1331,15 @@ MM_IncrementalGenerationalGC::preProcessPGCUsingCopyForward(MM_EnvironmentVLHGC 
 	 * NOTE: A second estimate for free tenure is later made - The lowest estimate for free tenure is used in heap sizing calculations
 	 */
 	_extensions->globalVLHGCStats._heapSizingData.freeTenure = freeMemoryForSurvivor;
+
+	MM_HeapMemorySnapshot snapShot;
+	_regionManager->getHeapMemorySnapshot(_extensions, &snapShot, FALSE);
+
+	j9tty_printf(PORTLIB, "MM_IncrementalGenerationalGC::preProcessPGCUsingCopyForward _heapSizingData.freeTenure=%zu, freeMemoryForSurvivor=%zu\n _freeRegionEdenSize=%zu, _totalRegionEdenSize=%zu, _totalHeapSize=%zu, snapshot._freeHeapSize=%zu, _totalRegionOldSize=%zu, _freeRegionOldSize=%zu, _totalRegionSurvivorSize=%zu, _freeRegionSurvivorSize=%zu\n",
+			_extensions->globalVLHGCStats._heapSizingData.freeTenure, freeMemoryForSurvivor, snapShot._freeRegionEdenSize, snapShot._totalRegionEdenSize, snapShot._totalHeapSize, snapShot._freeHeapSize, snapShot._totalRegionOldSize, snapShot._freeRegionOldSize, snapShot._totalRegionSurvivorSize, snapShot._freeRegionSurvivorSize);
+	j9tty_printf(PORTLIB, "MM_IncrementalGenerationalGC::preProcessPGCUsingCopyForward2 total Eden size=%zu, AllocatedSinceLastPGC=%zu\n",
+			getCurrentEdenSizeInBytes(NULL), getAllocatedSinceLastPGC());
+
 
 	cycleState->_vlhgcIncrementStats._copyForwardStats._freeMemoryBefore = freeMemoryForSurvivor;
 	cycleState->_vlhgcIncrementStats._copyForwardStats._totalMemoryBefore = _extensions->getHeap()->getMemorySize();

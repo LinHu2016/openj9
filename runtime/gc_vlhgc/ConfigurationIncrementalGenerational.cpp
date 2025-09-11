@@ -351,19 +351,19 @@ MM_ConfigurationIncrementalGenerational::initialize(MM_EnvironmentBase *env)
 	}
 
 	if (!extensions->dnssExpectedRatioMaximum._wasSpecified) {
-		extensions->dnssExpectedRatioMaximum._valueSpecified = 0.05;
+		extensions->dnssExpectedRatioMaximum._valueSpecified = 0.04;
 	}
 
 	if (!extensions->dnssExpectedRatioMinimum._wasSpecified) {
-		extensions->dnssExpectedRatioMinimum._valueSpecified = 0.02;
+		extensions->dnssExpectedRatioMinimum._valueSpecified = 0.03;
 	}
 
 	if (!extensions->heapExpansionGCRatioThreshold._wasSpecified) {
-		extensions->heapExpansionGCRatioThreshold._valueSpecified = 2;
+		extensions->heapExpansionGCRatioThreshold._valueSpecified = 5;
 	}
 
 	if (!extensions->heapContractionGCRatioThreshold._wasSpecified) {
-		extensions->heapContractionGCRatioThreshold._valueSpecified = 1;
+		extensions->heapContractionGCRatioThreshold._valueSpecified = 2;
 	}
 
 	return result;

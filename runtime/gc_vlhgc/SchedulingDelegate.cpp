@@ -1071,6 +1071,10 @@ MM_SchedulingDelegate::updateHeapSizingData(MM_EnvironmentVLHGC *env)
 		 * but until GMP occurs, one of those two estimates must be used for purposes of heap resizing (Note: the minimum of the two values is used, so that heap more likely to expand)
 		 */
 		_extensions->globalVLHGCStats._heapSizingData.freeTenure = _estimatedFreeTenure != 0 ? _estimatedFreeTenure : OMR_MIN(freeTenureEstimateFromBeforePgc, freeTenureEstimate);
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_SchedulingDelegate::updateHeapSizingData ._heapSizingData.freeTenure=%zu, _estimatedFreeTenure=%zu, freeTenureEstimateFromBeforePgc=%zu, freeTenureEstimate=%zu, reservedFreeMemory=%zu\n",
+				_extensions->globalVLHGCStats._heapSizingData.freeTenure, _estimatedFreeTenure, freeTenureEstimateFromBeforePgc, freeTenureEstimate, reservedFreeMemory);
 	} else {
 		/* Certain edge cases (usually in startup) the total heap might be too small for eden + survivor, and the live set, so free tenure is effectively 0 */
 		_extensions->globalVLHGCStats._heapSizingData.freeTenure = 0;
@@ -1190,6 +1194,12 @@ MM_SchedulingDelegate::calculatePGCCompactionRate(MM_EnvironmentVLHGC *env, uint
 	uintptr_t surivivorSize = (uintptr_t)(regionSize * _averageSurvivorSetRegionCount);
 	uintptr_t reservedFreeMemory = edenSizeInBytes + surivivorSize;
 	estimatedFreeMemory = estimateTotalFreeMemory(env, freeRegionMemory, defragmentedMemory, reservedFreeMemory);
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_SchedulingDelegate::calculatePGCCompactionRate estimatedFreeMemory=%zu, freeRegionMemory=%zu, defragmentedMemory=%zu, reservedFreeMemory=%zu, surivivorSize=%zu\n",
+			estimatedFreeMemory, freeRegionMemory, defragmentedMemory, reservedFreeMemory, surivivorSize);
+
+
 	calculateKickoffHeadroom(env, estimatedFreeMemory);
 
 	/* estimate totalFreeMemory for recalculating PGCCompactionRate with tarokKickoffHeadroomInBytes */

@@ -995,6 +995,11 @@ MM_MemorySubSpaceTarok::checkResize(MM_EnvironmentBase *env, MM_AllocateDescript
 
 	/* Adjust the heap size by both the required amount for eden AND non-eden. Non-eden size should generally be kept the same size, so that GMP kickoff, and incremental defragmentation timing stays accurate */
 	heapSizeChange += edenChangeRegionsBytes;
+	if ((0 == heapSizeChange) && (0 != edenChangeRegionsBytes)) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::checkResize SizeChange=%d, edenChangeRegionsBytes=%d, heapSizeChange=%d\n",
+				heapSizeChange, edenChangeRegionsBytes, (heapSizeChange - edenChangeRegionsBytes));
+	}
 
 	if (0 > heapSizeChange) {
 		_contractionSize = (uintptr_t)(heapSizeChange * -1);
@@ -1091,6 +1096,9 @@ double MM_MemorySubSpaceTarok::mapMemoryPercentageToGcOverhead(MM_EnvironmentBas
 	if (0 == heapSizeChange) {
 		Trc_MM_MemorySubSpaceTarok_mapMemoryPercentageToGcOverhead_1(env->getLanguageVMThread(), tenureSize, freeTenure);
 	}
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::mapMemoryPercentageToGcOverhead tenureSize=%zu, freeTenure=%zu, getActiveMemorySize()=%zu\n", tenureSize, freeTenure, getActiveMemorySize());
 
 	if (tenureSize < freeTenure) {
 		/*
