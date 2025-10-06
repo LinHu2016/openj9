@@ -94,6 +94,10 @@ MM_HeapRegionDataForAllocate::taskAsMemoryPool(MM_EnvironmentBase *env, MM_Alloc
 			_region->setMemoryPool(memoryPool);
 			_region->setRegionType(MM_HeapRegionDescriptor::ADDRESS_ORDERED);
 			_region->_allocateData._owningContext = context;
+
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "MM_HeapRegionDataForAllocate::taskAsMemoryPool _region=%p, context=%p\n", _region, context);
+
 			regionConverted = true;
 		}
 	} else if (MM_HeapRegionDescriptor::ADDRESS_ORDERED_IDLE == _region->getRegionType()) {

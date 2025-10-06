@@ -303,6 +303,11 @@ public:
 	 */
 	uintptr_t getSharedArrayReservedRegionsCount();
 
+	uintptr_t getSharedArrayReservedRegionsBytesUsed()
+	{
+		return _sharedArrayReservedRegionsBytesUsed;
+	}
+
 	MM_HeapRegionDescriptorVLHGC **getArrayReservedRegionListAddress()
 	{
 		return &_arrayReservedRegionList;

@@ -355,6 +355,8 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 	MM_HeapRegionDataForAllocate *leafAllocateData = &(freeRegionForArrayletLeaf->_allocateData);
 	/* ask the region to become a leaf type */
 	leafAllocateData->taskAsArrayletLeaf(env);
+	leafAllocateData->_owningContext = this;
+
 	/* look up the spine region since we need to add this region to its leaf list */
 	MM_HeapRegionDescriptorVLHGC *spineRegion = (MM_HeapRegionDescriptorVLHGC *)_heapRegionManager->tableDescriptorForAddress(spine);
 	/* the leaf requires a pointer back to the spine object so that it can verify its liveness elsewhere in the collector */
@@ -391,10 +393,27 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 		 * In future, allocations should remember (somewhere in Off-heap meta structures) how many regions came from each AC
 		 * \and release exact same number back to each AC.
 		 */
-		MM_AllocationContextTarok *context = this;
+//		MM_AllocationContextTarok *context = this;
+		MM_AllocationContextTarok *context = leafAllocateData->_owningContext;
+		if (NULL != leafAllocateData->_originalOwningContext) {
+			context = leafAllocateData->_originalOwningContext;
+		}
+
 		if (allocateDescription->getSharedReserved()) {
 			context = (MM_AllocationContextTarok *)env->getCommonAllocationContext();
 		}
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		if (NULL == context) {
+			j9tty_printf(PORTLIB, "lockedAllocateArrayletLeaf1 allocate reserved region this=%p, conext=%p, freeRegionForArrayletLeaf->_allocateData._owningContext=%p, freeRegionForArrayletLeaf->_allocateData._originalOwningContext=%p, region=%p\n",
+					this, context, freeRegionForArrayletLeaf->_allocateData._owningContext, freeRegionForArrayletLeaf->_allocateData._originalOwningContext, freeRegionForArrayletLeaf);
+		}
+
+		Assert_MM_true(NULL != context);
+
+		j9tty_printf(PORTLIB, "lockedAllocateArrayletLeaf2 allocate reserved region this=%p, conext=%p, arrayReservedRegionCount=%zu, region=%p\n",
+				this, context, ((MM_AllocationContextBalanced *)context)->getArrayReservedRegionCount(), freeRegionForArrayletLeaf);
+
 		if (this != context) {
 			/* The common allocation context is always an instance of AllocationContextBalanced */
 			((MM_AllocationContextBalanced *)context)->lockCommon();
@@ -533,6 +552,10 @@ MM_AllocationContextBalanced::recycleRegion(MM_EnvironmentVLHGC *env, MM_HeapReg
 	/* the region is being returned to us, set the fields appropriately before returning it to the list  */
 	allocateData->_originalOwningContext = NULL;
 	allocateData->_owningContext = this;
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "recycleRegion region=%p, owningContext=%p, allocateData->_owningContext=%p, allocateData->_originalOwningContext=%p\n",
+			region , owningContext, allocateData->_owningContext, allocateData->_originalOwningContext);
 
 	switch (region->getRegionType()) {
 		case MM_HeapRegionDescriptor::ADDRESS_ORDERED:
@@ -684,6 +707,9 @@ MM_AllocationContextBalanced::acquireMPRegionFromHeap(MM_EnvironmentBase *env, M
 				/* make sure that we record the original owner so that the region can be identified as foreign */
 				Assert_MM_true(NULL == region->_allocateData._originalOwningContext);
 				region->_allocateData._originalOwningContext = _nextToSteal;
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "MM_AllocationContextBalanced::acquireMPRegionFromHeap region=%p, region->_allocateData._originalOwningContext=%p\n",
+						region, region->_allocateData._originalOwningContext);
 			}
 			/* advance to the next node whether we succeeded or not since we want to distribute our "theft" as evenly as possible */
 			_nextToSteal = _nextToSteal->getStealingCousin();
@@ -712,6 +738,9 @@ MM_AllocationContextBalanced::acquireFreeRegionFromHeap(MM_EnvironmentBase *env)
 			region = _nextToSteal->acquireFreeRegionFromNode(env);
 			if (NULL != region) {
 				region->_allocateData._originalOwningContext = _nextToSteal;
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "MM_AllocationContextBalanced::acquireFreeRegionFromHeap region=%p, region->_allocateData._originalOwningContext=%p\n",
+						region, region->_allocateData._originalOwningContext);
 			}
 			/* advance to the next node whether we succeeded or not since we want to distribute our "theft" as evenly as possible */
 			_nextToSteal = _nextToSteal->getStealingCousin();
@@ -788,6 +817,10 @@ MM_AllocationContextBalanced::acquireMPRegionFromContext(MM_EnvironmentBase *env
 			/* also add this region into our owned region list */
 			region->resetAge(env, (U_64)_subspace->getBytesRemainingBeforeTaxation());
 			region->_allocateData._owningContext = requestingContext;
+
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "acquireMPRegionFromContext region=%p, requestingContext=%p, this=%p\n", region , requestingContext, this);
+
 			MM_MemoryPool *pool = region->getMemoryPool();
 			Assert_MM_true(subSpace == pool->getSubSpace());
 			pool->rebuildFreeListInRegion(env, region, NULL);
@@ -970,7 +1003,11 @@ MM_AllocationContextBalanced::lockedReplenishAndAllocate(MM_EnvironmentBase *env
 			MM_HeapRegionDescriptorVLHGC *leafRegion = acquireFreeRegionFromHeap(env);
 			if (NULL != leafRegion) {
 				result = lockedAllocateArrayletLeaf(env, allocateDescription, leafRegion);
-				leafRegion->_allocateData._owningContext = this;
+//				leafRegion->_allocateData._owningContext = this;
+
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "lockedReplenishAndAllocate leafRegion=%p, leafRegion->_allocateData=%p, this=%p\n", leafRegion, &leafRegion->_allocateData, this);
+
 				Assert_MM_true(leafRegion->getLowAddress() == result);
 				Trc_MM_AllocationContextBalanced_lockedReplenishAndAllocate_acquiredFreeRegion(env->getLanguageVMThread(), regionSize);
 			}

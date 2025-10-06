@@ -1559,6 +1559,9 @@ MM_IncrementalGenerationalGC::incrementRegionAges(MM_EnvironmentVLHGC *env, UDAT
 				if (owner != commonContext) {
 					if ((NULL == region->_allocateData._originalOwningContext) && (commonContext->getNumaNode() != owner->getNumaNode())) {
 						region->_allocateData._originalOwningContext = owner;
+						PORT_ACCESS_FROM_ENVIRONMENT(env);
+						j9tty_printf(PORTLIB, "MM_IncrementalGenerationalGC::incrementRegionAges region=%p, commonContext=%p, allocateData->_owningContext=%p, allocateData->_originalOwningContext=%p\n",
+								region, commonContext, region->_allocateData._owningContext, region->_allocateData._originalOwningContext);
 					}
 					region->_allocateData._owningContext = commonContext;
 					owner->migrateRegionToAllocationContext(region, commonContext);
@@ -1659,6 +1662,10 @@ MM_IncrementalGenerationalGC::setRegionAgesToMax(MM_EnvironmentVLHGC *env)
 			if ( (owner != commonContext) && owner->shouldMigrateRegionToCommonContext(env, region) ) {
 				if ((NULL == region->_allocateData._originalOwningContext) && (commonContext->getNumaNode() != owner->getNumaNode())) {
 					region->_allocateData._originalOwningContext = owner;
+
+					PORT_ACCESS_FROM_ENVIRONMENT(env);
+					j9tty_printf(PORTLIB, "MM_IncrementalGenerationalGC::setRegionAgesToMax region=%p, commonContext=%p, allocateData->_owningContext=%p, allocateData->_originalOwningContext=%p\n",
+							region, commonContext, region->_allocateData._owningContext, region->_allocateData._originalOwningContext);
 				}
 				region->_allocateData._owningContext = commonContext;
 				owner->migrateRegionToAllocationContext(region, commonContext);

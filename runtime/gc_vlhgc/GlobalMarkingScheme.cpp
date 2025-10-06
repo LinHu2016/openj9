@@ -1432,17 +1432,29 @@ private:
 				uintptr_t reservedRegionCount = dataSize / regionSize;
 				uintptr_t fraction = dataSize % regionSize;
 
+				PORT_ACCESS_FROM_ENVIRONMENT(env);
+				j9tty_printf(PORTLIB, "MM_GlobalMarkingSchemeRootClearer::doObjectInVirtualLargeObjectHeap recycle Reserved Regions objectPtr=%p, dataAddr=%p, reservedRegionCount=%zu\n",
+						objectPtr, dataAddr, reservedRegionCount);
+
 				MM_SparseVirtualMemory *largeObjectVirtualMemory = _extensions->largeObjectVirtualMemory;
 				/* recycle Reserved Regions */
 				MM_AllocationContextBalanced *context = NULL;
 				for (uintptr_t index = 0; index < reservedRegionCount; index++) {
 					context = (MM_AllocationContextBalanced *) largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, index);
 					Assert_MM_true(NULL != context);
+
+					j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap index=%zu, context=%p, arrayReservedRegionCount=%zu, sharedArrayReservedRegionsCount=%zu\n",
+							index, context, context->getArrayReservedRegionCount(), context->getSharedArrayReservedRegionsCount());
+
 					context->recycleReservedRegionsForVirtualLargeObjectHeap(env, 1);
 				}
 
 				/* crecycle shared reserved region(fraction) */
 				context = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
+
+				j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap fraction=%zu, commonContext=%p, arrayReservedRegionCount=%zu, sharedArrayReservedRegionsCount=%zu, sharedArrayReservedRegionsBytesUsed=%zu, regionSize=%zu\n",
+						fraction, context, context->getArrayReservedRegionCount(), context->getSharedArrayReservedRegionsCount(), context->getSharedArrayReservedRegionsBytesUsed(), regionSize);
+
 				if ((0 != fraction) && context->recycleToSharedArrayReservedRegion(env, fraction)) {
 					context->recycleReservedRegionsForVirtualLargeObjectHeap(env, 1);
 				}
