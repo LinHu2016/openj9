@@ -776,7 +776,7 @@ MM_MemorySubSpaceTarok::lockedAllocate(MM_EnvironmentBase *env, MM_AllocationCon
 	void* result = NULL;
 	
 	/* arraylet leaves need to be allocated directly after a new region has been found so fall through to the replenish path in that case */
-	if (MM_MemorySubSpace::ALLOCATION_TYPE_LEAF != allocationType) {
+	if ((MM_MemorySubSpace::ALLOCATION_TYPE_LEAF != allocationType) && (MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED != allocationType)) {
 		result = ((MM_AllocationContextTarok *)context)->lockedAllocate(env, objectAllocationInterface, allocateDescription, allocationType);
 	}
 

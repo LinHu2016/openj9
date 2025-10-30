@@ -4184,13 +4184,18 @@ private:
 				for (uintptr_t index = 0; index < reservedRegionCount; index++) {
 					context = (MM_AllocationContextBalanced *) largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, index);
 					Assert_MM_true(NULL != context);
-					context->recycleReservedRegionsForVirtualLargeObjectHeap(env, 1);
+					context->recycleReservedRegionsForVirtualLargeObjectHeap(env, 1, false);
 				}
 
-				/* crecycle shared reserved region(fraction) */
-				context = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
-				if ((0 != fraction) && context->recycleToSharedArrayReservedRegion(env, fraction)) {
-					context->recycleReservedRegionsForVirtualLargeObjectHeap(env, 1);
+				/* recycle shared reserved region(fraction) */
+				if (0 != fraction) {
+					context = (MM_AllocationContextBalanced *) largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, reservedRegionCount);
+
+					PORT_ACCESS_FROM_ENVIRONMENT(env);
+					j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap recycleToSharedArrayReservedRegion context=%p, fraction=%zu, reservedRegionCount=%zu\n",
+							context, fraction, reservedRegionCount);
+
+					context->recycleToSharedArrayReservedRegion(env, fraction);
 				}
 
 				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr, objectPtr, dataSize, sparseDataEntryIterator);

@@ -73,6 +73,7 @@ private:
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	uintptr_t _sharedArrayReservedRegionsBytesUsed; /**< total bytes in shared reserved regions */
+	void *_currentSharedArrayReservedRegionAddressLow;
 	MM_HeapRegionDescriptorVLHGC *_arrayReservedRegionList; /**< the list of all whole regions reserved in main heap to offset the allocation in the off-heap */
 	uintptr_t _arrayReservedRegionCount;	/**< the current size of _arrayReservedRegionList */
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
@@ -284,8 +285,9 @@ public:
 	 * @param fraction[in] the remainder of array size from region size.
 	 * @return True if need to allocate new reserved region for sharing.
 	 */
-	bool allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction);
+	bool allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, bool shouldCollectOnFailure);
 
+	bool allocateSharedReservedRegionFromNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, MM_AllocationContextBalanced *owningContext);
 	/**
 	 * Remove the remainder bytes(need to share the reserved region) of large array from the sheard bytes
 	 * and check if need to recycle a shared reserved region.
@@ -294,7 +296,7 @@ public:
 	 * @param fraction[in] the remainder of array size from region size.
 	 * @return True if need to recycle a shared reserved region.
 	 */
-	bool recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction);
+	bool recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction, bool needLock=false);
 
 	/**
 	 * Get total shared reserved region count.
@@ -328,7 +330,7 @@ public:
 		_arrayReservedRegionCount -= 1;
 	}
 
-	void recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock = false);
+	void recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock, bool shared = false);
 
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	
@@ -356,6 +358,7 @@ protected:
 		, _freeProcessorNodeCount(0)
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 		, _sharedArrayReservedRegionsBytesUsed(0)
+		, _currentSharedArrayReservedRegionAddressLow(NULL)
 		, _arrayReservedRegionList(NULL)
 		, _arrayReservedRegionCount(0)
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
@@ -477,6 +480,8 @@ private:
 	 * @return The address of the leaf
 	 */
 	void *lockedAllocateArrayletLeaf(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, MM_HeapRegionDescriptorVLHGC *freeRegionForArrayletLeaf);
+
+	void *lockedSharedReserveRegionAllocateFromNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, MM_AllocationContextBalanced *owningContext);
 
 	/**
 	 * Common implementation for flush() and flushForShutdown()

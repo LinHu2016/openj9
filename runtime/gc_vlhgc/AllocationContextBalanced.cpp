@@ -395,9 +395,6 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 		if (NULL != leafAllocateData->_originalOwningContext) {
 			context = leafAllocateData->_originalOwningContext;
 		}
-		if (allocateDescription->getSharedReserved()) {
-			context = (MM_AllocationContextTarok *)env->getCommonAllocationContext();
-		}
 
 		Assert_MM_true(NULL != context);
 
@@ -478,6 +475,14 @@ MM_AllocationContextBalanced::allocate(MM_EnvironmentBase *env, MM_ObjectAllocat
 	case MM_MemorySubSpace::ALLOCATION_TYPE_LEAF:
 		result = allocateArrayletLeaf(env, allocateDescription, false);
 		break;
+	case MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED:
+		{
+			uintptr_t dataSize = allocateDescription->getBytesRequested() - allocateDescription->getContiguousBytes();
+			uintptr_t regionSize = _heapRegionManager->getRegionSize();
+			uintptr_t fraction = dataSize % regionSize;
+			allocateFromSharedArrayReservedRegion(env, allocateDescription, fraction, &result, false);
+		}
+		break;
 	default:
 		Assert_MM_unreachable();
 		break;
@@ -497,6 +502,7 @@ MM_AllocationContextBalanced::lockedAllocate(MM_EnvironmentBase *env, MM_ObjectA
 		result = lockedAllocateTLH(env, allocateDescription, objectAllocationInterface);
 		break;
 	case MM_MemorySubSpace::ALLOCATION_TYPE_LEAF:
+	case MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED:
 		/* callers allocating an arraylet leaf should call lockedAllocateArrayletLeaf() directly */
 		Assert_MM_unreachable();
 		break;
@@ -966,7 +972,7 @@ MM_AllocationContextBalanced::lockedReplenishAndAllocate(MM_EnvironmentBase *env
 	UDATA regionSize = extensions->regionSize;
 	
 	UDATA contiguousAllocationSize;
-	if (MM_MemorySubSpace::ALLOCATION_TYPE_LEAF == allocationType) {
+	if ((MM_MemorySubSpace::ALLOCATION_TYPE_LEAF == allocationType) || (MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED == allocationType)) {
 		contiguousAllocationSize = regionSize;
 	} else {
 		contiguousAllocationSize = allocateDescription->getContiguousBytes();
@@ -985,6 +991,8 @@ MM_AllocationContextBalanced::lockedReplenishAndAllocate(MM_EnvironmentBase *env
 				Trc_MM_AllocationContextBalanced_lockedReplenishAndAllocate_acquiredFreeRegion(env->getLanguageVMThread(), regionSize);
 			}
 		}
+	} else if (MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED == allocationType) {
+		result = lockedSharedReserveRegionAllocateFromNode(env, allocateDescription, this);
 	} else {
 		Assert_MM_true(NULL == _allocationRegion);
 		MM_HeapRegionDescriptorVLHGC *newRegion = internalReplenishActiveRegion(env, true);
@@ -1117,12 +1125,45 @@ MM_AllocationContextBalanced::setNumaAffinityForThread(MM_EnvironmentBase *env)
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 bool
-MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction)
+MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, bool shouldCollectOnFailure)
+{
+	bool shouldAllocateNewSharedRegion = allocateSharedReservedRegionFromNode(env, allocateDescription, fraction, reservedAddressLow, this);
+	/* _nextToSteal will be this if NUMA is not enabled */
+	if (shouldAllocateNewSharedRegion || (NULL != *reservedAddressLow)) {
+		if ((NULL == *reservedAddressLow) && (_nextToSteal != this)) {
+			MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
+			Assert_MM_true(0 != extensions->_numaManager.getAffinityLeaderCount());
+			/* we didn't get any memory yet we are in a NUMA system so we should steal from a foreign node */
+			MM_AllocationContextBalanced *firstTheftAttempt = _nextToSteal;
+			do {
+				shouldAllocateNewSharedRegion = _nextToSteal->allocateSharedReservedRegionFromNode(env, allocateDescription, fraction, reservedAddressLow, this);
+				/* advance to the next node whether we succeeded or not since we want to distribute our "theft" as evenly as possible */
+				_nextToSteal = _nextToSteal->getStealingCousin();
+				if (this == _nextToSteal) {
+					/* never try to steal from ourselves since that wouldn't be possible and the code interprets this case as a uniform system */
+					_nextToSteal = _nextToSteal->getStealingCousin();
+				}
+			} while ((NULL == *reservedAddressLow) && (firstTheftAttempt != _nextToSteal));
+		}
+	} else {
+		/* payTax */
+	}
+	/* if that fails, try to invoke the collector */
+	if (shouldCollectOnFailure && (NULL == *reservedAddressLow)) {
+		*reservedAddressLow = _subspace->replenishAllocationContextFailed(env, _subspace, this, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED);
+	}
+
+	return shouldAllocateNewSharedRegion;
+}
+
+bool
+MM_AllocationContextBalanced::allocateSharedReservedRegionFromNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, MM_AllocationContextBalanced *owningContext)
 {
 	const uintptr_t regionSize = _heapRegionManager->getRegionSize();
 	Assert_MM_true((regionSize > fraction) && (0 != fraction));
 
 	bool shouldAllocateNewSharedRegion = false;
+	*reservedAddressLow = NULL;
 
 	lockCommon();
 	if (0 == _sharedArrayReservedRegionsBytesUsed) {
@@ -1135,13 +1176,48 @@ MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_Environme
 	if (!shouldAllocateNewSharedRegion && (wholeRegionsBefore < wholeRegionsAfter)) {
 		shouldAllocateNewSharedRegion = true;
 	}
+
+	if (shouldAllocateNewSharedRegion) {
+		if (_subspace->consumeFromTaxationThreshold(env, regionSize)) {
+			*reservedAddressLow = lockedSharedReserveRegionAllocateFromNode(env, allocateDescription, owningContext);
+
+			if (NULL == *reservedAddressLow) {
+				_sharedArrayReservedRegionsBytesUsed -= fraction;
+			} else {
+				_currentSharedArrayReservedRegionAddressLow = *reservedAddressLow;
+			}
+		} else {
+			shouldAllocateNewSharedRegion = false;
+		}
+	} else {
+		*reservedAddressLow = _currentSharedArrayReservedRegionAddressLow;
+	}
+
 	unlockCommon();
 
 	return shouldAllocateNewSharedRegion;
 }
 
+void *
+MM_AllocationContextBalanced::lockedSharedReserveRegionAllocateFromNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, MM_AllocationContextBalanced *owningContext)
+{
+	void * result = NULL;
+
+	MM_HeapRegionDescriptorVLHGC *region = acquireFreeRegionFromNode(env);
+	if (NULL != region) {
+		if (owningContext != this) {
+			region->_allocateData._originalOwningContext = this;
+		}
+		region->_allocateData._owningContext = owningContext;
+		result = lockedAllocateArrayletLeaf(env, allocateDescription, region);
+		Assert_MM_true(region->getLowAddress() == result);
+	}
+
+	return result;
+}
+
 bool
-MM_AllocationContextBalanced::recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction)
+MM_AllocationContextBalanced::recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction, bool needLock)
 {
 	const uintptr_t regionSize = _heapRegionManager->getRegionSize();
 	Assert_MM_true((regionSize > fraction) && (0 != fraction));
@@ -1149,7 +1225,10 @@ MM_AllocationContextBalanced::recycleToSharedArrayReservedRegion(MM_EnvironmentB
 
 	bool shouldReleaseCurrentSharedRegion = false;
 
-	lockCommon();
+	if (needLock) {
+		lockCommon();
+	}
+
 	uintptr_t wholeRegionsBefore = _sharedArrayReservedRegionsBytesUsed / regionSize;
 	_sharedArrayReservedRegionsBytesUsed -= fraction;
 	uintptr_t wholeRegionsAfter = _sharedArrayReservedRegionsBytesUsed / regionSize;
@@ -1157,8 +1236,14 @@ MM_AllocationContextBalanced::recycleToSharedArrayReservedRegion(MM_EnvironmentB
 	if ((0 == _sharedArrayReservedRegionsBytesUsed) || (wholeRegionsBefore > wholeRegionsAfter)) {
 		shouldReleaseCurrentSharedRegion = true;
 	}
-	unlockCommon();
 
+	if (shouldReleaseCurrentSharedRegion) {
+		recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC::getEnvironment(env), 1, false, true);
+	}
+
+	if (needLock) {
+		unlockCommon();
+	}
 	return shouldReleaseCurrentSharedRegion;
 }
 
@@ -1170,7 +1255,7 @@ MM_AllocationContextBalanced::getSharedArrayReservedRegionsCount()
 }
 
 void
-MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock)
+MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock, bool shared)
 {
 	MM_HeapRegionDescriptorVLHGC **head = getArrayReservedRegionListAddress();
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
@@ -1188,6 +1273,15 @@ MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM
 
 		region->getSubSpace()->recycleRegion(env, region);
 		reservedRegionCount -= 1;
+	}
+
+	if (shared) {
+		region = *head;
+		if (NULL != region) {
+			_currentSharedArrayReservedRegionAddressLow = region->getLowAddress();
+		} else {
+			_currentSharedArrayReservedRegionAddressLow = NULL;
+		}
 	}
 
 	if (needLock) {
