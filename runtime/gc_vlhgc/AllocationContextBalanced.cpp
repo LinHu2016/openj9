@@ -403,6 +403,8 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 			context = (MM_AllocationContextTarok *)env->getCommonAllocationContext();
 		}
 
+		Assert_MM_true(false);
+
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
 		if (NULL == context) {
 			j9tty_printf(PORTLIB, "lockedAllocateArrayletLeaf1 allocate reserved region this=%p, conext=%p, freeRegionForArrayletLeaf->_allocateData._owningContext=%p, freeRegionForArrayletLeaf->_allocateData._originalOwningContext=%p, region=%p\n",
