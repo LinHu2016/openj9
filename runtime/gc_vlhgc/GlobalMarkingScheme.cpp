@@ -1446,8 +1446,8 @@ private:
 					context = (MM_AllocationContextBalanced *) largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, reservedRegionCount);
 
 					PORT_ACCESS_FROM_ENVIRONMENT(env);
-					j9tty_printf(PORTLIB, "MM_GlobalMarkingSchemeRootClearer::doObjectInVirtualLargeObjectHeap recycleToSharedArrayReservedRegion context=%p, fraction=%zu, reservedRegionCount=%zu\n",
-							context, fraction, reservedRegionCount);
+					j9tty_printf(PORTLIB, "MM_GlobalMarkingSchemeRootClearer::doObjectInVirtualLargeObjectHeap recycleToSharedArrayReservedRegion objectPtr=%p, context=%p, fraction=%zu, reservedRegionCount=%zu\n",
+							objectPtr, context, fraction, reservedRegionCount);
 
 					context->recycleToSharedArrayReservedRegion(env, fraction);
 				}
