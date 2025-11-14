@@ -73,7 +73,6 @@ private:
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	uintptr_t _sharedArrayReservedRegionsBytesUsed; /**< total bytes in shared reserved regions */
-	void *_currentSharedArrayReservedRegionAddressLow;
 	MM_HeapRegionDescriptorVLHGC *_arrayReservedRegionList; /**< the list of all whole regions reserved in main heap to offset the allocation in the off-heap */
 	uintptr_t _arrayReservedRegionCount;	/**< the current size of _arrayReservedRegionList */
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
@@ -358,7 +357,6 @@ protected:
 		, _freeProcessorNodeCount(0)
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 		, _sharedArrayReservedRegionsBytesUsed(0)
-		, _currentSharedArrayReservedRegionAddressLow(NULL)
 		, _arrayReservedRegionList(NULL)
 		, _arrayReservedRegionCount(0)
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */

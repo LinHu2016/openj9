@@ -354,7 +354,6 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 #define REGION_RESERVE_THRESHOLD 64
 	void *allocationContexts[REGION_RESERVE_THRESHOLD];
 	void **reservedRegionAllocationContexts = allocationContexts;
-//	uintptr_t reservedRegionCount = bytesRemaining / regionSize;
 	uintptr_t reservedRegionCount = MM_Math::roundToCeiling(regionSize, bytesRemaining) / regionSize;
 
 
@@ -368,7 +367,6 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 	}
 
 	MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
-//	MM_AllocationContextBalanced *commonContext = (MM_AllocationContextBalanced *)env->getCommonAllocationContext();
 
 	Trc_MM_getSparseAddressAndDecommitLeaves_Entry(envBase->getLanguageVMThread(), spine, (void *)bytesRemaining, bytesRemaining / regionSize, (void *)regionSize);
 	uintptr_t arrayReservedRegionCount = 0;
@@ -381,8 +379,6 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 		if (regionSize > bytesRemaining) {
 			fraction = bytesRemaining;
-			/* For code simplicity and lower fragmentation, we always use Common Context. */
-//			shouldAllocateReservedRegion = commonContext->allocateFromSharedArrayReservedRegion(envBase, fraction);
 			MM_AllocationContextBalanced *ac = (MM_AllocationContextBalanced *) env->getAllocationContext();
 			reservedRegionAllocated = ac->allocateFromSharedArrayReservedRegion(envBase, &_allocateDescription, fraction, &reservedAddressLow, true);
 			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
@@ -390,55 +386,45 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 					spine, ac, fraction, reservedAddressLow, arrayReservedRegionCount, reservedRegionCount);
 
 		} else {
-//		if (shouldAllocateReservedRegion) {
-//			_allocateDescription.setSharedReserved(0 != fraction);
-
 			reservedAddressLow = envBase->_objectAllocationInterface->allocateArrayletLeaf(
 					envBase, &_allocateDescription, _allocateDescription.getMemorySpace(), true);
 			if (NULL != reservedAddressLow) {
 				reservedRegionAllocated = true;
 			}
 		}
-//			_allocateDescription.setSharedReserved(false);
 
-			/* If reservedRegion allocation failed set the result to NULL and return. */
+		/* If reservedRegion allocation failed set the result to NULL and return. */
 		if (NULL == reservedAddressLow) {
 			Trc_MM_allocateAndConnectNonContiguousArraylet_leafFailure(envBase->getLanguageVMThread());
 			_allocateDescription.setSpine(NULL);
-//			if (0 != fraction) {
-//				commonContext->recycleToSharedArrayReservedRegion(envBase, fraction);
-//				fraction = 0;
-//			}
 			spine = NULL;
 			break;
 		}
 
-//			if (0 == fraction) {
-		MM_HeapRegionDescriptorVLHGC *reservedRegion = (MM_HeapRegionDescriptorVLHGC *)extensions->heapRegionManager->regionDescriptorForAddress(reservedAddressLow);
-		MM_HeapRegionDataForAllocate *allocateData = &reservedRegion->_allocateData;
-		if (NULL != allocateData->_originalOwningContext) {
-			reservedRegionAllocationContexts[arrayReservedRegionCount] = allocateData->_originalOwningContext;
-		} else {
-			reservedRegionAllocationContexts[arrayReservedRegionCount] = allocateData->_owningContext;
-		}
-//			}
 		if (reservedRegionAllocated) {
+			MM_HeapRegionDescriptorVLHGC *reservedRegion = (MM_HeapRegionDescriptorVLHGC *)extensions->heapRegionManager->regionDescriptorForAddress(reservedAddressLow);
+			MM_HeapRegionDataForAllocate *allocateData = &reservedRegion->_allocateData;
+			if (NULL != allocateData->_originalOwningContext) {
+				reservedRegionAllocationContexts[arrayReservedRegionCount] = allocateData->_originalOwningContext;
+			} else {
+				reservedRegionAllocationContexts[arrayReservedRegionCount] = allocateData->_owningContext;
+			}
 			/* Disable region for reads and writes, since accessing virtualLargeObjectHeapAddress through DataAddrForContiguous */
 			void *reservedAddressHigh = (void *)((uintptr_t)reservedAddressLow + regionSize);
 			bool ret = extensions->heap->decommitMemory(reservedAddressLow, regionSize, reservedAddressLow, reservedAddressHigh);
 			if (!ret) {
 				Trc_MM_VirtualMemory_decommitMemory_failure(reservedAddressLow, regionSize);
 			}
+		} else {
+			/* share fraction and no need to allocate new reserved region case, reservedAddressLow contains allocation context pointer */
+			reservedRegionAllocationContexts[arrayReservedRegionCount] = reservedAddressLow;
 		}
 
 		/* Refresh the spine -- it might move if we GC while allocating the reservedRegion */
 		spine = _allocateDescription.getSpine();
-//		}
 
 		bytesRemaining -= OMR_MIN(bytesRemaining, regionSize);
-//		if (0 == fraction) {
-			arrayReservedRegionCount += 1;
-//		}
+		arrayReservedRegionCount += 1;
 	}
 
 	if (NULL != spine) {

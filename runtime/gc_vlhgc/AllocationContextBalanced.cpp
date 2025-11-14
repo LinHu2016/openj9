@@ -1183,14 +1183,12 @@ MM_AllocationContextBalanced::allocateSharedReservedRegionFromNode(MM_Environmen
 
 			if (NULL == *reservedAddressLow) {
 				_sharedArrayReservedRegionsBytesUsed -= fraction;
-			} else {
-				_currentSharedArrayReservedRegionAddressLow = *reservedAddressLow;
 			}
 		} else {
 			shouldAllocateNewSharedRegion = false;
 		}
 	} else {
-		*reservedAddressLow = _currentSharedArrayReservedRegionAddressLow;
+		*reservedAddressLow = this;
 	}
 
 	unlockCommon();
@@ -1273,15 +1271,6 @@ MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM
 
 		region->getSubSpace()->recycleRegion(env, region);
 		reservedRegionCount -= 1;
-	}
-
-	if (shared) {
-		region = *head;
-		if (NULL != region) {
-			_currentSharedArrayReservedRegionAddressLow = region->getLowAddress();
-		} else {
-			_currentSharedArrayReservedRegionAddressLow = NULL;
-		}
 	}
 
 	if (needLock) {
