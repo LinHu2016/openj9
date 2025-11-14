@@ -1188,6 +1188,10 @@ MM_AllocationContextBalanced::allocateSharedReservedRegionFromNode(MM_Environmen
 			shouldAllocateNewSharedRegion = false;
 		}
 	} else {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "allocateSharedReservedRegionFromNode env=%p, shouldAllocateNewSharedRegion=%zu, *reservedAddressLow=%p\n",
+				env, shouldAllocateNewSharedRegion, this);
+
 		*reservedAddressLow = this;
 	}
 

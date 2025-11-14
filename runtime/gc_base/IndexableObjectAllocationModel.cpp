@@ -368,6 +368,11 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 	MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(envBase);
 
+	{
+		PORT_ACCESS_FROM_ENVIRONMENT(envBase);
+		j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves envBase=%p spine=%p, reservedRegionCount=%zu\n",
+			envBase, spine, reservedRegionCount);
+	}
 	Trc_MM_getSparseAddressAndDecommitLeaves_Entry(envBase->getLanguageVMThread(), spine, (void *)bytesRemaining, bytesRemaining / regionSize, (void *)regionSize);
 	uintptr_t arrayReservedRegionCount = 0;
 	uintptr_t fraction = 0;
@@ -382,8 +387,8 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			MM_AllocationContextBalanced *ac = (MM_AllocationContextBalanced *) env->getAllocationContext();
 			reservedRegionAllocated = ac->allocateFromSharedArrayReservedRegion(envBase, &_allocateDescription, fraction, &reservedAddressLow, true);
 			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
-			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateFromSharedArrayReservedRegion spine=%p, ac=%p, fraction=%zu, reservedAddressLow=%p, arrayReservedRegionCount=%zu, reservedRegionCount=%zu\n",
-					spine, ac, fraction, reservedAddressLow, arrayReservedRegionCount, reservedRegionCount);
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateFromSharedArrayReservedRegion envBase=%p, spine=%p, ac=%p, fraction=%zu, reservedAddressLow=%p, arrayReservedRegionCount=%zu, reservedRegionCount=%zu\n",
+					envBase, spine, ac, fraction, reservedAddressLow, arrayReservedRegionCount, reservedRegionCount);
 
 		} else {
 			reservedAddressLow = envBase->_objectAllocationInterface->allocateArrayletLeaf(
@@ -391,6 +396,10 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			if (NULL != reservedAddressLow) {
 				reservedRegionAllocated = true;
 			}
+			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateArrayletLeaf envBase=%p, spine=%p, reservedAddressLow=%p, arrayReservedRegionCount=%zu, reservedRegionAllocated=%zu\n",
+					envBase, spine, reservedAddressLow, arrayReservedRegionCount, reservedRegionAllocated);
+
 		}
 
 		/* If reservedRegion allocation failed set the result to NULL and return. */
@@ -417,6 +426,8 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			}
 		} else {
 			/* share fraction and no need to allocate new reserved region case, reservedAddressLow contains allocation context pointer */
+			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves reservedRegionAllocationContexts[%zu]=%p\n", arrayReservedRegionCount, reservedAddressLow);
 			reservedRegionAllocationContexts[arrayReservedRegionCount] = reservedAddressLow;
 		}
 
@@ -439,7 +450,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		}
 
 		PORT_ACCESS_FROM_ENVIRONMENT(envBase);
-		j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves setAllocationContextForAddress spine=%p, fraction=%zu, arrayReservedRegionCount-1=%zu, reservedRegionAllocationContexts[arrayReservedRegionCount-1]=%p\n",
+		j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves setAllocationContextForAddress spine=%p, fraction=%zu, reservedRegionAllocationContexts[%zu]=%p\n",
 				spine, fraction, arrayReservedRegionCount-1, reservedRegionAllocationContexts[arrayReservedRegionCount-1]);
 
 		if (NULL != virtualLargeObjectHeapAddress) {
