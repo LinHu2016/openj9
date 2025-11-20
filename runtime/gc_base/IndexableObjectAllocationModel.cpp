@@ -380,37 +380,39 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		/* Allocate the next reserved region - reserved regions are allocated solely for the purpose of
 		   decommitting the memory later on in this function. */
 		void *reservedAddressLow = NULL;
-		bool reservedRegionAllocated = false;
+		void *acForSharedArrayReservedRegion = NULL;
+//		bool reservedRegionAllocated = false;
 
 		if (regionSize > bytesRemaining) {
 			fraction = bytesRemaining;
 			MM_AllocationContextBalanced *ac = (MM_AllocationContextBalanced *) env->getAllocationContext();
-			reservedRegionAllocated = ac->allocateFromSharedArrayReservedRegion(envBase, &_allocateDescription, fraction, &reservedAddressLow, true);
+			acForSharedArrayReservedRegion = ac->allocateFromSharedArrayReservedRegion(envBase, &_allocateDescription, fraction, true);
+//			reservedRegionAllocated = ac->allocateFromSharedArrayReservedRegion(envBase, &_allocateDescription, fraction, &reservedAddressLow, true);
 			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
-			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateFromSharedArrayReservedRegion envBase=%p, spine=%p, ac=%p, fraction=%zu, reservedAddressLow=%p, arrayReservedRegionCount=%zu, reservedRegionCount=%zu\n",
-					envBase, spine, ac, fraction, reservedAddressLow, arrayReservedRegionCount, reservedRegionCount);
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateFromSharedArrayReservedRegion envBase=%p, spine=%p, ac=%p, fraction=%zu, acForSharedArrayReservedRegion=%p, arrayReservedRegionCount=%zu, reservedRegionCount=%zu\n",
+					envBase, spine, ac, fraction, acForSharedArrayReservedRegion, arrayReservedRegionCount, reservedRegionCount);
 
 		} else {
 			reservedAddressLow = envBase->_objectAllocationInterface->allocateArrayletLeaf(
 					envBase, &_allocateDescription, _allocateDescription.getMemorySpace(), true);
-			if (NULL != reservedAddressLow) {
-				reservedRegionAllocated = true;
-			}
+//			if (NULL != reservedAddressLow) {
+//				reservedRegionAllocated = true;
+//			}
 			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
-			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateArrayletLeaf envBase=%p, spine=%p, reservedAddressLow=%p, arrayReservedRegionCount=%zu, reservedRegionAllocated=%zu\n",
-					envBase, spine, reservedAddressLow, arrayReservedRegionCount, reservedRegionAllocated);
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateArrayletLeaf envBase=%p, spine=%p, reservedAddressLow=%p, arrayReservedRegionCount=%zu\n",
+					envBase, spine, reservedAddressLow, arrayReservedRegionCount);
 
 		}
 
 		/* If reservedRegion allocation failed set the result to NULL and return. */
-		if (NULL == reservedAddressLow) {
+		if ((NULL == reservedAddressLow) && (NULL == acForSharedArrayReservedRegion)) {
 			Trc_MM_allocateAndConnectNonContiguousArraylet_leafFailure(envBase->getLanguageVMThread());
 			_allocateDescription.setSpine(NULL);
 			spine = NULL;
 			break;
 		}
 
-		if (reservedRegionAllocated) {
+		if (NULL != reservedAddressLow) {
 			MM_HeapRegionDescriptorVLHGC *reservedRegion = (MM_HeapRegionDescriptorVLHGC *)extensions->heapRegionManager->regionDescriptorForAddress(reservedAddressLow);
 			MM_HeapRegionDataForAllocate *allocateData = &reservedRegion->_allocateData;
 			if (NULL != allocateData->_originalOwningContext) {
@@ -427,8 +429,8 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		} else {
 			/* share fraction and no need to allocate new reserved region case, reservedAddressLow contains allocation context pointer */
 			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
-			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves reservedRegionAllocationContexts[%zu]=%p\n", arrayReservedRegionCount, reservedAddressLow);
-			reservedRegionAllocationContexts[arrayReservedRegionCount] = reservedAddressLow;
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves reservedRegionAllocationContexts[%zu]=%p\n", arrayReservedRegionCount, acForSharedArrayReservedRegion);
+			reservedRegionAllocationContexts[arrayReservedRegionCount] = acForSharedArrayReservedRegion;
 		}
 
 		/* Refresh the spine -- it might move if we GC while allocating the reservedRegion */

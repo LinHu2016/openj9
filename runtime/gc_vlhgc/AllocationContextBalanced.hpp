@@ -282,9 +282,9 @@ public:
 	 *
 	 * @param env[in] The current thread.
 	 * @param fraction[in] the remainder of array size from region size.
-	 * @return True if need to allocate new reserved region for sharing.
+	 * @return allocation context for SharedArrayReservedRegion, return NULL if there is no free space for sharing
 	 */
-	bool allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, bool shouldCollectOnFailure);
+	void* allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure);
 
 	bool allocateSharedReservedRegionFromNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, MM_AllocationContextBalanced *owningContext);
 	/**

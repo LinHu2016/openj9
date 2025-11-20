@@ -480,7 +480,7 @@ MM_AllocationContextBalanced::allocate(MM_EnvironmentBase *env, MM_ObjectAllocat
 			uintptr_t dataSize = allocateDescription->getBytesRequested() - allocateDescription->getContiguousBytes();
 			uintptr_t regionSize = _heapRegionManager->getRegionSize();
 			uintptr_t fraction = dataSize % regionSize;
-			allocateFromSharedArrayReservedRegion(env, allocateDescription, fraction, &result, false);
+			result = allocateFromSharedArrayReservedRegion(env, allocateDescription, fraction, false);
 		}
 		break;
 	default:
@@ -1124,36 +1124,60 @@ MM_AllocationContextBalanced::setNumaAffinityForThread(MM_EnvironmentBase *env)
 }
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
-bool
-MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, bool shouldCollectOnFailure)
+void *
+MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure)
 {
-	bool shouldAllocateNewSharedRegion = allocateSharedReservedRegionFromNode(env, allocateDescription, fraction, reservedAddressLow, this);
+	void *allocationContext = NULL;
+	void *reservedAddressLow = NULL;
+	bool shouldAllocateNewSharedRegion = allocateSharedReservedRegionFromNode(env, allocateDescription, fraction, &reservedAddressLow, this);
 	/* _nextToSteal will be this if NUMA is not enabled */
-	if (shouldAllocateNewSharedRegion || (NULL != *reservedAddressLow)) {
-		if ((NULL == *reservedAddressLow) && (_nextToSteal != this)) {
-			MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
-			Assert_MM_true(0 != extensions->_numaManager.getAffinityLeaderCount());
+	if (shouldAllocateNewSharedRegion || (NULL != reservedAddressLow)) {
+		if ((NULL == reservedAddressLow) && (_nextToSteal != this)) {
+			Assert_MM_true(0 != MM_GCExtensions::getExtensions(env)->_numaManager.getAffinityLeaderCount());
 			/* we didn't get any memory yet we are in a NUMA system so we should steal from a foreign node */
 			MM_AllocationContextBalanced *firstTheftAttempt = _nextToSteal;
 			do {
-				shouldAllocateNewSharedRegion = _nextToSteal->allocateSharedReservedRegionFromNode(env, allocateDescription, fraction, reservedAddressLow, this);
+				shouldAllocateNewSharedRegion = _nextToSteal->allocateSharedReservedRegionFromNode(env, allocateDescription, fraction, &reservedAddressLow, this);
 				/* advance to the next node whether we succeeded or not since we want to distribute our "theft" as evenly as possible */
 				_nextToSteal = _nextToSteal->getStealingCousin();
 				if (this == _nextToSteal) {
 					/* never try to steal from ourselves since that wouldn't be possible and the code interprets this case as a uniform system */
 					_nextToSteal = _nextToSteal->getStealingCousin();
 				}
-			} while ((NULL == *reservedAddressLow) && (firstTheftAttempt != _nextToSteal));
+			} while ((NULL == reservedAddressLow) && (firstTheftAttempt != _nextToSteal));
 		}
 	} else {
 		/* payTax */
 	}
+
+	if (NULL != reservedAddressLow) {
+		if (shouldAllocateNewSharedRegion) {
+			/* new shared region allocated */
+			const uintptr_t regionSize = _heapRegionManager->getRegionSize();
+			MM_HeapRegionDescriptorVLHGC *reservedRegion = (MM_HeapRegionDescriptorVLHGC *)_heapRegionManager->regionDescriptorForAddress(reservedAddressLow);
+			MM_HeapRegionDataForAllocate *allocateData = &reservedRegion->_allocateData;
+			if (NULL != allocateData->_originalOwningContext) {
+				allocationContext = allocateData->_originalOwningContext;
+			} else {
+				allocationContext = allocateData->_owningContext;
+			}
+			/* Disable region for reads and writes, since accessing virtualLargeObjectHeapAddress through DataAddrForContiguous */
+			void *reservedAddressHigh = (void *)((uintptr_t)reservedAddressLow + regionSize);
+			bool ret = MM_GCExtensions::getExtensions(env)->heap->decommitMemory(reservedAddressLow, regionSize, reservedAddressLow, reservedAddressHigh);
+			if (!ret) {
+				Trc_MM_VirtualMemory_decommitMemory_failure(reservedAddressLow, regionSize);
+			}
+		} else {
+			/* fit in allocationContext's shared reserved region */
+			allocationContext = reservedAddressLow;
+		}
+	}
 	/* if that fails, try to invoke the collector */
-	if (shouldCollectOnFailure && (NULL == *reservedAddressLow)) {
-		*reservedAddressLow = _subspace->replenishAllocationContextFailed(env, _subspace, this, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED);
+	if (shouldCollectOnFailure && (NULL == allocationContext)) {
+		allocationContext = _subspace->replenishAllocationContextFailed(env, _subspace, this, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED);
 	}
 
-	return shouldAllocateNewSharedRegion;
+	return allocationContext;
 }
 
 bool
