@@ -480,6 +480,9 @@ MM_AllocationContextBalanced::allocate(MM_EnvironmentBase *env, MM_ObjectAllocat
 			uintptr_t dataSize = allocateDescription->getBytesRequested() - allocateDescription->getContiguousBytes();
 			uintptr_t regionSize = _heapRegionManager->getRegionSize();
 			uintptr_t fraction = dataSize % regionSize;
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "MM_AllocationContextBalanced::allocate allocateFromSharedArrayReservedRegion env=%p, fraction=%zu, ac=%p\n",
+					env, fraction, this);
 			result = allocateFromSharedArrayReservedRegion(env, allocateDescription, fraction, false);
 		}
 		break;
@@ -992,7 +995,16 @@ MM_AllocationContextBalanced::lockedReplenishAndAllocate(MM_EnvironmentBase *env
 			}
 		}
 	} else if (MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED == allocationType) {
-		result = lockedSharedReserveRegionAllocateFromNode(env, allocateDescription, this);
+//		result = lockedSharedReserveRegionAllocateFromNode(env, allocateDescription, this);
+		{
+			uintptr_t dataSize = allocateDescription->getBytesRequested() - allocateDescription->getContiguousBytes();
+			uintptr_t regionSize = _heapRegionManager->getRegionSize();
+			uintptr_t fraction = dataSize % regionSize;
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "MM_AllocationContextBalanced::lockedReplenishAndAllocate allocateFromSharedArrayReservedRegion env=%p, fraction=%zu, ac=%p\n",
+					env, fraction, this);
+			result = allocateFromSharedArrayReservedRegion(env, allocateDescription, fraction, false);
+		}
 	} else {
 		Assert_MM_true(NULL == _allocationRegion);
 		MM_HeapRegionDescriptorVLHGC *newRegion = internalReplenishActiveRegion(env, true);
@@ -1130,8 +1142,8 @@ MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_Environme
 	void *allocationContext = NULL;
 	void *reservedAddressLow = NULL;
 	bool shouldAllocateNewSharedRegion = allocateSharedReservedRegionFromNode(env, allocateDescription, fraction, &reservedAddressLow, this);
-	/* _nextToSteal will be this if NUMA is not enabled */
 	if (shouldAllocateNewSharedRegion || (NULL != reservedAddressLow)) {
+		/* _nextToSteal will be this if NUMA is not enabled */
 		if ((NULL == reservedAddressLow) && (_nextToSteal != this)) {
 			Assert_MM_true(0 != MM_GCExtensions::getExtensions(env)->_numaManager.getAffinityLeaderCount());
 			/* we didn't get any memory yet we are in a NUMA system so we should steal from a foreign node */
@@ -1146,8 +1158,15 @@ MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_Environme
 				}
 			} while ((NULL == reservedAddressLow) && (firstTheftAttempt != _nextToSteal));
 		}
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "allocateFromSharedArrayReservedRegion env=%p, fraction=%zu, ac=%p, reservedAddressLow=%p, shouldAllocateNewSharedRegion=%zu\n",
+				env, fraction, this, reservedAddressLow, shouldAllocateNewSharedRegion);
+
 	} else {
 		/* payTax */
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "allocateFromSharedArrayReservedRegion env=%p, fraction=%zu, ac=%p, payTax reservedAddressLow=%p, shouldAllocateNewSharedRegion=%zu\n",
+				env, fraction, this, reservedAddressLow, shouldAllocateNewSharedRegion);
 	}
 
 	if (NULL != reservedAddressLow) {
@@ -1161,6 +1180,11 @@ MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_Environme
 			} else {
 				allocationContext = allocateData->_owningContext;
 			}
+
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "allocateFromSharedArrayReservedRegion env=%p, fraction=%zu, ac=%p, allocationContext=%p, reservedAddressLow=%p, shouldCollectOnFailure=%zu\n",
+					env, fraction, this, allocationContext, reservedAddressLow, shouldCollectOnFailure);
+
 			/* Disable region for reads and writes, since accessing virtualLargeObjectHeapAddress through DataAddrForContiguous */
 			void *reservedAddressHigh = (void *)((uintptr_t)reservedAddressLow + regionSize);
 			bool ret = MM_GCExtensions::getExtensions(env)->heap->decommitMemory(reservedAddressLow, regionSize, reservedAddressLow, reservedAddressHigh);
@@ -1170,11 +1194,17 @@ MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_Environme
 		} else {
 			/* fit in allocationContext's shared reserved region */
 			allocationContext = reservedAddressLow;
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "allocateFromSharedArrayReservedRegion env=%p, fraction=%zu, ac=%p, allocationContext=%p, reservedAddressLow=%p, shouldCollectOnFailure=%zu\n",
+					env, fraction, this, allocationContext, reservedAddressLow, shouldCollectOnFailure);
 		}
 	}
 	/* if that fails, try to invoke the collector */
 	if (shouldCollectOnFailure && (NULL == allocationContext)) {
 		allocationContext = _subspace->replenishAllocationContextFailed(env, _subspace, this, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED);
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "allocateFromSharedArrayReservedRegion replenishAllocationContextFailed env=%p, fraction=%zu, ac=%p, allocationContext=%p\n",
+				env, fraction, this, allocationContext);
 	}
 
 	return allocationContext;

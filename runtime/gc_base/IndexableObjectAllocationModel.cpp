@@ -392,6 +392,9 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves allocateFromSharedArrayReservedRegion envBase=%p, spine=%p, ac=%p, fraction=%zu, acForSharedArrayReservedRegion=%p, arrayReservedRegionCount=%zu, reservedRegionCount=%zu\n",
 					envBase, spine, ac, fraction, acForSharedArrayReservedRegion, arrayReservedRegionCount, reservedRegionCount);
 
+			if (NULL == acForSharedArrayReservedRegion) {
+				fraction = 0;
+			}
 		} else {
 			reservedAddressLow = envBase->_objectAllocationInterface->allocateArrayletLeaf(
 					envBase, &_allocateDescription, _allocateDescription.getMemorySpace(), true);
