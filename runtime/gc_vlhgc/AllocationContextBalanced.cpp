@@ -539,7 +539,14 @@ MM_AllocationContextBalanced::recycleRegion(MM_EnvironmentVLHGC *env, MM_HeapReg
 	MM_AllocationContextTarok *owningContext = allocateData->_owningContext;
 	MM_AllocationContextTarok *originalOwningContext = allocateData->_originalOwningContext;
 	Assert_MM_true((this == owningContext) || (this == originalOwningContext));
+
+	if (region->getNumaNode() != getNumaNode()) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "recycleRegion env=%p, ac=%p, region=%p, owningContext=%p, originalOwningContext=%p, region->getNumaNode()=%zu, getNumaNode(=%zu\n",
+				env, this, region, owningContext, originalOwningContext, region->getNumaNode(), getNumaNode());
+	}
 	Assert_MM_true(region->getNumaNode() == getNumaNode());
+
 	if (NULL == originalOwningContext) {
 		originalOwningContext = owningContext;
 	}
@@ -739,6 +746,12 @@ MM_AllocationContextBalanced::acquireFreeRegionFromHeap(MM_EnvironmentBase *env)
 
 	if (NULL != region) {
 		region->_allocateData._owningContext = this;
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "lockedSharedReserveRegionAllocateFromNodeacquireFreeRegionFromHeap env=%p, ac=%p, region=%p, _originalOwningContext=%p, _owningContext=%p, region->getNumaNode()=%zu, getNumaNode()=%zu\n",
+				env, this, region, region->_allocateData._originalOwningContext, region->_allocateData._owningContext, region->getNumaNode(), getNumaNode());
+
+
 	}
 
 	return region;
@@ -1240,6 +1253,7 @@ MM_AllocationContextBalanced::allocateSharedReservedRegionFromNode(MM_Environmen
 			}
 		} else {
 			shouldAllocateNewSharedRegion = false;
+			_sharedArrayReservedRegionsBytesUsed -= fraction;
 		}
 	} else {
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
@@ -1263,10 +1277,17 @@ MM_AllocationContextBalanced::lockedSharedReserveRegionAllocateFromNode(MM_Envir
 	if (NULL != region) {
 		if (owningContext != this) {
 			region->_allocateData._originalOwningContext = this;
+		} else {
+			region->_allocateData._originalOwningContext = NULL;
 		}
 		region->_allocateData._owningContext = owningContext;
 		result = lockedAllocateArrayletLeaf(env, allocateDescription, region);
 		Assert_MM_true(region->getLowAddress() == result);
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "lockedSharedReserveRegionAllocateFromNode env=%p, ac=%p, region=%p, _originalOwningContext=%p, _owningContext=%p, result=%p, region->getNumaNode()=%zu, this=%p, getNumaNode()=%zu\n",
+				env, this, region, region->_allocateData._originalOwningContext, region->_allocateData._owningContext, result, region->getNumaNode(), this, getNumaNode());
+
 	}
 
 	return result;

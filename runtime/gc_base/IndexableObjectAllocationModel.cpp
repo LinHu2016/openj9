@@ -429,11 +429,16 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			if (!ret) {
 				Trc_MM_VirtualMemory_decommitMemory_failure(reservedAddressLow, regionSize);
 			}
+
+			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves reservedRegionAllocationContexts[%zu]=%p, reservedAddressLow=%p, reservedRegion=%p, allocateData->_originalOwningContext=%p, allocateData->_owningContext=%p\n",
+					arrayReservedRegionCount, reservedRegionAllocationContexts[arrayReservedRegionCount], reservedAddressLow, reservedRegion, allocateData->_originalOwningContext, allocateData->_owningContext);
 		} else {
 			/* share fraction and no need to allocate new reserved region case, reservedAddressLow contains allocation context pointer */
-			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
-			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves reservedRegionAllocationContexts[%zu]=%p\n", arrayReservedRegionCount, acForSharedArrayReservedRegion);
 			reservedRegionAllocationContexts[arrayReservedRegionCount] = acForSharedArrayReservedRegion;
+
+			PORT_ACCESS_FROM_ENVIRONMENT(envBase);
+			j9tty_printf(PORTLIB, "getSparseAddressAndDecommitLeaves reservedRegionAllocationContexts[%zu]=%p, acForSharedArrayReservedRegion=%p\n", arrayReservedRegionCount, reservedRegionAllocationContexts[arrayReservedRegionCount], acForSharedArrayReservedRegion);
 		}
 
 		/* Refresh the spine -- it might move if we GC while allocating the reservedRegion */
