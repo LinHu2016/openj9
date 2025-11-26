@@ -406,6 +406,10 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 		leafAllocateData->pushRegionToArrayReservedRegionList(env, ((MM_AllocationContextBalanced *)context)->getArrayReservedRegionListAddress());
 		((MM_AllocationContextBalanced *)context)->incrementArrayReservedRegionCount();
 
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "lockedAllocateArrayletLeaf envBase=%p, context=%p, freeRegionForArrayletLeaf=%p, getArrayReservedRegionCount()=%zu\n",
+				envBase, context, freeRegionForArrayletLeaf, ((MM_AllocationContextBalanced *)context)->getArrayReservedRegionCount());
+
 		if (this != context) {
 			/* The common allocation context is always an instance of AllocationContextBalanced */
 			((MM_AllocationContextBalanced *)context)->unlockCommon();
@@ -540,11 +544,11 @@ MM_AllocationContextBalanced::recycleRegion(MM_EnvironmentVLHGC *env, MM_HeapReg
 	MM_AllocationContextTarok *originalOwningContext = allocateData->_originalOwningContext;
 	Assert_MM_true((this == owningContext) || (this == originalOwningContext));
 
-	if (region->getNumaNode() != getNumaNode()) {
+//	if (region->getNumaNode() != getNumaNode()) {
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
-		j9tty_printf(PORTLIB, "recycleRegion env=%p, ac=%p, region=%p, owningContext=%p, originalOwningContext=%p, region->getNumaNode()=%zu, getNumaNode(=%zu\n",
-				env, this, region, owningContext, originalOwningContext, region->getNumaNode(), getNumaNode());
-	}
+		j9tty_printf(PORTLIB, "recycleRegion env=%p, ac=%p, region=%p, owningContext=%p, originalOwningContext=%p, region->getNumaNode()=%zu, getNumaNode=%zu, getRegionType()=%zu\n",
+				env, this, region, owningContext, originalOwningContext, region->getNumaNode(), getNumaNode(), region->getRegionType());
+//	}
 	Assert_MM_true(region->getNumaNode() == getNumaNode());
 
 	if (NULL == originalOwningContext) {
@@ -716,6 +720,11 @@ MM_AllocationContextBalanced::acquireMPRegionFromHeap(MM_EnvironmentBase *env, M
 		} while ((NULL == region) && (firstTheftAttempt != _nextToSteal));
 	}
 
+	if (NULL != region) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "acquireMPRegionFromHeap env=%p, ac=%p, region=%p, _originalOwningContext=%p, _owningContext=%p, region->getNumaNode()=%zu, getNumaNode()=%zu\n",
+				env, this, region, region->_allocateData._originalOwningContext, region->_allocateData._owningContext, region->getNumaNode(), getNumaNode());
+	}
 	return region;
 }
 
@@ -745,13 +754,10 @@ MM_AllocationContextBalanced::acquireFreeRegionFromHeap(MM_EnvironmentBase *env)
 	}
 
 	if (NULL != region) {
-		region->_allocateData._owningContext = this;
-
+//		region->_allocateData._owningContext = this;
 		PORT_ACCESS_FROM_ENVIRONMENT(env);
-		j9tty_printf(PORTLIB, "lockedSharedReserveRegionAllocateFromNodeacquireFreeRegionFromHeap env=%p, ac=%p, region=%p, _originalOwningContext=%p, _owningContext=%p, region->getNumaNode()=%zu, getNumaNode()=%zu\n",
+		j9tty_printf(PORTLIB, "acquireFreeRegionFromHeap env=%p, ac=%p, region=%p, _originalOwningContext=%p, _owningContext=%p, region->getNumaNode()=%zu, getNumaNode()=%zu\n",
 				env, this, region, region->_allocateData._originalOwningContext, region->_allocateData._owningContext, region->getNumaNode(), getNumaNode());
-
-
 	}
 
 	return region;
@@ -1001,8 +1007,8 @@ MM_AllocationContextBalanced::lockedReplenishAndAllocate(MM_EnvironmentBase *env
 			/* acquire a free region */
 			MM_HeapRegionDescriptorVLHGC *leafRegion = acquireFreeRegionFromHeap(env);
 			if (NULL != leafRegion) {
+				leafRegion->_allocateData._owningContext = this;
 				result = lockedAllocateArrayletLeaf(env, allocateDescription, leafRegion);
-//				leafRegion->_allocateData._owningContext = this;
 				Assert_MM_true(leafRegion->getLowAddress() == result);
 				Trc_MM_AllocationContextBalanced_lockedReplenishAndAllocate_acquiredFreeRegion(env->getLanguageVMThread(), regionSize);
 			}
@@ -1344,6 +1350,10 @@ MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM
 	while ((reservedRegionCount > 0) && (NULL != (region = *head))) {
 		region->_allocateData.popRegionFromArrayReservedRegionList(env, head);
 		decrementArrayReservedRegionCount();
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "recycleReservedRegionsForVirtualLargeObjectHeap env=%p, region=%p, context=%p, needLock=%zu, shared=%zu, getArrayReservedRegionCount=%zu\n",
+				env, region, this, needLock, shared, getArrayReservedRegionCount());
 
 		/* Restore/Recommit the reserved region that have been previously decommitted. */
 		 MM_GCExtensions::getExtensions(env)->heap->commitMemory(region->getLowAddress(), _heapRegionManager->getRegionSize());

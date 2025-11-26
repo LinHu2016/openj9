@@ -4184,6 +4184,9 @@ private:
 				for (uintptr_t index = 0; index < reservedRegionCount; index++) {
 					context = (MM_AllocationContextBalanced *) largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, index);
 					Assert_MM_true(NULL != context);
+					PORT_ACCESS_FROM_ENVIRONMENT(env);
+					j9tty_printf(PORTLIB, "doObjectInVirtualLargeObjectHeap recycleToSharedArrayReservedRegion env=%p, objectPtr=%p, context=%p, index=%zu, reservedRegionCount=%zu\n",
+							env, objectPtr, context, index, reservedRegionCount);
 					context->recycleReservedRegionsForVirtualLargeObjectHeap(env, 1, false);
 				}
 
