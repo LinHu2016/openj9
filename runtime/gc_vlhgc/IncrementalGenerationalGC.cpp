@@ -1868,6 +1868,8 @@ MM_IncrementalGenerationalGC::reportGlobalGCStart(MM_EnvironmentVLHGC *env)
 	/* currently we only differ for the tracepoint since we still need to fire the global hook */
 	Trc_MM_GlobalGCStart(env->getLanguageVMThread(), _extensions->globalVLHGCStats.gcCount);
 	triggerGlobalGCStartHook(env);
+
+	((MM_GlobalAllocationManagerTarok *)_extensions->globalAllocationManager)->printAllocationContextRegionCounts(env, false);
 }
 
 void
@@ -1881,6 +1883,8 @@ MM_IncrementalGenerationalGC::reportGlobalGCEnd(MM_EnvironmentVLHGC *env)
 	);
 
 	triggerGlobalGCEndHook(env);
+
+	((MM_GlobalAllocationManagerTarok *)_extensions->globalAllocationManager)->printAllocationContextRegionCounts(env, true);
 }
 
 void

@@ -239,6 +239,27 @@ MM_GlobalAllocationManagerTarok::tearDown(MM_EnvironmentBase *env)
 	MM_GlobalAllocationManager::tearDown(env);
 }
 
+void
+MM_GlobalAllocationManagerTarok::printAllocationContextRegionCounts(MM_EnvironmentBase *env, bool isGCEnd)
+{
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	const char *eventName = "GC-Start";
+	if (isGCEnd) {
+		eventName = "GC-End";
+	}
+
+	j9tty_printf(PORTLIB, "AllocationContextRegionCounts %s,  managedAllocationContextCount=%zu\n", eventName, _managedAllocationContextCount);
+	for (UDATA i = 0; i < _managedAllocationContextCount; i++) {
+		MM_AllocationContextBalanced *ac = (MM_AllocationContextBalanced *)_managedAllocationContexts[i];
+
+		j9tty_printf(PORTLIB, "idx=%zu, AllocationContext=%p, numaNode=%zu, freeRegionCount=%zu, ReservedRegionCount=%zu, SharedArrayReservedRegionsCount=%zu\n",
+				i, ac, ac->getNumaNode(), ac->getFreeRegionCount(), ac->getArrayReservedRegionCount(), ac->getSharedArrayReservedRegionsCount());
+
+	}
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
+}
+
 /**
  * Print current counters for AC region count and resets the counters afterwards
  */	
