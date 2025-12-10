@@ -397,10 +397,13 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 		}
 
 		Assert_MM_true(NULL != context);
-
+		/* set the resulting AC, that might be used from the top level caller */
 		allocateDescription->setAllocationContext(context);
 		if (this != context) {
-			/* The common allocation context is always an instance of AllocationContextBalanced */
+			/**
+			 * At this point we hold locks of 2 different ACs. There should be no scenario that another thread attempts to lock these same locks in opposite order,
+			 * since it would not able to successfully steal from us (our AC is already depleted).
+			 */
 			((MM_AllocationContextBalanced *)context)->lockCommon();
 		}
 
@@ -408,7 +411,6 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 		((MM_AllocationContextBalanced *)context)->incrementArrayReservedRegionCount();
 
 		if (this != context) {
-			/* The common allocation context is always an instance of AllocationContextBalanced */
 			((MM_AllocationContextBalanced *)context)->unlockCommon();
 		}
 	}
@@ -481,7 +483,7 @@ MM_AllocationContextBalanced::allocate(MM_EnvironmentBase *env, MM_ObjectAllocat
 			uintptr_t dataSize = allocateDescription->getBytesRequested() - allocateDescription->getContiguousBytes();
 			uintptr_t regionSize = _heapRegionManager->getRegionSize();
 			uintptr_t fraction = dataSize % regionSize;
-			result = allocateFromSharedArrayReservedRegion(env, allocateDescription, fraction, false);
+			result = allocateFromSharedReservedRegion(env, allocateDescription, fraction, false);
 		}
 		break;
 	default:
@@ -991,12 +993,12 @@ MM_AllocationContextBalanced::lockedReplenishAndAllocate(MM_EnvironmentBase *env
 	} else if (MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED == allocationType) {
 		/**
 		 * (existing path to allocate a whole reserved region/leaf, that calls lockedAllocateArrayletLeaf, if not over tax threshold)
-		 * MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion (this does not check tax threshold here, but it will check later)
+		 * MM_AllocationContextBalanced::allocateFromSharedReservedRegion (this does not check tax threshold here, but it will check later)
 		 */
 		uintptr_t dataSize = allocateDescription->getBytesRequested() - allocateDescription->getContiguousBytes();
 		uintptr_t regionSize = _heapRegionManager->getRegionSize();
 		uintptr_t fraction = dataSize % regionSize;
-		result = allocateFromSharedArrayReservedRegion(env, allocateDescription, fraction, false);
+		result = allocateFromSharedReservedRegion(env, allocateDescription, fraction, false);
 	} else {
 		Assert_MM_true(NULL == _allocationRegion);
 		MM_HeapRegionDescriptorVLHGC *newRegion = internalReplenishActiveRegion(env, true);
@@ -1129,7 +1131,7 @@ MM_AllocationContextBalanced::setNumaAffinityForThread(MM_EnvironmentBase *env)
 
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 void *
-MM_AllocationContextBalanced::allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure)
+MM_AllocationContextBalanced::allocateFromSharedReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure)
 {
 	void *reservedAddressLow = NULL;
 
@@ -1288,10 +1290,6 @@ MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM
 		region->_allocateData.popRegionFromArrayReservedRegionList(env, head);
 		decrementArrayReservedRegionCount();
 
-//		PORT_ACCESS_FROM_ENVIRONMENT(env);
-//		j9tty_printf(PORTLIB, "recycleReservedRegionsForVirtualLargeObjectHeap env=%p, region=%p, context=%p, needLock=%zu, shared=%zu, getArrayReservedRegionCount=%zu\n",
-//				env, region, this, needLock, shared, getArrayReservedRegionCount());
-//
 		/* Restore/Recommit the reserved region that have been previously decommitted. */
 		 MM_GCExtensions::getExtensions(env)->heap->commitMemory(region->getLowAddress(), _heapRegionManager->getRegionSize());
 

@@ -284,7 +284,7 @@ public:
 	 * @param fraction[in] the remainder of array size from region size.
 	 * @return allocation context for SharedArrayReservedRegion, return NULL if there is no free space for sharing
 	 */
-	void* allocateFromSharedArrayReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure);
+	void *allocateFromSharedReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure);
 
 	bool allocateFromSharedReservedRegionForNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, MM_AllocationContextBalanced *requestingContext, bool payTax);
 	/**
