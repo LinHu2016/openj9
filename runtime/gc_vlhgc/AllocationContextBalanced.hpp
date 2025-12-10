@@ -284,7 +284,7 @@ public:
 	 * @param fraction[in] the remainder of array size from region size.
 	 * @return allocation context for SharedArrayReservedRegion, return NULL if there is no free space for sharing
 	 */
-	void *allocateFromSharedReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure);
+	virtual void *allocateFromSharedReservedRegion(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, bool shouldCollectOnFailure);
 
 	bool allocateFromSharedReservedRegionForNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, uintptr_t fraction, void **reservedAddressLow, MM_AllocationContextBalanced *requestingContext, bool payTax);
 	/**
@@ -295,8 +295,9 @@ public:
 	 * @param fraction[in] the remainder of array size from region size.
 	 * @return True if need to recycle a shared reserved region.
 	 */
-	bool recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction, bool needLock=false);
+	virtual bool recycleToSharedArrayReservedRegion(MM_EnvironmentBase *env, uintptr_t fraction, bool needLock = false);
 
+	virtual void recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentBase *env, uintptr_t reservedRegionCount, bool needLock);
 	/**
 	 * Get total shared reserved region count.
 	 *
@@ -328,8 +329,6 @@ public:
 	{
 		_arrayReservedRegionCount -= 1;
 	}
-
-	void recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock, bool shared = false);
 
 #endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	

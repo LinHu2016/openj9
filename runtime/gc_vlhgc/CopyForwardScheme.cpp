@@ -4180,16 +4180,16 @@ private:
 
 				MM_SparseVirtualMemory *largeObjectVirtualMemory = _extensions->largeObjectVirtualMemory;
 				/* recycle Reserved Regions */
-				MM_AllocationContextBalanced *context = NULL;
+				MM_AllocationContext *context = NULL;
 				for (uintptr_t index = 0; index < reservedRegionCount; index++) {
-					context = (MM_AllocationContextBalanced *) largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, index);
+					context = largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, index);
 					Assert_MM_true(NULL != context);
 					context->recycleReservedRegionsForVirtualLargeObjectHeap(env, 1, false);
 				}
 
 				/* recycle shared reserved region(fraction) */
 				if (0 != fraction) {
-					context = (MM_AllocationContextBalanced *) largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, reservedRegionCount);
+					context = largeObjectVirtualMemory->getAllocationContextForAddress(dataAddr, reservedRegionCount);
 					context->recycleToSharedArrayReservedRegion(env, fraction);
 				}
 

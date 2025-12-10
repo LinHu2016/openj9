@@ -384,13 +384,7 @@ MM_AllocationContextBalanced::lockedAllocateArrayletLeaf(MM_EnvironmentBase *env
 	}
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	else {
-		/*
-		 * For now, only a single list of reserved regions owned by the common AC is maintained.
-		 * This is a sub-optimal approach, since due to different order of how regions are reserved and released
-		 * (objects don't die in order they are allocated) it may lead to imbalance of how many regions are committed in each AC.
-		 * In future, allocations should remember (somewhere in Off-heap meta structures) how many regions came from each AC
-		 * \and release exact same number back to each AC.
-		 */
+		/* TODO: try changing the type of _owningContext/_originalOwningContext to MM_AllocationContextBalanced * */
 		MM_AllocationContextTarok *context = leafAllocateData->_owningContext;
 		if (NULL != leafAllocateData->_originalOwningContext) {
 			context = leafAllocateData->_originalOwningContext;
@@ -988,6 +982,8 @@ MM_AllocationContextBalanced::lockedReplenishAndAllocate(MM_EnvironmentBase *env
 				result = lockedAllocateArrayletLeaf(env, allocateDescription, leafRegion);
 				Assert_MM_true(leafRegion->getLowAddress() == result);
 				Trc_MM_AllocationContextBalanced_lockedReplenishAndAllocate_acquiredFreeRegion(env->getLanguageVMThread(), regionSize);
+			} else {
+				allocateDescription->setAllocationContext(NULL);
 			}
 		}
 	} else if (MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED == allocationType) {
@@ -1135,7 +1131,6 @@ MM_AllocationContextBalanced::allocateFromSharedReservedRegion(MM_EnvironmentBas
 {
 	void *reservedAddressLow = NULL;
 
-	allocateDescription->setAllocationContext(NULL);
 	bool needCollection = allocateFromSharedReservedRegionForNode(env, allocateDescription, fraction, &reservedAddressLow, this, true);
 	if (!needCollection) {
 		if (NULL == allocateDescription->getAllocationContext()) {
@@ -1166,7 +1161,7 @@ MM_AllocationContextBalanced::allocateFromSharedReservedRegion(MM_EnvironmentBas
 	}
 
 	/* if that fails, try to invoke the collector */
-	if(shouldCollectOnFailure & (NULL == allocateDescription->getAllocationContext())) {
+	if (shouldCollectOnFailure && (NULL == allocateDescription->getAllocationContext())) {
 		reservedAddressLow = _subspace->replenishAllocationContextFailed(env, _subspace, this, NULL, allocateDescription, MM_MemorySubSpace::ALLOCATION_TYPE_SHARED_RESERVED);
 	}
 
@@ -1206,6 +1201,9 @@ MM_AllocationContextBalanced::allocateFromSharedReservedRegionForNode(MM_Environ
 			if (NULL != *reservedAddressLow) {
 				_sharedArrayReservedRegionsBytesUsed += fraction;
 			}
+		} else {
+			/* PayTax */
+			allocateDescription->setAllocationContext(NULL);
 		}
 	} else {
 		*reservedAddressLow = NULL;
@@ -1221,7 +1219,7 @@ MM_AllocationContextBalanced::allocateFromSharedReservedRegionForNode(MM_Environ
 void *
 MM_AllocationContextBalanced::lockedSharedReserveRegionAllocateFromNode(MM_EnvironmentBase *env, MM_AllocateDescription *allocateDescription, MM_AllocationContextBalanced *requestingContext)
 {
-	void * result = NULL;
+	void *result = NULL;
 
 	MM_HeapRegionDescriptorVLHGC *region = acquireFreeRegionFromNode(env);
 	if (NULL != region) {
@@ -1233,6 +1231,8 @@ MM_AllocationContextBalanced::lockedSharedReserveRegionAllocateFromNode(MM_Envir
 		region->_allocateData._owningContext = requestingContext;
 		result = lockedAllocateArrayletLeaf(env, allocateDescription, region);
 		Assert_MM_true(region->getLowAddress() == result);
+	} else {
+		allocateDescription->setAllocationContext(NULL);
 	}
 
 	return result;
@@ -1260,7 +1260,7 @@ MM_AllocationContextBalanced::recycleToSharedArrayReservedRegion(MM_EnvironmentB
 	}
 
 	if (shouldReleaseCurrentSharedRegion) {
-		recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC::getEnvironment(env), 1, false, true);
+		recycleReservedRegionsForVirtualLargeObjectHeap(env, 1, false);
 	}
 
 	if (needLock) {
@@ -1277,23 +1277,24 @@ MM_AllocationContextBalanced::getSharedArrayReservedRegionsCount()
 }
 
 void
-MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentVLHGC *env, uintptr_t reservedRegionCount, bool needLock, bool shared)
+MM_AllocationContextBalanced::recycleReservedRegionsForVirtualLargeObjectHeap(MM_EnvironmentBase *env, uintptr_t reservedRegionCount, bool needLock)
 {
 	MM_HeapRegionDescriptorVLHGC **head = getArrayReservedRegionListAddress();
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
+	MM_EnvironmentVLHGC *envVLHGC = MM_EnvironmentVLHGC::getEnvironment(env);
 
 	if (needLock) {
 		lockCommon();
 	}
 
 	while ((reservedRegionCount > 0) && (NULL != (region = *head))) {
-		region->_allocateData.popRegionFromArrayReservedRegionList(env, head);
+		region->_allocateData.popRegionFromArrayReservedRegionList(envVLHGC, head);
 		decrementArrayReservedRegionCount();
 
 		/* Restore/Recommit the reserved region that have been previously decommitted. */
 		 MM_GCExtensions::getExtensions(env)->heap->commitMemory(region->getLowAddress(), _heapRegionManager->getRegionSize());
 
-		region->getSubSpace()->recycleRegion(env, region);
+		region->getSubSpace()->recycleRegion(envVLHGC, region);
 		reservedRegionCount -= 1;
 	}
 
