@@ -352,10 +352,6 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 	Assert_MM_true(_allocateDescription.getBytesRequested() >= _allocateDescription.getContiguousBytes());
 	uintptr_t bytesRemaining = _allocateDescription.getBytesRequested() - _allocateDescription.getContiguousBytes();
 #define REGION_RESERVE_THRESHOLD 64
-	/**
-	 * reservation of all regions in the main heap is does before we allocate them in Offheap.
-	 * Since the reservation can fail we don't want set AC pointers directly in Offheap, but only in the temp array, and after flush it in Offheap.
-	 */
 	void *allocationContexts[REGION_RESERVE_THRESHOLD];
 	void **reservedRegionAllocationContexts = allocationContexts;
 	uintptr_t reservedRegionCount = MM_Math::roundToCeiling(regionSize, bytesRemaining) / regionSize;
@@ -378,33 +374,40 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		/* Allocate the next reserved region - reserved regions are allocated solely for the purpose of
 		   decommitting the memory later on in this function. */
 		void *reservedAddressLow = NULL;
-		void *acForReservedRegion = NULL;
+		void *acForSharedArrayReservedRegion = NULL;
 
 		if (regionSize > bytesRemaining) {
 			fraction = bytesRemaining;
 			MM_AllocationContextBalanced *ac = (MM_AllocationContextBalanced *) env->getAllocationContext();
-			reservedAddressLow = ac->allocateFromSharedReservedRegion(envBase, &_allocateDescription, fraction, true);
-			/* allocation might be fulfilled by another AC */
-			acForReservedRegion = _allocateDescription.getAllocationContext();
-			if (NULL == acForReservedRegion) {
+			reservedAddressLow = ac->allocateFromSharedArrayReservedRegion(envBase, &_allocateDescription, fraction, true);
+			acForSharedArrayReservedRegion = _allocateDescription.getAllocationContext();
+			if (NULL == acForSharedArrayReservedRegion) {
 				fraction = 0;
 			}
 		} else {
 			reservedAddressLow = envBase->_objectAllocationInterface->allocateArrayletLeaf(
 					envBase, &_allocateDescription, _allocateDescription.getMemorySpace(), true);
-			/* allocation might be fulfilled by another AC */
-			acForReservedRegion = _allocateDescription.getAllocationContext();
 		}
 
-		if (NULL != acForReservedRegion) {
-			reservedRegionAllocationContexts[arrayReservedRegionCount] = acForReservedRegion;
-		} else {
-			Assert_MM_true(NULL == reservedAddressLow);
-			/* reservedRegion allocation failed set the result to NULL and return. */
-			Trc_MM_getSparseAddressAndDecommitLeaves_reserveFailed(envBase->getLanguageVMThread(), arrayReservedRegionCount);
+		/* If reservedRegion allocation failed set the result to NULL and return. */
+		if ((NULL == reservedAddressLow) && (NULL == acForSharedArrayReservedRegion)) {
+			Trc_MM_allocateAndConnectNonContiguousArraylet_leafFailure(envBase->getLanguageVMThread());
 			_allocateDescription.setSpine(NULL);
 			spine = NULL;
 			break;
+		}
+
+		if (NULL != acForSharedArrayReservedRegion) {
+			reservedRegionAllocationContexts[arrayReservedRegionCount] = acForSharedArrayReservedRegion;
+		} else {
+			Assert_MM_true(NULL != reservedAddressLow);
+			MM_HeapRegionDescriptorVLHGC *reservedRegion = (MM_HeapRegionDescriptorVLHGC *)extensions->heapRegionManager->regionDescriptorForAddress(reservedAddressLow);
+			MM_HeapRegionDataForAllocate *allocateData = &reservedRegion->_allocateData;
+			if (NULL != allocateData->_originalOwningContext) {
+				reservedRegionAllocationContexts[arrayReservedRegionCount] = allocateData->_originalOwningContext;
+			} else {
+				reservedRegionAllocationContexts[arrayReservedRegionCount] = allocateData->_owningContext;
+			}
 		}
 
 		if (NULL != reservedAddressLow) {
@@ -424,7 +427,6 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 	}
 
 	if (NULL != spine) {
-		/* only now that reservation of all regions in the main heap succeeded, we can proceed with allocating in offheap and setting AC pointers */
 		Assert_MM_true(_layout == GC_ArrayletObjectModel::InlineContiguous);
 		Assert_MM_true(indexableObjectModel->isVirtualLargeObjectHeapEnabled());
 
@@ -438,7 +440,6 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		if (NULL != virtualLargeObjectHeapAddress) {
 			indexableObjectModel->setDataAddrForContiguous((J9IndexableObject *)spine, virtualLargeObjectHeapAddress);
 		} else {
-			Trc_MM_getSparseAddressAndDecommitLeaves_allocFailed(envBase->getLanguageVMThread(), byteAmount);
 			_allocateDescription.setSpine(NULL);
 			spine = NULL;
 		}
