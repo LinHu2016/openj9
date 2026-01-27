@@ -149,6 +149,10 @@ private:
 	 */
 	void reportClassUnloadingEnd(MM_EnvironmentBase *env);
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
+	/**
+	 * Confirm free region count is equal or more than eden region count.
+	 */
+	void verifyHeapSizing(MM_EnvironmentVLHGC *env, bool isGlobalGC);
 
 protected:
 	bool initialize(MM_EnvironmentVLHGC *env);

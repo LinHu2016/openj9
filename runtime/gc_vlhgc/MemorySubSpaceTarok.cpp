@@ -963,6 +963,12 @@ MM_MemorySubSpaceTarok::checkResize(MM_EnvironmentBase *env, MM_AllocateDescript
 	intptr_t edenChangeRegions = _extensions->globalVLHGCStats._heapSizingData.edenRegionChange;
 	intptr_t edenChangeRegionsBytes = edenChangeRegions * (intptr_t)_heapRegionManager->getRegionSize();
 
+	{
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::checkResize edenChangeRegions=%d, heapSizeChangeRegions=%d\n",
+					edenChangeRegions, heapSizeChange/(intptr_t)_heapRegionManager->getRegionSize());
+	}
+
 	Trc_MM_MemorySubSpaceTarok_checkResize_2(env->getLanguageVMThread(), heapSizeChange, edenChangeRegionsBytes);
 
 	ExpandReason nonEdenHeapLastExpandReason = _extensions->heap->getResizeStats()->getLastExpandReason();
@@ -1045,6 +1051,12 @@ MM_MemorySubSpaceTarok::calculateHeapSizeChange(MM_EnvironmentBase *env, MM_Allo
 	 *        - If the hybrid value falls within the acceptable thresholds, the heap will not resize
 	 */
 	double hybridHeapScore = calculateCurrentHybridHeapOverhead(env);
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_MemorySubSpaceTarok::calculateHeapSizeChange sizeInRegionsRequired=%zu, expandToSatisfy=%d, hybridHeapScore=%f, _extensions->heapExpansionGCRatioThreshold._valueSpecified=%zu, _extensions->heapContractionGCRatioThreshold._valueSpecified=%zu\n",
+				sizeInRegionsRequired, expandToSatisfy, hybridHeapScore,
+				_extensions->heapExpansionGCRatioThreshold._valueSpecified,
+				_extensions->heapContractionGCRatioThreshold._valueSpecified);
 
 	/* Based on the hybrid overhead of gc cpu, and free memory, decide if heap should expand or contract */
 	if ((hybridHeapScore > (double)_extensions->heapExpansionGCRatioThreshold._valueSpecified) || expandToSatisfy) {

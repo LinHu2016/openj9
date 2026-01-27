@@ -1404,6 +1404,10 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env)
 		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxEdenChange, edenChangeWithSurvivorHeadroom);
 	}
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "calculateEdenSize desiredEdenChangeSize=%d, maxHeapExpansionRegions=%d, maxEdenChange=%d, _edenRegionCount=%zu, freeRegions=%zu\n",
+			 desiredEdenChangeSize, maxHeapExpansionRegions, maxEdenChange, _edenRegionCount, freeRegions);
+
 	desiredEdenChangeSize = OMR_MIN(maxEdenChange, desiredEdenChangeSize);
 
 	_edenRegionCount = (uintptr_t)OMR_MAX(1, ((intptr_t)_edenRegionCount + desiredEdenChangeSize));
