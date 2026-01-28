@@ -1709,7 +1709,20 @@ MM_SchedulingDelegate::heapReconfigured(MM_EnvironmentVLHGC *env)
 	Assert_MM_true(_idealEdenRegionCount >= _minimumEdenRegionCount);
 	
 	/* recalculate Eden Size after resize heap */
-	calculateEdenSize(env);
+	if (SATISFY_COLLECTOR == _extensions->heap->getResizeStats()->getLastExpandReason()) {
+//	if (((_extensions->globalVLHGCStats.gcCount - 1) == _extensions->heap->getResizeStats()->getLastHeapExpansionGCCount()) &&
+//		(SATISFY_COLLECTOR == _extensions->heap->getResizeStats()->getLastExpandReason())) {
+		/* don't need recalculate eden size for expending heap size for collector */
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "heapReconfigured recalculate eden size for collector _extensions->globalVLHGCStats.gcCount=%zu, getLastHeapExpansionGCCount()=%zu\n",
+				_extensions->globalVLHGCStats.gcCount, _extensions->heap->getResizeStats()->getLastHeapExpansionGCCount());
+		calculateEdenSize(env, true);
+	} else {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "heapReconfigured calculateEdenSize _extensions->globalVLHGCStats.gcCount=%zu, getLastHeapExpansionGCCount()=%zu, getLastExpandReason()=%zu\n",
+				_extensions->globalVLHGCStats.gcCount, _extensions->heap->getResizeStats()->getLastHeapExpansionGCCount(), _extensions->heap->getResizeStats()->getLastExpandReason());
+		calculateEdenSize(env);
+	}
 }
 
 uintptr_t
