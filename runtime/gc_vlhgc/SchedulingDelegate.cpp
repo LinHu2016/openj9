@@ -1392,6 +1392,7 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTot
 			_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom + (intptr_t)(_edenRegionCount - freeRegions));
 		}
 	}
+
 	/**
 	 * We account for maxEdenChange late, since it could have changed based on allowTotalHeapResize value. Meanwhile,
 	 * we had notification for full heap resizing based on old maxEdenChange value, but that is ok, since the notification accounted
@@ -1706,7 +1707,11 @@ MM_SchedulingDelegate::heapReconfigured(MM_EnvironmentVLHGC *env)
 	Assert_MM_true(_idealEdenRegionCount >= _minimumEdenRegionCount);
 	
 	/* recalculate Eden Size after resize heap */
-	calculateEdenSize(env);
+		/* don't need recalculate eden size for expending heap size for collector */
+	if ((SATISFY_COLLECTOR != _extensions->heap->getResizeStats()->getLastExpandReason()) ||
+		(_extensions->globalVLHGCStats.gcCount == _extensions->heap->getResizeStats()->getLastHeapContractionGCCount())) {
+		calculateEdenSize(env);
+	}
 }
 
 uintptr_t

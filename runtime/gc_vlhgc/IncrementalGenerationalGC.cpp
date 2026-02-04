@@ -2635,5 +2635,5 @@ MM_IncrementalGenerationalGC::verifyHeapSizing(MM_EnvironmentVLHGC *env, bool is
 				((MM_GlobalAllocationManagerTarok *)_extensions->globalAllocationManager)->getFreeRegionCount(),
 				_schedulingDelegate.getCurrentEdenSizeInRegions(env),
 				getAllocatedSinceLastPGC(),
-				(isGlobalGC)?"globleGC":"PGC");
+				(isGlobalGC)?"Global GC":"PGC");
 }

@@ -876,7 +876,7 @@ MM_MemorySubSpaceTarok::collectorExpand(MM_EnvironmentBase *env)
 	Assert_MM_true((0 == expandSize) || (_heapRegionManager->getRegionSize() == expandSize));
 
 	_extensions->heap->getResizeStats()->setLastExpandReason(SATISFY_COLLECTOR);
-	
+
 	/* expand by a single region */
 	/* for the most part the code path is not multi-threaded safe, so we do this under expandLock */
 	uintptr_t expansionAmount= expand(env, expandSize);
@@ -997,6 +997,15 @@ MM_MemorySubSpaceTarok::checkResize(MM_EnvironmentBase *env, MM_AllocateDescript
 	heapSizeChange += edenChangeRegionsBytes;
 	if (edenChangeRegionsBytes > heapSizeChange) {
 		Trc_MM_MemorySubSpaceTarok_checkResize(env->getLanguageVMThread(), heapSizeChange, edenChangeRegionsBytes);
+//		heapSizeChange = edenChangeRegionsBytes;
+
+		intptr_t freeBytes = (intptr_t)_globalAllocationManagerTarok->getFreeRegionCount()*_heapRegionManager->getRegionSize();
+		MM_IncrementalGenerationalGC *collector = (MM_IncrementalGenerationalGC*)_extensions->getGlobalCollector();
+		intptr_t edenSizeInBytes = (intptr_t) collector->getCurrentEdenSizeInBytes(NULL);
+
+		if (edenSizeInBytes > (heapSizeChange + freeBytes)) {
+			heapSizeChange = (edenSizeInBytes - freeBytes);
+		}
 	}
 
 	if (0 > heapSizeChange) {
