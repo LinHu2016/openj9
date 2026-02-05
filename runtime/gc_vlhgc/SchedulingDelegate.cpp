@@ -1707,11 +1707,7 @@ MM_SchedulingDelegate::heapReconfigured(MM_EnvironmentVLHGC *env)
 	Assert_MM_true(_idealEdenRegionCount >= _minimumEdenRegionCount);
 	
 	/* recalculate Eden Size after resize heap */
-		/* don't need recalculate eden size for expending heap size for collector */
-	if ((SATISFY_COLLECTOR != _extensions->heap->getResizeStats()->getLastExpandReason()) ||
-		(_extensions->globalVLHGCStats.gcCount == _extensions->heap->getResizeStats()->getLastHeapContractionGCCount())) {
-		calculateEdenSize(env);
-	}
+	calculateEdenSize(env);
 }
 
 uintptr_t
