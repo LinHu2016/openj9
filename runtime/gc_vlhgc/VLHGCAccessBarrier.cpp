@@ -305,16 +305,11 @@ MM_VLHGCAccessBarrier::indexableDataDisplacement(J9StackWalkState *walkState, J9
 	return displacement;
 }
 
-void*
-MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray array, jboolean *isCopy)
+
+void *
+MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread *vmThread, jarray array, jboolean *isCopy)
 {
 	void *data = NULL;
-	VM_VMAccess::inlineEnterVMFromJNI(vmThread);
-	GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
-
-	J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
-	bool alwaysCopyInCritical = (vmThread->javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
-
 	/* Set default isCopy value to JNI_FALSE, where in case we need to copy array critical
 	 * the value is set to JNI_TRUE in copyArrayCritical()
 	 */
@@ -322,34 +317,108 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		*isCopy = JNI_FALSE;
 	}
 
+	if (!_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
+		return jniGetPrimitiveArrayCriticalForArraylet(vmThread, array, isCopy);
+	}
+
+	bool alwaysCopyInCritical = (vmThread->javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
+	if (alwaysCopyInCritical) {
+		VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+		J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
+		copyArrayCritical(vmThread, &data, arrayObject, isCopy);
+		VM_VMAccess::inlineExitVMToJNI(vmThread);
+	} else {
+		/* no need to check isInlineContiguousArraylet(), if VirtualLargeObjectHeapEnabled all of array are InlineContiguous except 0 size array, deal 0-size array as adjacent array */
+		/* off heap enabled and Adjacent or not adjacent, acquire access to prevent object being moved by GC access and return a direct pointer.
+		 */
+		MM_JNICriticalRegion::enterCriticalRegion(vmThread, false);
+		J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
+		data = (void *)_extensions->indexableObjectModel.getDataPointerForContiguous(arrayObject);
+
+		if (NULL == data) {
+			/* For 0-size arrays data will NULL(return NULL) and exit the critical region. */
+			MM_JNICriticalRegion::exitCriticalRegion(vmThread, false);
+		} else {
+			/* we need to increment this region's critical count so that we know not to compact it */
+			UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
+			MM_AtomicOperations::add(criticalCount, 1);
+		}
+	}
+	return data;
+}
+
+void *
+MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCriticalForArraylet(J9VMThread *vmThread, jarray array, jboolean *isCopy)
+{
+	void *data = NULL;
+	GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
+
+	VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+
+	J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
+	bool alwaysCopyInCritical = (vmThread->javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
+
 	if (alwaysCopyInCritical || !indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
 		/* alwaysCopyInCritical or discontiguous (including 0 size array) */
 		copyArrayCritical(vmThread, &data, arrayObject, isCopy);
-	} else if (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && !indexableObjectModel->isDataAdjacentToHeader(arrayObject)) {
-		/* off heap enabled and not adjacent */
-		data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
 	} else {
-		/* Adjacent for offheap enabled and contiguous for offheap disabled.
+		/* contiguous for offheap disabled.
 		   acquire access to prevent object being moved by GC access and return a direct pointer. */
 		MM_JNICriticalRegion::enterCriticalRegion(vmThread, true);
 		Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
 		arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
 		data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
-#if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)
 		/* we need to increment this region's critical count so that we know not to compact it */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
 		MM_AtomicOperations::add(criticalCount, 1);
-#endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
 	return data;
 }
 
 void
-MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, jarray array, void * elems, jint mode)
+MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread *vmThread, jarray array, void *elems, jint mode)
 {
-	VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+	if (!_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
+		jniReleasePrimitiveArrayCriticalForArraylet(vmThread, array, elems, mode);
+		return;
+	}
+	bool alwaysCopyInCritical = (vmThread->javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
+	if (alwaysCopyInCritical) {
+		VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+		J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
+		copyBackArrayCritical(vmThread, elems, &arrayObject, mode);
+		VM_VMAccess::inlineExitVMToJNI(vmThread);
+	} else {
+		/* no need to check isInlineContiguousArraylet(), if VirtualLargeObjectHeapEnabled all of array are InlineContiguous except 0-size array,
+		 * for 0-size array(data == NULL) logs an error trace.
+		 */
+		J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
+		void *data = (void *)_extensions->indexableObjectModel.getDataPointerForContiguous(arrayObject);
+		if (elems != data) {
+			Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
+		}
+
+		if (NULL != data) {
+		/* we need to decrement this region's critical count */
+			UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
+			Assert_MM_true((*criticalCount) > 0);
+			MM_AtomicOperations::subtract(criticalCount, 1);
+			MM_JNICriticalRegion::exitCriticalRegion(vmThread, false);
+		} else {
+			/* For Zero-sized arrays we have exitCriticalRegion in jniGetPrimitiveArrayCritical. */
+			/* Zero-sized arrays result in a NULL DataPointer. jniReleasePrimitiveArrayCritical should only be called for non-NULL pointers in OffHeap enabled. */
+			Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
+		}
+	}
+}
+
+void
+MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCriticalForArraylet(J9VMThread *vmThread, jarray array, void *elems, jint mode)
+{
 	GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
+
+	VM_VMAccess::inlineEnterVMFromJNI(vmThread);
 
 	J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
 	bool alwaysCopyInCritical = (vmThread->javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
@@ -357,8 +426,6 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 	if (alwaysCopyInCritical || !indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
 		/* alwaysCopyInCritical or discontiguous (including 0 size array) */
 		copyBackArrayCritical(vmThread, elems, &arrayObject, mode);
-	} else if (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && !indexableObjectModel->isDataAdjacentToHeader(arrayObject)) {
-		/* off heap enabled and not adjacent */
 	} else {
 		/* adjacent for offheap enabled and contiguous for offheap disabled,
 		 * Objects can not be moved if critical section is active
@@ -368,58 +435,111 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 		if(elems != data) {
 			Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
 		}
-#if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)
 		/* we need to decrement this region's critical count */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
 		Assert_MM_true((*criticalCount) > 0);
 		MM_AtomicOperations::subtract(criticalCount, 1);
-#endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
 		MM_JNICriticalRegion::exitCriticalRegion(vmThread, true);
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
 }
 
-const jchar*
-MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, jboolean *isCopy)
+const jchar *
+MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread *vmThread, jstring str, jboolean *isCopy)
 {
 	jchar *data = NULL;
+	if (NULL != isCopy) {
+		*isCopy = JNI_FALSE;
+	}
+	if (!_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
+		return jniGetStringCriticalForArraylet(vmThread, str, isCopy);
+	}
+	J9JavaVM *javaVM = vmThread->javaVM;
+	bool isCompressed = false;
+	bool shouldCopy = false;
+	bool hasVMAccess = false;
+
+	if ((javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) {
+		VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+		hasVMAccess = true;
+		shouldCopy = true;
+	} else if (IS_STRING_COMPRESSION_ENABLED_VM(javaVM)) {
+		/* If the string bytes are in compressed UNICODE, then we need to copy to decompress */
+		VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+		hasVMAccess = true;
+		J9Object *stringObject = (J9Object *)J9_JNI_UNWRAP_REFERENCE(str);
+		if (IS_STRING_COMPRESSED(vmThread,stringObject)) {
+			isCompressed = true;
+			shouldCopy = true;
+		}
+	}
+
+	if (shouldCopy) {
+		J9Object *stringObject = (J9Object *)J9_JNI_UNWRAP_REFERENCE(str);
+		J9IndexableObject *valueObject = (J9IndexableObject*)J9VMJAVALANGSTRING_VALUE(vmThread, stringObject);
+
+		if (IS_STRING_COMPRESSED(vmThread, stringObject)) {
+				isCompressed = true;
+		}
+
+		copyStringCritical(vmThread, &data, valueObject, stringObject, isCopy, isCompressed);
+	} else {
+		/* no need to check isInlineContiguousArraylet(), if VirtualLargeObjectHeapEnabled all of array are InlineContiguous except 0-size array,
+		 * deal 0-size array as adjacent array.
+		 */
+		/* Acquire access and return a direct pointer. */
+		MM_JNICriticalRegion::enterCriticalRegion(vmThread, hasVMAccess);
+		J9Object *stringObject = (J9Object *)J9_JNI_UNWRAP_REFERENCE(str);
+		J9IndexableObject *valueObject = (J9IndexableObject *)J9VMJAVALANGSTRING_VALUE(vmThread, stringObject);
+
+		data = (jchar *)_extensions->indexableObjectModel.getDataPointerForContiguous(valueObject);
+
+		if (NULL == data) {
+			/* For 0-size arrays data will NULL(return NULL) and exit the critical region. */
+			MM_JNICriticalRegion::exitCriticalRegion(vmThread, hasVMAccess);
+		} else {
+			/* we need to increment this region's critical count so that we know not to compact it */
+			UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(valueObject))->_criticalRegionsInUse);
+			MM_AtomicOperations::add(criticalCount, 1);
+		}
+	}
+
+	if (hasVMAccess) {
+		VM_VMAccess::inlineExitVMToJNI(vmThread);
+	}
+	return data;
+}
+
+const jchar *
+MM_VLHGCAccessBarrier::jniGetStringCriticalForArraylet(J9VMThread *vmThread, jstring str, jboolean *isCopy)
+{
+	jchar *data = NULL;
+	GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
+
 	J9JavaVM *javaVM = vmThread->javaVM;
 	VM_VMAccess::inlineEnterVMFromJNI(vmThread);
-	GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
 
 	J9Object *stringObject = (J9Object *)J9_JNI_UNWRAP_REFERENCE(str);
 	J9IndexableObject *valueObject = (J9IndexableObject *)J9VMJAVALANGSTRING_VALUE(vmThread, stringObject);
 	/* If the string bytes are in compressed UNICODE, then we need to copy to decompress */	
 	bool isCompressed = IS_STRING_COMPRESSION_ENABLED_VM(javaVM) && IS_STRING_COMPRESSED(vmThread, stringObject);
 
-	if (NULL != isCopy) {
-		*isCopy = JNI_FALSE;
-	}
-
 	bool alwaysCopyInCritical = (javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
 	if (alwaysCopyInCritical || isCompressed || !indexableObjectModel->isInlineContiguousArraylet(valueObject)) {
 		/*  alwaysCopyInCritical or isCompressed  or discontiguous (including 0 size array) */
 		copyStringCritical(vmThread, &data, valueObject, stringObject, isCopy, isCompressed);
-	} else if (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && !indexableObjectModel->isDataAdjacentToHeader(valueObject)) {
-		/* off heap enabled and not adjacent */
-		data = (jchar *)indexableObjectModel->getDataPointerForContiguous(valueObject);
 	} else {
 		/**
-		 *  adjacent for offheap enabled and contiguous for offheap disabled
+		 *  contiguous for offheap disabled
 		 *  acquire access to prevent object being moved by GC access and return a direct pointer
 		 */
 		MM_JNICriticalRegion::enterCriticalRegion(vmThread, true);
 		Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
 		data = (jchar *)_extensions->indexableObjectModel.getDataPointerForContiguous(valueObject);
 
-		if (NULL != isCopy) {
-			*isCopy = JNI_FALSE;
-		}
-#if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)
 		/* we need to increment this region's critical count so that we know not to compact it */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(valueObject))->_criticalRegionsInUse);
 		MM_AtomicOperations::add(criticalCount, 1);
-#endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
 	}
 
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
@@ -427,11 +547,57 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, j
 }
 
 void
-MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread* vmThread, jstring str, const jchar* elems)
+MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread *vmThread, jstring str, const jchar *elems)
+{
+	if (!_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
+		jniReleaseStringCriticalForArraylet(vmThread, str, elems);
+		return;
+	}
+	J9JavaVM *javaVM = vmThread->javaVM;
+	bool hasVMAccess = false;
+	bool shouldCopy = false;
+
+	if ((javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) {
+		shouldCopy = true;
+	} else if (IS_STRING_COMPRESSION_ENABLED_VM(javaVM)) {
+		VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+		hasVMAccess = true;
+		J9Object *stringObject = (J9Object *)J9_JNI_UNWRAP_REFERENCE(str);
+		if (IS_STRING_COMPRESSED(vmThread, stringObject)) {
+			shouldCopy = true;
+		}
+	}
+
+	if (shouldCopy) {
+		freeStringCritical(vmThread, elems);
+	} else {
+		J9Object *stringObject = (J9Object *)J9_JNI_UNWRAP_REFERENCE(str);
+		J9IndexableObject *valueObject = (J9IndexableObject *)J9VMJAVALANGSTRING_VALUE(vmThread, stringObject);
+		jchar *data = (jchar *)_extensions->indexableObjectModel.getDataPointerForContiguous(valueObject);
+
+		if (NULL != data) {
+			/* we need to decrement this region's critical count */
+			UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(valueObject))->_criticalRegionsInUse);
+			Assert_MM_true((*criticalCount) > 0);
+			MM_AtomicOperations::subtract(criticalCount, 1);
+			MM_JNICriticalRegion::exitCriticalRegion(vmThread, hasVMAccess);
+		} else {
+			/* zero size String  */
+		}
+	}
+	if (hasVMAccess) {
+		VM_VMAccess::inlineExitVMToJNI(vmThread);
+	}
+}
+
+void
+MM_VLHGCAccessBarrier::jniReleaseStringCriticalForArraylet(J9VMThread *vmThread, jstring str, const jchar *elems)
 {
 	J9JavaVM *javaVM = vmThread->javaVM;
-	VM_VMAccess::inlineEnterVMFromJNI(vmThread);
+
 	GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
+
+	VM_VMAccess::inlineEnterVMFromJNI(vmThread);
 
 	J9Object *stringObject = (J9Object *)J9_JNI_UNWRAP_REFERENCE(str);
 	J9IndexableObject *valueObject = (J9IndexableObject *)J9VMJAVALANGSTRING_VALUE(vmThread, stringObject);
@@ -442,19 +608,15 @@ MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread* vmThread, jstring st
 	if (alwaysCopyInCritical || isCompressed || !indexableObjectModel->isInlineContiguousArraylet(valueObject)) {
 		/*  alwaysCopyInCritical or isCompressed  or discontiguous (including 0 size array) */
 		freeStringCritical(vmThread, elems);
-	} else if (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && !indexableObjectModel->isDataAdjacentToHeader(valueObject)) {
-		/* off heap enabled and not adjacent */
 	} else {
 		/**
-		 *  adjacent for offheap enabled and contiguous for offheap disabled,
+		 *  contiguous for offheap disabled,
 		 *  direct pointer, just drop access
 		 */
-#if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)
 		/* we need to decrement this region's critical count */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(valueObject))->_criticalRegionsInUse);
 		Assert_MM_true((*criticalCount) > 0);
 		MM_AtomicOperations::subtract(criticalCount, 1);
-#endif /* defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)*/
 		MM_JNICriticalRegion::exitCriticalRegion(vmThread, true);
 	}
 	VM_VMAccess::inlineExitVMToJNI(vmThread);
@@ -464,7 +626,7 @@ bool
 MM_VLHGCAccessBarrier::preWeakRootSlotRead(J9VMThread *vmThread, j9object_t *srcAddress)
 {
 	MM_ForwardedHeader forwardedHeader(*srcAddress, compressObjectReferences());
-	J9Object* forwardedPtr = forwardedHeader.getForwardedObject();
+	J9Object *forwardedPtr = forwardedHeader.getForwardedObject();
 	if (NULL != forwardedPtr) {
 		*srcAddress = forwardedPtr;
 	}
@@ -476,7 +638,7 @@ bool
 MM_VLHGCAccessBarrier::preWeakRootSlotRead(J9JavaVM *vm, j9object_t *srcAddress)
 {
 	MM_ForwardedHeader forwardedHeader(*srcAddress, compressObjectReferences());
-	J9Object* forwardedPtr = forwardedHeader.getForwardedObject();
+	J9Object *forwardedPtr = forwardedHeader.getForwardedObject();
 	if (NULL != forwardedPtr) {
 		*srcAddress = forwardedPtr;
 	}

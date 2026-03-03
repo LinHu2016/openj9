@@ -47,6 +47,11 @@ private:
 	void postObjectStoreImpl(J9VMThread *vmThread, J9Object *dstObject, J9Object *srcObject);
 	void postBatchObjectStoreImpl(J9VMThread *vmThread, J9Object *dstObject);
 
+	void *jniGetPrimitiveArrayCriticalForArraylet(J9VMThread *vmThread, jarray array, jboolean *isCopy);
+	void jniReleasePrimitiveArrayCriticalForArraylet(J9VMThread *vmThread, jarray array, void *elems, jint mode);
+	const jchar *jniGetStringCriticalForArraylet(J9VMThread *vmThread, jstring str, jboolean *isCopy);
+	void jniReleaseStringCriticalForArraylet(J9VMThread *vmThread, jstring str, const jchar *elems);
+
 protected:
 	virtual bool initialize(MM_EnvironmentBase *env);
 	virtual void tearDown(MM_EnvironmentBase *env);
@@ -79,10 +84,10 @@ public:
 
 	virtual IDATA indexableDataDisplacement(J9StackWalkState *walkState, J9IndexableObject *src, J9IndexableObject *dst);
 
-	virtual void* jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray array, jboolean *isCopy);
-	virtual void jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, jarray array, void * elems, jint mode);
-	virtual const jchar* jniGetStringCritical(J9VMThread* vmThread, jstring str, jboolean *isCopy);
-	virtual void jniReleaseStringCritical(J9VMThread* vmThread, jstring str, const jchar* elems);
+	virtual void *jniGetPrimitiveArrayCritical(J9VMThread *vmThread, jarray array, jboolean *isCopy);
+	virtual void jniReleasePrimitiveArrayCritical(J9VMThread *vmThread, jarray array, void *elems, jint mode);
+	virtual const jchar *jniGetStringCritical(J9VMThread *vmThread, jstring str, jboolean *isCopy);
+	virtual void jniReleaseStringCritical(J9VMThread *vmThread, jstring str, const jchar *elems);
 
 	virtual void referenceReprocess(J9VMThread *vmThread, J9Object *refObject)
 	{
