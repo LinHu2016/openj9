@@ -421,9 +421,6 @@ public:
 		return _schedulingDelegate.getCurrentEdenSizeInBytes(env);
 	}
 
-	/**
-	 *
-	 */
 	MMINLINE void reCalculateEdenSize(MM_EnvironmentVLHGC *env)
 	{
 		_schedulingDelegate.reCalculateEdenSize(env);

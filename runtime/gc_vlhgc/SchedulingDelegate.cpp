@@ -1362,7 +1362,7 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTot
 	Assert_MM_true(edenMaximumCount >= 1);
 	Assert_MM_true(edenMaximumCount >= edenMinimumCount);
 
-	/* Allow eden to expand as much as it wants, as long as the total heap can expand to accomodate it. */
+	/* Allow eden to expand as much as it wants, as long as the total heap can expand to accommodate it. */
 	uintptr_t desiredEdenCount = OMR_MAX(edenMaximumCount, edenMinimumCount);
 	intptr_t desiredEdenChangeSize = (intptr_t)desiredEdenCount - (intptr_t)_edenRegionCount;
 	/* Determine if eden should try to grow anyways, or if the heap is tight on memory */

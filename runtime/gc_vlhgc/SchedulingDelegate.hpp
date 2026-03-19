@@ -660,6 +660,9 @@ public:
 	 */
 	void heapReconfigured(MM_EnvironmentVLHGC *env);
 
+	/**
+	 * call calculateEdenSize() without allowTotalHeapResize option
+	 */
 	void reCalculateEdenSize(MM_EnvironmentVLHGC *env)
 	{
 		calculateEdenSize(env);
