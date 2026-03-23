@@ -335,6 +335,17 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread *vmThread, jarray
 		J9IndexableObject *arrayObject = (J9IndexableObject *)J9_JNI_UNWRAP_REFERENCE(array);
 		data = (void *)_extensions->indexableObjectModel.getDataPointerForContiguous(arrayObject);
 
+		/* Debug */
+		if (NULL == data) {
+			PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+			j9tty_printf(PORTLIB, "jniGetPrimitiveArrayCritical 0-size array arrayObject=%p, data=%p", arrayObject, data);
+
+			data = (void *)((uintptr_t) arrayObject + _extensions->indexableObjectModel.contiguousIndexableHeaderSize());
+
+			j9tty_printf(PORTLIB, "return=%p\n", data);
+		}
+		/* Debug */
+
 		if (NULL == data) {
 			/* For 0-size arrays data will NULL(return NULL) and exit the critical region. */
 			MM_JNICriticalRegion::exitCriticalRegion(vmThread, false);
@@ -399,7 +410,14 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread *vmThread, ja
 			Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
 		}
 
-		if (NULL != data) {
+		/* Debug */
+//		if (NULL != data) {
+		if (true) {
+			if (NULL == data) {
+				PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+				j9tty_printf(PORTLIB, "jniReleasePrimitiveArrayCritical 0-size array arrayObject=%p, data=%p, elems=%p\n", arrayObject, data, elems);
+			}
+		/* Debug */
 		/* we need to decrement this region's critical count */
 			UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
 			Assert_MM_true((*criticalCount) > 0);
@@ -494,6 +512,17 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread *vmThread, jstring str, j
 
 		data = (jchar *)_extensions->indexableObjectModel.getDataPointerForContiguous(valueObject);
 
+		/* Debug */
+		if (NULL == data) {
+			PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+			j9tty_printf(PORTLIB, "jniGetStringCritical 0-size array valueObject=%p, data=%p", valueObject, data);
+
+			data = (jchar *) ((uintptr_t) valueObject + _extensions->indexableObjectModel.contiguousIndexableHeaderSize());
+
+			j9tty_printf(PORTLIB, "return=%p\n", data);
+		}
+		/* Debug */
+
 		if (NULL == data) {
 			/* For 0-size arrays data will NULL(return NULL) and exit the critical region. */
 			MM_JNICriticalRegion::exitCriticalRegion(vmThread, hasVMAccess);
@@ -575,7 +604,14 @@ MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread *vmThread, jstring st
 		J9IndexableObject *valueObject = (J9IndexableObject *)J9VMJAVALANGSTRING_VALUE(vmThread, stringObject);
 		jchar *data = (jchar *)_extensions->indexableObjectModel.getDataPointerForContiguous(valueObject);
 
-		if (NULL != data) {
+		/* Debug */
+//		if (NULL != data) {
+		if (true) {
+			if (NULL == data) {
+				PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+				j9tty_printf(PORTLIB, "jniReleaseStringCritical 0-size array valueObject=%p, data=%p, elems=%p\n", valueObject, data, elems);
+			}
+		/* Debug */
 			/* we need to decrement this region's critical count */
 			UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(valueObject))->_criticalRegionsInUse);
 			Assert_MM_true((*criticalCount) > 0);
