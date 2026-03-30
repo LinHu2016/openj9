@@ -494,6 +494,7 @@ jvmtiIterationControl
 j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrary *portLibrary, UDATA flags, jvmtiIterationControl (*func)(J9VMThread *vmThread, J9MM_IterateObjectDescriptor *object, void *userData), void *userData)
 {
 	J9JavaVM *javaVM = vmThread->javaVM;
+	PORT_ACCESS_FROM_JAVAVM(javaVM);
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(javaVM->omrVM);
 	MM_ObjectAccessBarrier *barrier = extensions->accessBarrier;
 
@@ -510,6 +511,7 @@ j9mm_iterate_all_ownable_synchronizer_objects(J9VMThread *vmThread, J9PortLibrar
 		if (0 != regionFound) {
 			initializeObjectDescriptor(javaVM, &objectDescriptor, &regionDesc, objectPtr);
 			returnCode = func(vmThread, &objectDescriptor, userData);
+			j9tty_printf(PORTLIB, "j9mm_iterate_all_ownable_synchronizer_objects objectPtr=%p\n", objectPtr);
 			if (JVMTI_ITERATION_ABORT == returnCode) {
 				return returnCode;
 			}

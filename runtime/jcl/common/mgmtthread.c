@@ -720,6 +720,7 @@ Java_openj9_internal_tools_attach_target_DiagnosticUtils_dumpAllThreadsImpl(JNIE
 	vmfns->internalEnterVMFromJNI(currentThread);
 	vmfns->acquireExclusiveVMAccess(currentThread);
 
+	j9tty_printf(PORTLIB, "Java_openj9_internal_tools_attach_target_DiagnosticUtils_dumpAllThreadsImpl getLockedSynchronizers=%zu\n", getLockedSynchronizers);
 	/* j9gc_ensureLockedSynchronizersIntegrity can't be delayed, it must be called before fetching any references as
 	 * it may complete any GC in progress and move references */
 	if (getLockedSynchronizers) {
@@ -851,6 +852,7 @@ getArrayOfThreadInfo(JNIEnv *env, jlong *threadIDs, jint numThreads,
 	/* j9gc_ensureLockedSynchronizersIntegrity can't be delayed, it must be called before fetching any references as
 	 * it may complete any GC in progress and move references */
 	if (getLockedSynchronizers) {
+		j9tty_printf(PORTLIB, "getArrayOfThreadInfo numThreads=%zu, getLockedSynchronizers=%zu, j9gc_ensureLockedSynchronizersIntegrity()\n", numThreads, getLockedSynchronizers);
 		vm->memoryManagerFunctions->j9gc_ensureLockedSynchronizersIntegrity(currentThread);
 	}
 

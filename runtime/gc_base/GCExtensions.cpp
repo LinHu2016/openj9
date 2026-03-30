@@ -281,6 +281,10 @@ void
 MM_GCExtensions::rebuildOwnableSynchronizerObjectList(MM_EnvironmentBase* env)
 {
 	Assert_MM_true(NULL == ownableSynchronizerObjectLists);
+
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_OwnableSynchronizerObjectList::rebuildOwnableSynchronizerObjectList\n");
+
 	ownableSynchronizerObjectList->reset();
 	ownableSynchronizerObjectList->rebuildList(env);
 }

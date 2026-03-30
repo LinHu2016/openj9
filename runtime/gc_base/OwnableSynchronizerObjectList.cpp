@@ -167,32 +167,45 @@ MM_OwnableSynchronizerObjectList::ensureHeapWalkable(MM_EnvironmentBase *env)
 
 	J9VMThread *vmThread = (J9VMThread *)env->getLanguageVMThread();
 
-	uintptr_t savedGCFlags = _javaVM->requiredDebugAttributes & J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
-	if (savedGCFlags == 0) { /* if the flags was not set, you set it */
+//	uintptr_t savedGCFlags = _javaVM->requiredDebugAttributes & J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
+//	if (savedGCFlags == 0) { /* if the flags was not set, you set it */
+//		_javaVM->requiredDebugAttributes |= J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
+//	}
+	/* If heap walk is already enabled, nothing need be done */
+	if (J9_ARE_NO_BITS_SET(_javaVM->requiredDebugAttributes, J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK)) {
+		/* J9MMCONSTANT_EXPLICIT_GC_RASDUMP_COMPACT allows the GC to run while the current thread is holding
+		 * exclusive VM access.
+		 */
 		_javaVM->requiredDebugAttributes |= J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
-	}
-	/* J9MMCONSTANT_EXPLICIT_GC_RASDUMP_COMPACT allows the GC to run while the current thread is holding
-	 * exclusive VM access.
-	 */
-	_javaVM->memoryManagerFunctions->j9gc_modron_global_collect_with_overrides(vmThread, J9MMCONSTANT_EXPLICIT_GC_RASDUMP_COMPACT);
-	if (J9_GC_POLICY_METRONOME == _javaVM->gcPolicy) {
-		/* In metronome, the previous GC call may have only finished the current cycle.
-		 * Call again to ensure a full GC takes place.					 */
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "MM_OwnableSynchronizerObjectList::ensureHeapWalkable VM_ACCESS=%zu, XACCESS_EXCLUSIVE=%zu\n",
+				J9_ARE_ANY_BITS_SET(vmThread->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS),
+				(J9_XACCESS_EXCLUSIVE == _javaVM->exclusiveAccessState));
+
 		_javaVM->memoryManagerFunctions->j9gc_modron_global_collect_with_overrides(vmThread, J9MMCONSTANT_EXPLICIT_GC_RASDUMP_COMPACT);
+		if (J9_GC_POLICY_METRONOME == _javaVM->gcPolicy) {
+			/* In metronome, the previous GC call may have only finished the current cycle.
+			 * Call again to ensure a full GC takes place.					 */
+			j9tty_printf(PORTLIB, "MM_OwnableSynchronizerObjectList::ensureHeapWalkable j9gc_modron_global_collect_with_overrides second time\n");
+			_javaVM->memoryManagerFunctions->j9gc_modron_global_collect_with_overrides(vmThread, J9MMCONSTANT_EXPLICIT_GC_RASDUMP_COMPACT);
+		}
 	}
-
-
-	if (savedGCFlags == 0) { /* if you set it, you have to unset it */
-		_javaVM->requiredDebugAttributes &= ~J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
-	}
+//	if (savedGCFlags == 0) { /* if you set it, you have to unset it */
+//		_javaVM->requiredDebugAttributes &= ~J9VM_DEBUG_ATTRIBUTE_ALLOW_USER_HEAP_WALK;
+//	}
 }
 
 j9object_t
 MM_OwnableSynchronizerObjectList::getHeadOfList(MM_EnvironmentBase *env)
 {
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_OwnableSynchronizerObjectList::getHeadOfList _head=%p\n", _head);
+
 	if (_needRefresh) {
 		rebuildList(env);
 	}
+
 	return _head;
 }
 
@@ -203,6 +216,9 @@ MM_OwnableSynchronizerObjectList::rebuildList(MM_EnvironmentBase *env)
 		_javaVM = _extensions->getJavaVM();
 	}
 
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+	j9tty_printf(PORTLIB, "MM_OwnableSynchronizerObjectList::rebuildList start \n");
+
 	if ((NULL != env) && _extensions->requiresHeapWalkForRebuildingOwnableSynchronizerObjectList) {
 		ensureHeapWalkable(env);
 	}
@@ -212,6 +228,7 @@ MM_OwnableSynchronizerObjectList::rebuildList(MM_EnvironmentBase *env)
 	userData.regionDesc = NULL;
 	_javaVM->memoryManagerFunctions->j9mm_iterate_heaps(_javaVM, _javaVM->portLibrary, 0, walk_heapIteratorCallback, &userData);
 	_needRefresh = false;
+	j9tty_printf(PORTLIB, "MM_OwnableSynchronizerObjectList::rebuildList end _needRefresh=%zu\n", _needRefresh);
 }
 
 static jvmtiIterationControl
