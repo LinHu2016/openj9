@@ -25,6 +25,7 @@
 #if defined(J9VM_GC_REALTIME)
 
 #include "omr.h"
+#include "j9port.h"
 
 #include "ClassHeapIterator.hpp"
 #include "ClassLoaderIterator.hpp"
@@ -310,6 +311,10 @@ MM_MetronomeDelegate::mainSetupForGC(MM_EnvironmentBase *env)
 		default:
 			break;
 	}
+
+	if (J9MMCONSTANT_EXPLICIT_GC_RASDUMP_COMPACT == env->_cycleState->_gcCode.getCode()) {
+		_extensions->_runtimeCheckDynamicClassUnloading = false;
+	}
 #endif /* J9VM_GC_DYNAMIC_CLASS_UNLOADING */
 
 #if defined(J9VM_GC_FINALIZATION)
@@ -352,6 +357,10 @@ MM_MetronomeDelegate::incrementalCollect(MM_EnvironmentRealtime *env)
 		_realtimeGC->setCollectorUnloadingClassLoaders();
 		reportClassUnloadingStart(env);
 		classUnloadStats->_startTime = j9time_hires_clock();
+
+		j9tty_printf(PORTLIB, "MM_MetronomeDelegate::incrementalCollect unloadDeadClassLoaders VM_ACCESS=%zu\n",
+				J9_ARE_ANY_BITS_SET(((J9VMThread *)env->getLanguageVMThread())->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS));
+
 		unloadDeadClassLoaders(env);
 		classUnloadStats->_endTime = j9time_hires_clock();
 		reportClassUnloadingEnd(env);
@@ -521,6 +530,8 @@ MM_MetronomeDelegate::addDyingClassesToList(MM_EnvironmentRealtime *env, J9Class
 					Trc_MM_cleanUpClassLoadersStart_triggerClassUnload(env->getLanguageVMThread(),clazz,
 								(UDATA) J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(clazz->romClass)),
 								J9UTF8_DATA(J9ROMCLASS_CLASSNAME(clazz->romClass)));
+					PORT_ACCESS_FROM_ENVIRONMENT(env);
+					j9tty_printf(PORTLIB, "addDyingClassesToList TRIGGER_J9HOOK_VM_CLASS_UNLOAD clazz=%p\n", clazz);
 					TRIGGER_J9HOOK_VM_CLASS_UNLOAD(_javaVM->hookInterface, vmThread, clazz);
 						
 					/* add class to dying anonymous classes link list */

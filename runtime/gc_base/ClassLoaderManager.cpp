@@ -414,6 +414,9 @@ MM_ClassLoaderManager::addDyingClassesToList(MM_EnvironmentBase *env, J9ClassLoa
 					Trc_MM_cleanUpClassLoadersStart_triggerClassUnload(env->getLanguageVMThread(),clazz,
 								(uintptr_t)J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(clazz->romClass)),
 								J9UTF8_DATA(J9ROMCLASS_CLASSNAME(clazz->romClass)));
+
+					PORT_ACCESS_FROM_ENVIRONMENT(env);
+					j9tty_printf(PORTLIB, "addDyingClassesToList TRIGGER_J9HOOK_VM_CLASS_UNLOAD clazz=%p\n", clazz);
 					TRIGGER_J9HOOK_VM_CLASS_UNLOAD(_javaVM->hookInterface, vmThread, clazz);
 
 					/* add class to dying classes link list */
