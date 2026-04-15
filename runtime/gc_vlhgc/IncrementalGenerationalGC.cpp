@@ -1578,8 +1578,6 @@ MM_IncrementalGenerationalGC::incrementRegionAge(MM_EnvironmentVLHGC *env, MM_He
 			logicalAge);
 
 	region->setAge(logicalAge);
-	/* Update compact group tracking after aging */
-	region->updateCompactGroupTracking(env);
 }
 
 void
@@ -1594,8 +1592,6 @@ MM_IncrementalGenerationalGC::setRegionAgesToMax(MM_EnvironmentVLHGC *env)
 		 */
 		if(region->containsObjects()) {
 			region->setAge(_extensions->tarokRegionMaxAge);
-			/* Update compact group tracking after setting age to max */
-			region->updateCompactGroupTracking(env);
 			/* migrate to common context */
 			MM_AllocationContextTarok *owner = region->_allocateData._owningContext;
 			if ( (owner != commonContext) && owner->shouldMigrateRegionToCommonContext(env, region) ) {
@@ -1608,8 +1604,6 @@ MM_IncrementalGenerationalGC::setRegionAgesToMax(MM_EnvironmentVLHGC *env)
 		} else if (region->isArrayletLeaf()) {
 			/* adjust age for arraylet leaves */
 			region->setAge(_extensions->tarokRegionMaxAge);
-			/* Update compact group tracking for arraylet leaves */
-			region->updateCompactGroupTracking(env);
 		}
 	}
 }
