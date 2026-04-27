@@ -5647,7 +5647,6 @@ MM_CopyForwardScheme::setRegionAsSurvivor(MM_EnvironmentVLHGC *env, MM_HeapRegio
 void
 MM_CopyForwardScheme::setAllocationAgeForMergedRegion(MM_EnvironmentVLHGC *env, MM_HeapRegionDescriptorVLHGC *region)
 {
-	uintptr_t compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 	uintptr_t usedBytes = region->getSize() - region->getMemoryPool()->getFreeMemoryAndDarkMatterBytes();
 
 	Assert_MM_true(0 != usedBytes);
@@ -5655,15 +5654,7 @@ MM_CopyForwardScheme::setAllocationAgeForMergedRegion(MM_EnvironmentVLHGC *env, 
 	/* convert allocation age product (usedBytes * age) back to pure age */
 	uint64_t newAllocationAge = (uint64_t)(region->getAllocationAgeSizeProduct() / (double)usedBytes);
 
-	Trc_MM_CopyForwardScheme_setAllocationAgeForMergedRegion(env->getLanguageVMThread(), _regionManager->mapDescriptorToRegionTableIndex(region), compactGroup,
-	    region->getAllocationAgeSizeProduct() / (1024 * 1024) / (1024 * 1024), (double)usedBytes / (1024 * 1024), (double)newAllocationAge / (1024 * 1024),
-	    (double)region->getLowerAgeBound() / (1024 * 1024), (double)region->getUpperAgeBound() / (1024 * 1024));
-
-	if (_extensions->tarokAllocationAgeEnabled) {
-		Assert_MM_true(newAllocationAge < _extensions->compactGroupPersistentStats[compactGroup]._maxAllocationAge);
-		Assert_MM_true((MM_CompactGroupManager::getRegionAgeFromGroup(env, compactGroup) == 0) || (newAllocationAge >= _extensions->compactGroupPersistentStats[compactGroup - 1]._maxAllocationAge));
-	}
-
+	uintptr_t compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
 	uintptr_t logicalAge = 0;
 	if (_extensions->tarokAllocationAgeEnabled) {
 		logicalAge = MM_CompactGroupManager::calculateLogicalAgeForRegion(env, newAllocationAge);
@@ -5672,6 +5663,18 @@ MM_CopyForwardScheme::setAllocationAgeForMergedRegion(MM_EnvironmentVLHGC *env, 
 	}
 
 	region->setAge(newAllocationAge, logicalAge);
+
+	if (_extensions->tarokAllocationAgeEnabled) {
+		/* NOW get compact group based on the CORRECT logical age */
+		compactGroup = MM_CompactGroupManager::getCompactGroupNumber(env, region);
+		Assert_MM_true(newAllocationAge < _extensions->compactGroupPersistentStats[compactGroup]._maxAllocationAge);
+		Assert_MM_true((MM_CompactGroupManager::getRegionAgeFromGroup(env, compactGroup) == 0) || (newAllocationAge >= _extensions->compactGroupPersistentStats[compactGroup - 1]._maxAllocationAge));
+	}
+
+	Trc_MM_CopyForwardScheme_setAllocationAgeForMergedRegion(env->getLanguageVMThread(), _regionManager->mapDescriptorToRegionTableIndex(region), compactGroup,
+	    region->getAllocationAgeSizeProduct() / (1024 * 1024) / (1024 * 1024), (double)usedBytes / (1024 * 1024), (double)newAllocationAge / (1024 * 1024),
+	    (double)region->getLowerAgeBound() / (1024 * 1024), (double)region->getUpperAgeBound() / (1024 * 1024));
+
 	/* reset aging auxiliary datea for future usage */
 	region->setAllocationAgeSizeProduct(0.0);
 }
