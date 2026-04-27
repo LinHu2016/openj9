@@ -146,7 +146,12 @@ public:
 		double exponentBase = extensions->tarokAllocationAgeExponentBase;
 
 		Assert_MM_true(unit > 0);
-		Assert_MM_true(allocationAge <= extensions->tarokMaximumAgeInBytes);
+		if (allocationAge > extensions->tarokMaximumAgeInBytes) {
+			PORT_ACCESS_FROM_ENVIRONMENT(env);
+			j9tty_printf(PORTLIB, "calculateLogicalAgeForRegion allocationAge=%zu, unit=%zu, extensions->tarokMaximumAgeInBytes=%zu, exponentBase=%f, extensions->tarokRegionMaxAge=%zu \n",
+					allocationAge, unit, extensions->tarokMaximumAgeInBytes, exponentBase, extensions->tarokRegionMaxAge);
+			Assert_MM_true(allocationAge <= extensions->tarokMaximumAgeInBytes);
+		}
 
 		UDATA logicalAge = 0;
 		bool tooLarge = false;

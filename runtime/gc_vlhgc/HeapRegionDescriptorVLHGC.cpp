@@ -50,6 +50,7 @@ MM_HeapRegionDescriptorVLHGC::MM_HeapRegionDescriptorVLHGC(MM_EnvironmentVLHGC *
 	,_extensions(MM_GCExtensions::getExtensions(env))
 	,_allocationAge(0)
 	,_allocationAgeSizeProduct(0.0)
+	,_allocationSize(0)
 	,_age(0)
 	,_rememberedSetCardList()
 	,_rsclBufferPool(NULL)
@@ -168,6 +169,8 @@ MM_HeapRegionDescriptorVLHGC::resetAge(MM_EnvironmentVLHGC *env, U_64 allocation
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
 	uintptr_t logicalAge = 0;
 	if (extensions->tarokAllocationAgeEnabled) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "resetAge allocationAge=%zu\n", allocationAge);
 		logicalAge = MM_CompactGroupManager::calculateLogicalAgeForRegion(env, allocationAge);
 	}
 	setAge(allocationAge, logicalAge);

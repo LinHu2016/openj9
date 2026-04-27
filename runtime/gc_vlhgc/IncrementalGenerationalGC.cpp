@@ -1625,6 +1625,8 @@ MM_IncrementalGenerationalGC::incrementRegionAge(MM_EnvironmentVLHGC *env, MM_He
 
 	UDATA logicalAge = 0;
 	if (_extensions->tarokAllocationAgeEnabled) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "incrementRegionAge allocationAge=%zu, maxAgeInBytes=%zu \n", allocationAge, maxAgeInBytes);
 		logicalAge = MM_CompactGroupManager::calculateLogicalAgeForRegion(env, allocationAge);
 	} else {
 		/* Calculate age for PGC-count-based (old) aging system */
@@ -1636,7 +1638,7 @@ MM_IncrementalGenerationalGC::incrementRegionAge(MM_EnvironmentVLHGC *env, MM_He
 		}
 	}
 	
-	region->incrementAgeBounds(increment);
+	region->incrementAgeBounds(increment, maxAgeInBytes);
 
 	Trc_MM_IncrementalGenerationalGC_incrementRegionAge(env->getLanguageVMThread(),
 			_regionManager->mapDescriptorToRegionTableIndex(region),

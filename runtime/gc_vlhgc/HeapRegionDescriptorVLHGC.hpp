@@ -94,6 +94,9 @@ private:
 	U_64 _lowerAgeBound; /**< lowest possible age of any object in this region */
 	U_64 _upperAgeBound; /**< highest possible age of any object in this region */
 	double _allocationAgeSizeProduct; /**< sum of (age * size) products for each object in the region. used for age merging math in survivor regions */
+
+	uintptr_t _allocationSize;
+
 	uintptr_t _age; /**< logical allocation age (number of GC cycles since the last attempted allocation) */
 	MM_RememberedSetCardList _rememberedSetCardList; /**< remembered set card list */
 	MM_RememberedSetCard *_rsclBufferPool;			 /**< RSCL Buffer pool owned by this region (Buffers can still be shared among other regions) */
@@ -128,23 +131,28 @@ public:
 		 return _allocationAgeSizeProduct;
 	}
 
+	MMINLINE uintptr_t getAllocationSize()
+	{
+		 return _allocationSize;
+	}
 	/**
 	 * set current value of (age * size) product used for survivor regions (used for setting its initial value)
 	 */
-	MMINLINE void setAllocationAgeSizeProduct(double allocationAgeSizeProduct)
+	MMINLINE void setAllocationAgeSizeProduct(double allocationAgeSizeProduct, uintptr_t allocationSize)
 	{
+		 _allocationSize = allocationSize;
 		 _allocationAgeSizeProduct = allocationAgeSizeProduct;
 	}
-
 
 	/**
 	 * increment atomically allocation (age * size) product
 	 * @param allocationAgeSizeProduct age to increment with
 	 * @return new allocationAgeSizeProduct value
 	 */
-	MMINLINE double atomicIncrementAllocationAgeSizeProduct(double allocationAgeSizeProduct)
+	MMINLINE double atomicIncrementAllocationAgeSizeProduct(double allocationAgeSizeProduct, uintptr_t allocationSize)
 	{
-		 return MM_AtomicOperations::addDouble(&_allocationAgeSizeProduct, allocationAgeSizeProduct);
+		MM_AtomicOperations::add(&_allocationSize, allocationSize);
+		return MM_AtomicOperations::addDouble(&_allocationAgeSizeProduct, allocationAgeSizeProduct);
 	}
 
 	/**
@@ -176,9 +184,15 @@ public:
 	/**
 	 * Increment lowest and higher object age bounds (when doing region aging)
 	 */
-	MMINLINE void incrementAgeBounds(uintptr_t increment) {
-		_lowerAgeBound += increment;
-		_upperAgeBound += increment;
+	MMINLINE void incrementAgeBounds(uintptr_t increment, U_64 maxAgeInBytes) {
+		U_64 newLower = _lowerAgeBound + increment;
+		U_64 newUpper = _upperAgeBound + increment;
+
+		// Saturate at maximum age
+		_lowerAgeBound = (newLower < _lowerAgeBound || newLower > maxAgeInBytes)
+							? maxAgeInBytes : newLower;
+		_upperAgeBound = (newUpper < _upperAgeBound || newUpper > maxAgeInBytes)
+							? maxAgeInBytes : newUpper;
 	}
 
 	/**

@@ -90,6 +90,8 @@ monitorWaitImpl(J9VMThread *vmThread, j9object_t object, I_64 millis, I_32 nanos
 		PORT_ACCESS_FROM_JAVAVM(javaVM);
 		J9Class *monitorClass = NULL;
 		I_64 startTicks = j9time_nano_time();
+#if JAVA_SPEC_VERSION >= 24
+#endif /* JAVA_SPEC_VERSION >= 24 */
 
 		monitorClass = J9OBJECT_CLAZZ(vmThread, object);
 
