@@ -181,6 +181,11 @@ MM_CompactGroupPersistentStats::updateProjectedSurvivalRate(MM_EnvironmentVLHGC 
 		Assert_MM_true(newSurvivalRate >= 0.0);
 		Assert_MM_true(newSurvivalRate <= 1.0);
 
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "updateProjectedSurvivalRate Historical Survival Rate compactGroup=%zu, totalBytesBeforeCollect=%zu, liveBytesInCollectedSetAfterCollect=%zu, weightOfOldStats=%f, weightOfNewStats=%f, thisSurvivalRate=%f, oldSurvivalRate=%f, newSurvivalRate=%f\n",
+				compactGroup, totalBytesBeforeCollect, liveBytesInCollectedSetAfterCollect, weightOfOldStats, weightOfNewStats, thisSurvivalRate, persistentStats->_historicalSurvivalRate, newSurvivalRate);
+
+
 		persistentStats->_historicalSurvivalRate = newSurvivalRate;
 	}
 
@@ -320,6 +325,11 @@ MM_CompactGroupPersistentStats::updateProjectedSurvivalRate(MM_EnvironmentVLHGC 
 		}
 		persistentStats->_projectedInstantaneousSurvivalRatePerAgeUnit = (observedWeight * thisSurvivalRate) + ((1.0 - observedWeight) * oldSurvivalRate);
 		persistentStats->_projectedInstantaneousSurvivalRate = pow(persistentStats->_projectedInstantaneousSurvivalRatePerAgeUnit, maxAgeUnitsInThisGroup);
+
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "updateProjectedSurvivalRate the projected instantaneous survival rate compactGroup=%zu, edenFraction=%zu, nonEdenFraction=%zu, thisSurvivalRateForEdenFraction=%f, thisSurvivalRateForNonEdenFraction=%f, weightedMeanSurvivalRate=%f, _projectedInstantaneousSurvivalRateThisPGCPerAgeUnit=%f oldSurvivalRate=%f, _projectedInstantaneousSurvivalRate=%f,\n",
+				compactGroup, edenFractionOfCompactGroup, nonEdenFractionOfCompactGroup, thisSurvivalRateForEdenFraction, thisSurvivalRateForNonEdenFraction, weightedMeanSurvivalRate, thisSurvivalRate, oldSurvivalRate, persistentStats->_projectedInstantaneousSurvivalRate);
+
 
 		Trc_MM_CompactGroupPersistentStats_updateProjectedSurvivalRate_Exit(env->getLanguageVMThread(), compactGroup, thisSurvivalRateForEdenFraction, thisSurvivalRateForNonEdenFraction,
 		 weightedMeanSurvivalRate, ageUnitsInThisAgeGroup, thisSurvivalRate, persistentStats->_projectedInstantaneousSurvivalRate, persistentStats->_projectedInstantaneousSurvivalRatePerAgeUnit);
