@@ -399,6 +399,34 @@ MM_SchedulingDelegate::partialGarbageCollectCompleted(MM_EnvironmentVLHGC *env, 
 		   will skip update Survival Rate */
 		if (0 != edenCountBeforeCollect) {
 			double thisSurvivalRate = (double)edenSurvivorCount / (double)edenCountBeforeCollect;
+
+			if (1.0 < thisSurvivalRate) {
+				j9tty_printf(PORTLIB, "partialGarbageCollectCompleted regionSize=%zu, copyForwardStats->_aborted=%zu, copyForwardStats->_nonEvacuateRegionCount=%zu, thisSurvivalRate=%f, copyForwardStats->_edenEvacuateRegionCount=%zu, edenCountBeforeCollect=%zu, copyForwardStats->_scanBytesEden=%zu, copyForwardStats->_edenSurvivorRegionCount=%zu, edenSurvivorCount=%zu, copyForwardStats->_nonEdenEvacuateRegionCount=%zu, nonEdenSurvivorCount=%zu\n",
+						regionSize,
+						copyForwardStats->_aborted,
+						copyForwardStats->_nonEvacuateRegionCount,
+						thisSurvivalRate,
+						copyForwardStats->_edenEvacuateRegionCount,
+						edenCountBeforeCollect, copyForwardStats->_scanBytesEden,
+						copyForwardStats->_edenSurvivorRegionCount,
+						edenSurvivorCount,
+						copyForwardStats->_nonEdenEvacuateRegionCount,
+						nonEdenSurvivorCount);
+
+				Assert_GC_true_with_message(env, (4.0 > thisSurvivalRate),
+						"partialGarbageCollectCompleted regionSize=%zu, copyForwardStats->_aborted=%zu, copyForwardStats->_nonEvacuateRegionCount=%zu, thisSurvivalRate=%f, copyForwardStats->_edenEvacuateRegionCount=%zu, edenCountBeforeCollect=%zu, copyForwardStats->_scanBytesEden=%zu, copyForwardStats->_edenSurvivorRegionCount=%zu, edenSurvivorCount=%zu, copyForwardStats->_nonEdenEvacuateRegionCount=%zu, nonEdenSurvivorCount=%zu\n",
+						regionSize,
+						copyForwardStats->_aborted,
+						copyForwardStats->_nonEvacuateRegionCount,
+						thisSurvivalRate,
+						copyForwardStats->_edenEvacuateRegionCount,
+						edenCountBeforeCollect, copyForwardStats->_scanBytesEden,
+						copyForwardStats->_edenSurvivorRegionCount,
+						edenSurvivorCount,
+						copyForwardStats->_nonEdenEvacuateRegionCount,
+						nonEdenSurvivorCount);
+			}
+
 			updateSurvivalRatesAfterCopyForward(thisSurvivalRate, nonEdenSurvivorCount);
 		}
 
@@ -1374,6 +1402,7 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTot
 
 	/* Eden size can not be bigger than free region size. */
 	intptr_t maxEdenChange = freeRegions - _edenRegionCount;
+	uintptr_t  oldEdenRegionCount = _edenRegionCount;
 	if (allowTotalHeapResize) {
 
 		maxEdenChange += maxHeapExpansionRegions;
@@ -1381,7 +1410,10 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTot
 		 * If heap is fully expanded (or close to) make sure that there are enough free regions to satisfy given eden size change.
 		 */
 		/* Proportionally adjust survivor area. */
-		intptr_t edenChangeWithSurvivorHeadroom = desiredEdenChangeSize + (intptr_t)ceil((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward);
+		intptr_t edenChangeWithSurvivorHeadroom = desiredEdenChangeSize;
+//		if (desiredEdenChangeSize > 0) {
+			edenChangeWithSurvivorHeadroom += (intptr_t)ceil((double)desiredEdenChangeSize * _edenSurvivalRateCopyForward);
+//		}
 		/* Inform the total heap resizing logic, that it needs to change total heap size in order to maintain same "non-eden" size. */
 		if (freeRegions > _edenRegionCount) {
 			_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom);
@@ -1391,6 +1423,11 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTot
 			 */
 			_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = OMR_MIN(maxHeapExpansionRegions, edenChangeWithSurvivorHeadroom + (intptr_t)(_edenRegionCount - freeRegions));
 		}
+//		if (0 > (freeRegions + _extensions->globalVLHGCStats._heapSizingData.edenRegionChange)) {
+//			_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = -freeRegions;
+//		}
+	} else {
+//		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = 0;
 	}
 
 	/**
@@ -1403,6 +1440,16 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTot
 	_edenRegionCount = _edenRegionCount + desiredEdenChangeSize;
 
 	Trc_MM_SchedulingDelegate_calculateEdenSize_Exit(env->getLanguageVMThread(), (_edenRegionCount * regionSize));
+
+	if (_extensions->globalVLHGCStats._heapSizingData.edenRegionChange < 0) {
+		PORT_ACCESS_FROM_ENVIRONMENT(env);
+		j9tty_printf(PORTLIB, "calculateEdenSize allowTotalHeapResize=%d, oldEdenRegionCount=%zu, _edenRegionCount=%d, freeRegions=%d, maxHeapExpansionRegions=%d, maxEdenChange=%d, desiredEdenCount=%zu, _extensions->globalVLHGCStats._heapSizingData.edenRegionChange=%d\n",
+					allowTotalHeapResize, oldEdenRegionCount, _edenRegionCount, freeRegions, maxHeapExpansionRegions, maxEdenChange, desiredEdenCount, _extensions->globalVLHGCStats._heapSizingData.edenRegionChange);
+	}
+
+	Assert_GC_true_with_message(env, (0 < _edenRegionCount) && ((freeRegions + _extensions->globalVLHGCStats._heapSizingData.edenRegionChange) >= 0),
+			"calculateEdenSize allowTotalHeapResize=%d, oldEdenRegionCount=%zu, _edenRegionCount=%d, freeRegions=%d, maxHeapExpansionRegions=%d, maxEdenChange=%d, desiredEdenCount=%zu, _extensions->globalVLHGCStats._heapSizingData.edenRegionChange=%d\n",
+			allowTotalHeapResize, oldEdenRegionCount, _edenRegionCount, freeRegions, maxHeapExpansionRegions, maxEdenChange, desiredEdenCount, _extensions->globalVLHGCStats._heapSizingData.edenRegionChange);
 }
 
 intptr_t
