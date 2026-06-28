@@ -372,7 +372,16 @@ MM_SchedulingDelegate::partialGarbageCollectCompleted(MM_EnvironmentVLHGC *env, 
 	bool globalSweepHappened = _globalSweepRequired;
 	_globalSweepRequired = false;
 	/* copy out the Eden size of the previous interval (between the last PGC and this one) before we recalculate the next one */
-	uintptr_t edenCountBeforeCollect = getCurrentEdenSizeInRegions(env);
+//	uintptr_t edenCountBeforeCollect = getCurrentEdenSizeInRegions(env);
+	/* During GC, the heap may expand to allow the current collection to continue.
+	 * A heap resize triggers an eden size recalculation without allowing further
+	 * heap expansion (heap reconfiguration). As a result, the newly calculated
+	 * eden size can differ significantly from the eden size at the start of the
+	 * collection, causing the SurvivalRate calculation to become inaccurate.
+	 * Therefore, set copyForwardStats->_edenEvacuateRegionCount to
+	 * edenCountBeforeCollect.
+	 */
+	uintptr_t edenCountBeforeCollect = copyForwardStats->_edenEvacuateRegionCount;
 	
 	Trc_MM_SchedulingDelegate_partialGarbageCollectCompleted_stats(env->getLanguageVMThread(),
 			copyForwardStats->_edenEvacuateRegionCount,
@@ -1427,7 +1436,7 @@ MM_SchedulingDelegate::calculateEdenSize(MM_EnvironmentVLHGC *env, bool allowTot
 //			_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = -freeRegions;
 //		}
 	} else {
-//		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = 0;
+		_extensions->globalVLHGCStats._heapSizingData.edenRegionChange = 0;
 	}
 
 	/**
