@@ -397,13 +397,21 @@ MM_SchedulingDelegate::partialGarbageCollectCompleted(MM_EnvironmentVLHGC *env, 
 		uintptr_t edenSurvivorCount = copyForwardStats->_edenSurvivorRegionCount;
 		uintptr_t nonEdenSurvivorCount = copyForwardStats->_nonEdenSurvivorRegionCount;
 		
+		/* Adjust edenSurvivorCount and nonEdenSurvivorCount based on _copyBytesEden due to fresh survivor region could be shared between eden evacuateRegions and age0 nonEden evacuateRegions */
+		if (copyForwardStats->_copyBytesEden > 0) {
+			uintptr_t neededEdenSurvivorCount = (copyForwardStats->_copyBytesEden +regionSize - 1) / regionSize;
+			if (neededEdenSurvivorCount != edenSurvivorCount) {
+				nonEdenSurvivorCount = nonEdenSurvivorCount + edenSurvivorCount - neededEdenSurvivorCount;
+				edenSurvivorCount = neededEdenSurvivorCount;
+			}
+		}
 		/* estimate how many more regions we would have needed to avoid abort */
 		Assert_MM_true( (0 == copyForwardStats->_scanBytesEden) || copyForwardStats->_aborted || (0 != copyForwardStats->_nonEvacuateRegionCount));
 		Assert_MM_true( (0 == copyForwardStats->_scanBytesNonEden) || copyForwardStats->_aborted || (0 != copyForwardStats->_nonEvacuateRegionCount));
+		Assert_GC_true_with_message(env, edenSurvivorCount <= edenCountBeforeCollect + 1,
+				"PGCCompleted  _edenSurvivor=%zu, _nonEdenSurvivor=%zu, _edenEvacuate=%zu, _nonEdenEvacuate=%zu, edenSurvivor=%zu, curEden=%zu, nonEdenSurvivor=%zu, _nonEvacuate=%zu, _scanBytesEden=%zu, numa=%zu\n",
+				copyForwardStats->_edenSurvivorRegionCount, copyForwardStats->_nonEdenSurvivorRegionCount, copyForwardStats->_edenEvacuateRegionCount, copyForwardStats->_nonEdenEvacuateRegionCount, edenSurvivorCount, getCurrentEdenSizeInRegions(env), nonEdenSurvivorCount, copyForwardStats->_nonEvacuateRegionCount, copyForwardStats->_scanBytesEden, _extensions->_numaManager.getAffinityLeaderCount());
 		edenSurvivorCount += (copyForwardStats->_scanBytesEden + regionSize - 1) / regionSize;
-		Assert_GC_true_with_message(env, copyForwardStats->_edenSurvivorRegionCount <= edenCountBeforeCollect,
-				"partialGarbageCollectCompleted copyForwardStats->_edenSurvivorRegionCount=%zu, copyForwardStats->_edenEvacuateRegionCount=%zu, edenCountBeforeCollect=%zu, edenSurvivorCount=%zu, copyForwardStats->_aborted=%zu, getCurrentEdenSizeInRegions(env)=%zu\n",
-				copyForwardStats->_edenSurvivorRegionCount, copyForwardStats->_edenEvacuateRegionCount, edenCountBeforeCollect, edenSurvivorCount, copyForwardStats->_aborted, getCurrentEdenSizeInRegions(env));
 		if (edenSurvivorCount > edenCountBeforeCollect) {
 			/* when abort is in progress, every Eden object scanned in abort-recovery contributes to _scannedBytes.
 			 * But an object that was partially copied before abort (the copy succeeded,
@@ -411,7 +419,9 @@ MM_SchedulingDelegate::partialGarbageCollectCompleted(MM_EnvironmentVLHGC *env, 
 			 * So _scanBytesEden might be double-counted, then cause edenSurvivorCount is bigger than edenCountBeforeCollect.
 			 * for this case, set edenSurvivorCount = edenCountBeforeCollect.
 			 */
-			Assert_MM_true(copyForwardStats->_aborted);
+			Assert_GC_true_with_message(env, copyForwardStats->_aborted || (edenSurvivorCount <= edenCountBeforeCollect + 1),
+					"PGCCompleted2 _edenSurvivor=%zu, _nonEdenSurvivor=%zu, _edenEvacuate=%zu, _nonEdenEvacuate=%zu, edenSurvivor=%zu, curEden=%zu, nonEdenSurvivor=%zu, _nonEvacuate=%zu, _scanBytesEden=%zu, numa=%zu\n",
+					copyForwardStats->_edenSurvivorRegionCount, copyForwardStats->_nonEdenSurvivorRegionCount, copyForwardStats->_edenEvacuateRegionCount, copyForwardStats->_nonEdenEvacuateRegionCount, edenSurvivorCount, getCurrentEdenSizeInRegions(env), nonEdenSurvivorCount, copyForwardStats->_nonEvacuateRegionCount, copyForwardStats->_scanBytesEden, _extensions->_numaManager.getAffinityLeaderCount());
 			edenSurvivorCount = edenCountBeforeCollect;
 		}
 		nonEdenSurvivorCount += (copyForwardStats->_scanBytesNonEden + regionSize - 1) / regionSize;

@@ -53,6 +53,7 @@ public:
 	uint64_t _lowerAgeBound; /**< lowest possible age of any object in this copy cache */
 	uint64_t _upperAgeBound; /**< highest possible age of any object in this copy cache */
 	uintptr_t _arraySplitIndex; /**< The index within the array in scanCurrent to start scanning from (meaningful is OMR_COPYSCAN_CACHE_TYPE_SPLIT_ARRAY is set) */
+	bool _hasEdenContent; /**< true if at least one object copied into this cache originated from an Eden (ADDRESS_ORDERED) source region */
 
 	/* Members Function */
 private:
@@ -88,6 +89,7 @@ public:
 		, _lowerAgeBound(U_64_MAX)
 		, _upperAgeBound(0)
 		, _arraySplitIndex(0)
+		, _hasEdenContent(false)
 	{}
 };
 

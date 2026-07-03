@@ -83,6 +83,7 @@ MM_HeapRegionDescriptorVLHGC::initialize(MM_EnvironmentBase *env, MM_HeapRegionM
 	_copyForwardData._survivor = false;
 	_copyForwardData._freshSurvivor = false;
 	_copyForwardData._nextRegion = NULL;
+	_copyForwardData._hasEdenContent = false;
 	_copyForwardData._previousRegion = NULL;
 
 #if defined (J9VM_GC_MODRON_COMPACTION)

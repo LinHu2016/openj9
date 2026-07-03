@@ -493,6 +493,8 @@ MM_CopyForwardScheme::preProcessRegions(MM_EnvironmentVLHGC *env)
 	while (NULL != (region = regionIterator.nextRegion())) {
 		region->_copyForwardData._survivor = false;
 		region->_copyForwardData._freshSurvivor = false;
+		region->_copyForwardData._hasEdenContent = false;
+
 		_regionShouldMark[_regionManager->mapDescriptorToRegionTableIndex(region)] = region->_markData._shouldMark;
 		if (region->containsObjects()) {
 			region->_copyForwardData._initialLiveSet = true;
@@ -541,8 +543,13 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 				static_cast<MM_CycleStateVLHGC *>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._nonEdenEvacuateRegionCount += 1;
 			}
 		} else if (region->isFreshSurvivorRegion()) {
-			/* check Eden Survivor Regions */
-			if (0 == region->getLogicalAge()) {
+			/* Classify the survivor region by the Eden-ness of its source objects.
+			 * _hasEdenContent is set during copy when sourceRegion->isEden() (ADDRESS_ORDERED type),
+			 * which is the same predicate used on the evacuate side.  This avoids the previous bug
+			 * where logicalAge==0 was used instead, which incorrectly included survivors from
+			 * non-Eden regions at compact group 0 (type ADDRESS_ORDERED_MARKED).
+			 */
+			if (region->_copyForwardData._hasEdenContent) {
 				static_cast<MM_CycleStateVLHGC *>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._edenSurvivorRegionCount += 1;
 			} else {
 				static_cast<MM_CycleStateVLHGC *>(env->_cycleState)->_vlhgcIncrementStats._copyForwardStats._nonEdenSurvivorRegionCount += 1;
@@ -582,6 +589,7 @@ MM_CopyForwardScheme::postProcessRegions(MM_EnvironmentVLHGC *env)
 		region->_copyForwardData._requiresPhantomReferenceProcessing = false;
 		region->_copyForwardData._survivor = false;
 		region->_copyForwardData._freshSurvivor = false;
+		region->_copyForwardData._hasEdenContent = false;
 
 		if (region->_copyForwardData._evacuateSet) {
 			Assert_MM_true(region->_sweepData._alreadySwept);
@@ -708,6 +716,7 @@ MM_CopyForwardScheme::reinitCache(MM_EnvironmentVLHGC *env, MM_CopyScanCacheVLHG
 	
 	Assert_MM_true(compactGroup < _compactGroupMaxCount);
 	cache->_compactGroup = compactGroup;
+	cache->_hasEdenContent = false;
 	Assert_MM_true(0.0 == cache->_allocationAgeSizeProduct);
 	
 	MM_HeapRegionDescriptorVLHGC * region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(cache->cacheBase);
@@ -1859,6 +1868,12 @@ MM_CopyForwardScheme::stopCopyingIntoCache(MM_EnvironmentVLHGC *env, uintptr_t c
 		
 		MM_HeapRegionDescriptorVLHGC * region = (MM_HeapRegionDescriptorVLHGC *)_regionManager->tableDescriptorForAddress(copyCache->cacheBase);
 
+		/* propagate Eden-content flag: a region is an Eden-content survivor if any cache that filled it received Eden objects */
+		if (copyCache->_hasEdenContent) {
+			region->_copyForwardData._hasEdenContent = true;
+		}
+		copyCache->_hasEdenContent = false;
+
 		/* atomically add (age * usedBytes) product from this cache to the regions product */
 		double newAllocationAgeSizeProduct = region->atomicIncrementAllocationAgeSizeProduct(copyCache->_allocationAgeSizeProduct);
 		region->updateAgeBounds(copyCache->_lowerAgeBound, copyCache->_upperAgeBound);
@@ -2094,6 +2109,7 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 					env->_copyForwardCompactGroups[sourceCompactGroup]._edenStats._liveBytes += objectCopySizeInBytes;
 					env->_copyForwardCompactGroups[destinationCompactGroup]._edenStats._copiedObjects += 1;
 					env->_copyForwardCompactGroups[destinationCompactGroup]._edenStats._copiedBytes += objectCopySizeInBytes;
+					copyCache->_hasEdenContent = true;
 				} else {
 					env->_copyForwardCompactGroups[sourceCompactGroup]._nonEdenStats._liveObjects += 1;
 					env->_copyForwardCompactGroups[sourceCompactGroup]._nonEdenStats._liveBytes += objectCopySizeInBytes;

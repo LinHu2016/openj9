@@ -71,6 +71,7 @@ public:
 		bool _freshSurvivor;
 		MM_HeapRegionDescriptorVLHGC *_nextRegion;  /**< Region list link for compact group resource management during a copyforward operation */
 		MM_HeapRegionDescriptorVLHGC *_previousRegion;  /**< Region list link for compact group resource management during a copyforward operation */
+		bool _hasEdenContent;  /**< true if at least one object copied into this survivor region originated from an Eden (ADDRESS_ORDERED) source region */
 	} _copyForwardData;
 #if defined (J9VM_GC_MODRON_COMPACTION)
 	MM_HeapRegionDataForCompactVLHGC _compactData;
