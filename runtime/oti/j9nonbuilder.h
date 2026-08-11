@@ -608,6 +608,14 @@ typedef struct J9JFRJavaEventData {
 
 #define J9JFRJAVAEVENTDATA_EVENTDATA(jfrEvent) ((U_8 *)(((J9JFRJavaEventData *)(jfrEvent)) + 1))
 
+/* Variable-size structure - stackTraceSize worth of UDATA follow the fixed portion */
+typedef struct J9JFRObjectAllocationSample {
+	J9JFR_EVENT_WITH_STACKTRACE_FIELDS
+	struct J9Class *objectClass; /**< class of the allocated object */
+	UDATA weight;                /**< bytes allocated by this thread since last JFR sample */
+} J9JFRObjectAllocationSample;
+#define J9JFROBJECTALLOCATIONSAMPLE_STACKTRACE(jfrEvent) ((UDATA *)(((J9JFRObjectAllocationSample *)(jfrEvent)) + 1))
+
 typedef struct J9JFRClassLoaderStatistics {
 	J9JFR_EVENT_COMMON_FIELDS
 	struct J9ClassLoader *classLoader;
@@ -619,14 +627,6 @@ typedef struct J9JFRClassLoaderStatistics {
 	U_64 hiddenChunkSize;
 	U_64 hiddenBlockSize;
 } J9JFRClassLoaderStatistics;
-
-/* Variable-size structure - stackTraceSize worth of UDATA follow the fixed portion */
-typedef struct J9JFRObjectAllocationSample {
-	J9JFR_EVENT_WITH_STACKTRACE_FIELDS
-	struct J9Class *objectClass; /**< class of the allocated object */
-	UDATA weight;                /**< bytes allocated by this thread since last JFR sample */
-} J9JFRObjectAllocationSample;
-#define J9JFROBJECTALLOCATIONSAMPLE_STACKTRACE(jfrEvent) ((UDATA *)(((J9JFRObjectAllocationSample *)(jfrEvent)) + 1))
 
 #endif /* defined(J9VM_OPT_JFR) */
 
@@ -5785,6 +5785,8 @@ typedef struct J9InternalVMFunctions {
 	I_64 (*getThreadTID)(struct J9VMThread *currentThread, struct J9VMThread *vmThread);
 	U_32 (*emitStackTrace)(struct J9VMThread *currentThread, I_32 skipCount);
 	void (*flushJavaJFRBuffer)(struct J9VMThread *currentThread, jobject eventWriterRef, I_32 uncommited, I_32 needed);
+	void (*enableJFRObjectAllocationSample)(struct J9VMThread *currentThread, BOOLEAN enable);
+	void (*setJFRObjectAllocationSampleThrottle)(struct J9VMThread *currentThread, UDATA throttle);
 #endif /* defined(J9VM_OPT_JFR) */
 #if defined(J9VM_OPT_SNAPSHOTS)
 	void (*initializeSnapshotClassLoaderObject)(struct J9JavaVM *javaVM, struct J9ClassLoader *classLoader, j9object_t classLoaderObject);
@@ -6352,6 +6354,7 @@ typedef struct JFRState {
 	UDATA jfrChunkCount;
 	UDATA objectAllocationSampleThrottleRate;   /**< target ObjectAllocationSample events per second (default 150) */
 	UDATA objectAllocationSampleInterval;		/**< bytes interval between ObjectAllocationSample events per thread */
+	omrthread_monitor_t setObjectAllocationSampleIntervalMutex;
 	uint64_t lastGCCycleEndTicks; /**< hires-clock ticks when the last GC cycle ended; 0 if no GC has occurred */
 	I_64 chunkStartTime;
 	I_64 chunkStartTicks;
