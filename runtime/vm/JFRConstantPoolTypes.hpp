@@ -931,9 +931,9 @@ public:
 
 	void addJavaEventDataEntry(J9JFRJavaEventData *event);
 
-	void addObjectAllocationSampleEntry(J9JFRObjectAllocationSample *objectAllocationSampleData);
-
 	void addClassLoaderStatisticsEntry(J9JFRClassLoaderStatistics *classLoaderStatisticsData);
+
+	void addObjectAllocationSampleEntry(J9JFRObjectAllocationSample *objectAllocationSampleData);
 
 	J9Pool *getExecutionSampleTable()
 	{

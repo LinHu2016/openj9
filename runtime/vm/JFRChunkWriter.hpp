@@ -244,9 +244,9 @@ private:
 	static constexpr int NETWORK_UTILIZATION_EVENT_SIZE = (4 * sizeof(U_64)) + sizeof(U_32);
 	static constexpr int DATA_LOSS_EVENT_SIZE = sizeof(U_8) + LEB128_32_SIZE + (3 * LEB128_64_SIZE);
 	static constexpr int THREAD_ALLOCATION_STATISTICS_EVENT_SIZE = sizeof(U_8) + LEB128_32_SIZE + (3 * LEB128_64_SIZE);
+	static constexpr int GC_CONFIGURATION_EVENT_SIZE = (3 * LEB128_64_SIZE) + (6 * LEB128_32_SIZE) + (3 * sizeof(U_8));
 	/* OBJECT_ALLOCATION_SAMPLE_EVENT_SIZE: eventSize(LEB128_64) + eventType(LEB128_32) + ticks(LEB128_64) + eventThread(LEB128_64) + stackTrace(LEB128_32) + objectClass(LEB128_32) + weight(LEB128_64) */
 	static constexpr int OBJECT_ALLOCATION_SAMPLE_EVENT_SIZE = (4 * LEB128_64_SIZE) + (3 * LEB128_32_SIZE);
-	static constexpr int GC_CONFIGURATION_EVENT_SIZE = (3 * LEB128_64_SIZE) + (6 * LEB128_32_SIZE) + (3 * sizeof(U_8));
 
 	static constexpr int METADATA_ID = 1;
 

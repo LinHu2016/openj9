@@ -116,6 +116,52 @@ isJFRHostEventClass(const char *name)
 		|| J9UTF8_LITERAL_EQUALS(name, nameLength, "java/lang/Error");
 }
 
+void
+enableJFRObjectAllocationSample(J9VMThread *currentThread, BOOLEAN enable)
+{
+	J9JavaVM *vm = currentThread->javaVM;
+	omrthread_monitor_enter(vm->jfrState.setObjectAllocationSampleIntervalMutex);
+	if (enable) {
+		if (UDATA_MAX == vm->memoryManagerFunctions->j9gc_get_jfr_allocation_sampling_interval(vm)) {
+			if (0 == vm->jfrState.objectAllocationSampleThrottleRate) {
+				vm->jfrState.objectAllocationSampleThrottleRate = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
+			}
+			UDATA newSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL * J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE / vm->jfrState.objectAllocationSampleThrottleRate;
+			vm->jfrState.objectAllocationSampleInterval = newSampleInterval;
+			internalReleaseVMAccess(currentThread);
+			vm->memoryManagerFunctions->j9gc_set_jfr_allocation_sampling_interval(vm, newSampleInterval);
+			internalAcquireVMAccess(currentThread);
+		}
+	} else {
+		vm->jfrState.objectAllocationSampleInterval = UDATA_MAX;
+		internalReleaseVMAccess(currentThread);
+		vm->memoryManagerFunctions->j9gc_set_jfr_allocation_sampling_interval(vm, UDATA_MAX);
+		internalAcquireVMAccess(currentThread);
+	}
+	omrthread_monitor_exit(vm->jfrState.setObjectAllocationSampleIntervalMutex);
+}
+
+void
+setJFRObjectAllocationSampleThrottle(J9VMThread *currentThread, UDATA throttle)
+{
+	J9JavaVM *vm = currentThread->javaVM;
+	if (vm->jfrState.objectAllocationSampleThrottleRate != throttle) {
+		vm->jfrState.objectAllocationSampleThrottleRate = throttle;
+		omrthread_monitor_enter(vm->jfrState.setObjectAllocationSampleIntervalMutex);
+		UDATA oldSampleInterval = vm->memoryManagerFunctions->j9gc_get_jfr_allocation_sampling_interval(vm);
+		if (UDATA_MAX != oldSampleInterval) {
+			UDATA newSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL * vm->jfrState.objectAllocationSampleThrottleRate / J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
+			if (oldSampleInterval != newSampleInterval) {
+				vm->jfrState.objectAllocationSampleInterval = newSampleInterval;
+				internalReleaseVMAccess(currentThread);
+				vm->memoryManagerFunctions->j9gc_set_jfr_allocation_sampling_interval(vm, newSampleInterval);
+				internalAcquireVMAccess(currentThread);
+			}
+		}
+		omrthread_monitor_exit(vm->jfrState.setObjectAllocationSampleIntervalMutex);
+	}
+}
+
 U_32
 emitStackTrace(J9VMThread *currentThread, I_32 skipCount)
 {
@@ -1161,6 +1207,13 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 	MM_ObjectAllocationSamplingInternalEvent *data =
 		(MM_ObjectAllocationSamplingInternalEvent *)eventData;
 	J9VMThread *currentThread = data->currentThread;
+	J9JavaVM *javaVM = currentThread->javaVM;
+
+#if JAVA_SPEC_VERSION >= 17
+	if (!isJFREventEnabled(javaVM, JfrObjectAllocationSampleEvent)) {
+		return;
+	}
+#endif /* JAVA_SPEC_VERSION >= 17 */
 
 	U_8 *className = J9UTF8_DATA(J9ROMCLASS_CLASSNAME(data->clazz->romClass));
 	UDATA lenClassName = J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass));
@@ -1287,6 +1340,9 @@ initializeJFR(J9JavaVM *vm)
 		goto fail;
 	}
 	if (omrthread_monitor_init_with_name(&vm->jfrState.threadObjectsMutex, 0, "Thread objects mutex")) {
+		goto fail;
+	}
+	if (omrthread_monitor_init_with_name(&vm->jfrState.setObjectAllocationSampleIntervalMutex, 0, "set objectAllocationSampleInterval mutex")) {
 		goto fail;
 	}
 
