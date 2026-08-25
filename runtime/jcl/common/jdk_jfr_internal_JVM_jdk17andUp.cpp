@@ -26,6 +26,9 @@
 
 extern "C" {
 
+/* jdk.ObjectAllocationSample event type ID -- must match MetadataTypeID */
+#define JFR_EVENT_TYPE_ID_OBJECT_ALLOCATION_SAMPLE 200
+
 void JNICALL
 Java_jdk_jfr_internal_JVM_markChunkFinal(JNIEnv *env, jobject obj)
 {
@@ -57,8 +60,17 @@ Java_jdk_jfr_internal_JVM_setMethodSamplingPeriod(JNIEnv *env, jobject obj, jlon
 jboolean JNICALL
 Java_jdk_jfr_internal_JVM_setThrottle(JNIEnv *env, jobject obj, jlong eventTypeId, jlong eventSampleSize, jlong period_ms)
 {
-	// TODO: implementation
-	return JNI_FALSE;
+	jboolean result = JNI_FALSE;
+
+	if (JFR_EVENT_TYPE_ID_OBJECT_ALLOCATION_SAMPLE != (UDATA)eventTypeId) {
+		return result;
+	}
+
+	J9VMThread *currentThread = (J9VMThread *)env;
+	J9JavaVM *vm = currentThread->javaVM;
+	vm->memoryManagerFunctions->setJFRObjectAllocationSampleThrottle(vm, eventSampleSize * period_ms / 1000);
+	result = JNI_TRUE;
+	return result;
 }
 
 void JNICALL

@@ -844,16 +844,16 @@ memoryManagerTLHAsyncCallbackHandler(J9VMThread *vmThread, IDATA handlerKey, voi
 			/* Arm the TLH sampling top at the minimum of all active sampling intervals so
 			 * that the TLH triggers at whichever sampling point comes first.
 			 */
-			PORT_ACCESS_FROM_VMC(vmThread);
-			j9tty_printf(PORTLIB, "memoryManagerTLHAsyncCallbackHandler vmThread=%p, samplingBytesGranularity=%zu, jfrGranularity=%zu\n", vmThread,
-					samplingBytesGranularity, jfrGranularity);
+//			PORT_ACCESS_FROM_VMC(vmThread);
+//			j9tty_printf(PORTLIB, "memoryManagerTLHAsyncCallbackHandler vmThread=%p, samplingBytesGranularity=%zu, jfrGranularity=%zu\n", vmThread,
+//					samplingBytesGranularity, jfrGranularity);
 
 			if (samplingBytesGranularity > jfrGranularity) {
 				samplingBytesGranularity = jfrGranularity;
 			}			
 #else /* defined(J9VM_OPT_JFR) */
 			if (UDATA_MAX != samplingBytesGranularity) {
-				j9tty_printf(PORTLIB, "memoryManagerTLHAsyncCallbackHandler vmThread=%p,setTLHSamplingTop=%zu\n", vmThread, samplingBytesGranularity);
+//				j9tty_printf(PORTLIB, "memoryManagerTLHAsyncCallbackHandler vmThread=%p,setTLHSamplingTop=%zu\n", vmThread, samplingBytesGranularity);
 				env->setTLHSamplingTop(samplingBytesGranularity);
 			} else if (!env->isInlineTLHAllocateEnabled()) {
 				env->resetTLHSamplingTop();

@@ -43,6 +43,9 @@ extern "C" {
 #define JFR_STRING_BUFFER_SIZE 256
 #define JFR_CLASS_BUFFER_SIZE 32
 
+/* jdk.ObjectAllocationSample event type ID -- must match MetadataTypeID */
+#define JFR_EVENT_TYPE_ID_OBJECT_ALLOCATION_SAMPLE 200
+
 void JNICALL
 Java_jdk_jfr_internal_JVM_registerNatives(JNIEnv *env, jclass clazz)
 {
@@ -431,12 +434,20 @@ Java_jdk_jfr_internal_JVM_setEnabled(JNIEnv *env, jobject obj, jlong eventTypeId
 {
 	J9VMThread *currentThread = (J9VMThread *)env;
 	J9JavaVM *vm = currentThread->javaVM;
+	J9InternalVMFunctions *vmFuncs = vm->internalVMFunctions;
+
 	if ((NULL != vm->jfrState.jfrEventEnabledFlags)
 		&& (0 <= eventTypeId)
 		&& (eventTypeId < vm->jfrState.jfrEventEnabledFlagsSize)
 	) {
 		vm->jfrState.jfrEventEnabledFlags[(UDATA)eventTypeId] = enabled ? 1 : 0;
 	}
+
+	if (JFR_EVENT_TYPE_ID_OBJECT_ALLOCATION_SAMPLE != (UDATA)eventTypeId) {
+		return;
+	}
+
+	vmFuncs->enableJFRObjectAllocationSample(vm, JNI_TRUE == enabled);
 }
 
 void JNICALL

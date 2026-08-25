@@ -6096,6 +6096,13 @@ emitStackTrace(J9VMThread *currentThread, I_32 skipCount);
 
 void
 flushJavaJFRBuffer(J9VMThread *currentThread, jobject eventWriterRef, I_32 uncommited, I_32 needed);
+
+void
+enableJFRObjectAllocationSample(J9JavaVM *vm, BOOLEAN enable);
+
+jboolean
+setJFRObjectAllocationSampleThrottle(J9JavaVM *vm, UDATA throttle);
+
 #endif /* defined(J9VM_OPT_JFR) */
 
 #ifdef __cplusplus

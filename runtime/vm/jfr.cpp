@@ -116,6 +116,43 @@ isJFRHostEventClass(const char *name)
 		|| J9UTF8_LITERAL_EQUALS(name, nameLength, "java/lang/Error");
 }
 
+void
+enableJFRObjectAllocationSample(J9JavaVM *vm, BOOLEAN enable)
+{
+	if (enable) {
+		if (UDATA_MAX == vm->memoryManagerFunctions->j9gc_get_jfr_allocation_sampling_interval(vm)) {
+			if (0 == vm->jfrState.objectAllocationSampleThrottleRate) {
+				vm->jfrState.objectAllocationSampleThrottleRate = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
+			}
+			UDATA newSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL * vm->jfrState.objectAllocationSampleThrottleRate / J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
+			internalReleaseVMAccess(currentThread);
+			vm->memoryManagerFunctions->j9gc_set_jfr_allocation_sampling_interval(vm, newSampleInterval);
+			internalAcquireVMAccess(currentThread);
+		}
+	} else {
+		internalReleaseVMAccess(currentThread);
+		vm->memoryManagerFunctions->j9gc_set_jfr_allocation_sampling_interval(vm, UDATA_MAX);
+		internalAcquireVMAccess(currentThread);
+	}
+}
+
+jboolean
+setJFRObjectAllocationSampleThrottle(J9JavaVM *vm, UDATA throttle)
+{
+	if (vm->jfrState.objectAllocationSampleThrottleRate != throttle) {
+		vm->jfrState.objectAllocationSampleThrottleRate  = throttle;
+		UDATA oldSampleInterval = vm->memoryManagerFunctions->j9gc_get_jfr_allocation_sampling_interval(vm);
+		if (UDATA_MAX != oldSampleInterval) {
+			UDATA newSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL * vm->jfrState.objectAllocationSampleThrottleRate / J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
+			if (oldSampleInterval != newSampleInterval) {
+				internalReleaseVMAccess(currentThread);
+				vm->memoryManagerFunctions->j9gc_set_jfr_allocation_sampling_interval(vm, newSampleInterval);
+				internalAcquireVMAccess(currentThread);
+			}
+		}
+	}
+}
+
 U_32
 emitStackTrace(J9VMThread *currentThread, I_32 skipCount)
 {
@@ -1440,7 +1477,7 @@ stopJFRRecording(J9JavaVM *vm)
 
 	/* disable JFRObjectAllocationSample */
 	(*gcHooks)->J9HookUnregister(gcHooks, J9HOOK_MM_OBJECT_ALLOCATION_SAMPLING_INTERNAL, jfrObjectAllocationSample, NULL);
-	vm->jfrState.objectAllocationSampleThrottleRate = 0;
+//	vm->jfrState.objectAllocationSampleThrottleRate = 0;
 	vm->memoryManagerFunctions->j9gc_set_jfr_allocation_sampling_interval(vm, UDATA_MAX);
 
 //	j9tty_printf(PORTLIB, "stopJFRRecording disable JFRObjectAllocationSample currentThread=%p,  objectAllocationSampleThrottleRate=%zu, jfr_allocation_sampling_interval=%zu\n", currentThread,
