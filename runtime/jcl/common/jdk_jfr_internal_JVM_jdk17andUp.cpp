@@ -27,7 +27,7 @@
 extern "C" {
 
 /* jdk.ObjectAllocationSample event type ID -- must match MetadataTypeID */
-#define JFR_EVENT_TYPE_ID_OBJECT_ALLOCATION_SAMPLE 200
+#define JFR_EVENT_TYPE_ID_OBJECT_ALLOCATION_SAMPLE 83
 
 void JNICALL
 Java_jdk_jfr_internal_JVM_markChunkFinal(JNIEnv *env, jobject obj)
