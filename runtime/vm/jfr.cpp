@@ -66,8 +66,8 @@ J9_DECLARE_CONSTANT_NAS(constructorEventWriterNAS, constructorEventWriterUTF8, c
 
 
 // TODO: allow configureable values
-#define J9JFR_THREAD_BUFFER_SIZE (128 * 1024)
-#define J9JFR_GLOBAL_BUFFER_SIZE (10 * J9JFR_THREAD_BUFFER_SIZE)
+#define J9JFR_THREAD_BUFFER_SIZE (512 * 1024)
+#define J9JFR_GLOBAL_BUFFER_SIZE (100 * J9JFR_THREAD_BUFFER_SIZE)
 #define J9JFR_SAMPLING_RATE 10
 #define J9JFR_CLASSNAME_BUFFER_SIZE 128
 #define J9TIME_NANOSECONDS_PER_SECOND	(1000000000ULL)
@@ -523,6 +523,8 @@ reserveBuffer(J9VMThread *currentThread, J9VMThread *sampleThread, UDATA size)
 		/* If there isn't enough space, flush the thread buffer to global */
 		if (size > sampleThread->jfrBuffer.bufferRemaining) {
 			/* Dont flush Java buffer as it will recusrively call reserveBuffer. */
+			PORT_ACCESS_FROM_VMC(currentThread);
+			j9tty_printf(PORTLIB, "reserveBuffer flushBufferToGlobal currentThread=%p sampleThread->jfrBuffer.bufferRemaining=%zu, size=%zu\n", currentThread, sampleThread->jfrBuffer.bufferRemaining, size);
 			if (!flushBufferToGlobal(currentThread, sampleThread, false)) {
 				goto done;
 			}
@@ -632,6 +634,9 @@ jfrClassesUnload(J9HookInterface **hook, UDATA eventNum, void *eventData, void *
 
 	Trc_VM_jfrClassesUnload(currentThread);
 
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "jfrClassesUnload flushAllThreadBuffers currentThread=%p \n", currentThread);
+
 	flushAllThreadBuffers(currentThread, false);
 	if (isJFRV2SupportEnabled(vm)) {
 		/* In JFRv2 we need to coordinate chunk rotation with the JCL. We can't block a GC for
@@ -641,11 +646,17 @@ jfrClassesUnload(J9HookInterface **hook, UDATA eventNum, void *eventData, void *
 		UDATA lostData = vm->jfrBuffer.bufferSize - vm->jfrBuffer.bufferRemaining;
 		vm->jfrBuffer.bufferRemaining = vm->jfrBuffer.bufferSize;
 		vm->jfrBuffer.bufferCurrent = vm->jfrBuffer.bufferStart;
+
+		j9tty_printf(PORTLIB, "jfrClassesUnload jfrEmitDataLoss currentThread=%p \n", currentThread);
+
 		jfrEmitDataLoss(currentThread, lostData);
 	} else {
 		/* Some class pointers in the thread and global buffers are about the become
 		 * invalid, so write out all of the available data now.
 		 */
+
+		j9tty_printf(PORTLIB, "jfrClassesUnload writeOutGlobalBuffer currentThread=%p \n", currentThread);
+
 		writeOutGlobalBuffer(currentThread, false, false);
 	}
 }
@@ -678,6 +689,8 @@ jfrVMShutdown(J9HookInterface **hook, UDATA eventNum, void *eventData, void *use
 	}
 
 	/* Flush and free all the thread buffers and write out the global buffer */
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "jfrVMShutdown flushAllThreadBuffers writeOutGlobalBuffer currentThread=%p \n", currentThread);
 	flushAllThreadBuffers(currentThread, true);
 	writeOutGlobalBuffer(currentThread, true, true);
 
@@ -775,6 +788,7 @@ jfrThreadEnd(J9HookInterface **hook, UDATA eventNum, void *eventData, void *user
 			initializeEventFields(currentThread, currentThread, jfrEvent, J9JFR_EVENT_TYPE_THREAD_END);
 		}
 	}
+	j9tty_printf(PORTLIB, "jfrThreadEnd flushBufferToGlobal currentThread=%p\n", currentThread);
 	flushBufferToGlobal(currentThread, currentThread, true);
 
 	/* Free the thread local buffer */
@@ -1228,6 +1242,7 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 	UDATA sampleCount = VM_AtomicSupport::add(&currentThread->javaVM->jfrState.objectAllocationSampleCount, 1);
 
 	if (J9ROMCLASS_IS_ARRAY(data->clazz->romClass)) {
+		UDATA arrayCount = VM_AtomicSupport::add(&currentThread->javaVM->jfrState.arrayAllocationSampleCount, 1);
 	    J9ArrayClass *arrayClass = (J9ArrayClass *)data->clazz;
 	    U_8 *classLeafName = J9UTF8_DATA(J9ROMCLASS_CLASSNAME(arrayClass->leafComponentType->romClass));
 	    UDATA lenClassLeafName = J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(arrayClass->leafComponentType->romClass));
@@ -1239,11 +1254,11 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 			data->weight,
 			data->objectSize);
 		PORT_ACCESS_FROM_VMC(currentThread);
-		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s%.*s;, weight=%zu, startTime=%zu, objectSize=%zu, sampleCount=%zu\n", currentThread,
+		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s%.*s;, weight=%zd, startTime=%zu, objectSize=%zu, arrayCount=%zu, sampleCount=%zu\n", currentThread,
 				lenClassName, className,
 				lenClassLeafName, classLeafName,
 				data->weight, data->timestamp, data->objectSize,
-				sampleCount);
+				arrayCount, sampleCount);
 	}
 	else {
 		Trc_VM_jfrObjectAllocationSample(currentThread,
@@ -1253,13 +1268,18 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 			data->objectSize);
 
 		PORT_ACCESS_FROM_VMC(currentThread);
-		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s, weight=%zu, startTime=%zu, objectSize=%zu, sampleCount=%zu\n", currentThread, J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass)),
+		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s, weight=%zd, startTime=%zu, objectSize=%zu, sampleCount=%zu\n", currentThread, J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass)),
 	            J9UTF8_DATA(J9ROMCLASS_CLASSNAME(data->clazz->romClass)), data->weight, data->timestamp, data->objectSize, sampleCount);
 	}
 
 
-	J9JFRObjectAllocationSample *jfrEvent = (J9JFRObjectAllocationSample *)reserveBufferWithStackTrace(
+	J9JFRObjectAllocationSample *jfrEvent = NULL;
+
+//	if (!J9ROMCLASS_IS_ARRAY(data->clazz->romClass)) {
+		jfrEvent = (J9JFRObjectAllocationSample *)reserveBufferWithStackTrace(
 			currentThread, currentThread, J9JFR_EVENT_TYPE_OBJECT_ALLOCATION_SAMPLE, sizeof(J9JFRObjectAllocationSample), 0);
+//	}
+
 	if (NULL != jfrEvent) {
 		jfrEvent->objectClass = data->clazz;
 		jfrEvent->weight      = data->weight;
@@ -1456,6 +1476,7 @@ startJFRRecording(J9JavaVM *vm)
 
 	/* enable JFRObjectAllocationSample */
 	vm->jfrState.objectAllocationSampleCount = 0;
+	vm->jfrState.arrayAllocationSampleCount = 0;
 	if ((0 == extensions->fixJFRObjectAllocationSampleThrottleRate)) {
 		vm->jfrState.objectAllocationSampleThrottleRate  = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
 		vm->jfrState.objectAllocationSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL;
@@ -1549,6 +1570,8 @@ tearDownJFR(J9JavaVM *vm)
 
 	Assert_VM_mustHaveVMAccess(currentThread);
 	Assert_VM_true(vm->jfrState.isCreated);
+
+	j9tty_printf(PORTLIB, "tearDownJFR currentThread=%p \n", currentThread);
 
 	if (!isJFRV2SupportEnabled(vm)) {
 		stopJFRRecording(vm);
@@ -2062,6 +2085,8 @@ void
 jfrDump(J9VMThread *currentThread, BOOLEAN finalWrite)
 {
 	/* Flush all the thread buffers and write out the global buffer. */
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, "jfrDump flushAllThreadBuffers writeOutGlobalBuffer currentThread=%p \n", currentThread);
 	flushAllThreadBuffers(currentThread, finalWrite);
 	writeOutGlobalBuffer(currentThread, finalWrite, true);
 }
