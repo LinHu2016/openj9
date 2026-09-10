@@ -101,6 +101,7 @@ public:
 	MM_StringTable* stringTable; /**< top level String Table structure (internally organized as a set of hash sub-tables */
 #if defined(J9VM_OPT_JFR)
 	UDATA fixJFRObjectAllocationSampleThrottleRate;
+	bool JFRObjectAllocationSampleEnabled;
 #endif /* defined(J9VM_OPT_JFR) */
 
 	void* gcchkExtensions;
@@ -390,6 +391,7 @@ public:
 		, stringTable(NULL)
 #if defined(J9VM_OPT_JFR)
 		, fixJFRObjectAllocationSampleThrottleRate(0)
+		, JFRObjectAllocationSampleEnabled(true)
 #endif /* defined(J9VM_OPT_JFR) */
 		, gcchkExtensions(NULL)
 		, tgcExtensions(NULL)

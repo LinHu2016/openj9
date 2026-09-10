@@ -1631,6 +1631,17 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			extensions->fixJFRObjectAllocationSampleThrottleRate = throttleRate;
 			continue;
 		}
+
+		if (try_scan(&scan_start, "disableJFRObjectAllocationSample")) {
+			extensions->JFRObjectAllocationSampleEnabled = false;
+			continue;
+		}
+
+		if (try_scan(&scan_start, "enableJFRObjectAllocationSample")) {
+			extensions->JFRObjectAllocationSampleEnabled = true;
+			continue;
+		}
+
 #endif /* defined(J9VM_OPT_JFR) */
 
 		/* Couldn't find a match for arguments */
