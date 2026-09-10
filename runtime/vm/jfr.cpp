@@ -1243,6 +1243,8 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 	U_8 *className = J9UTF8_DATA(J9ROMCLASS_CLASSNAME(data->clazz->romClass));
 	UDATA lenClassName = J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass));
 
+	UDATA sampleCount = VM_AtomicSupport::add(&currentThread->javaVM->jfrState.objectAllocationSampleCount, 1);
+
 	if (J9ROMCLASS_IS_ARRAY(data->clazz->romClass)) {
 	    J9ArrayClass *arrayClass = (J9ArrayClass *)data->clazz;
 	    U_8 *classLeafName = J9UTF8_DATA(J9ROMCLASS_CLASSNAME(arrayClass->leafComponentType->romClass));
@@ -1255,12 +1257,11 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 			data->weight,
 			data->objectSize);
 		PORT_ACCESS_FROM_VMC(currentThread);
-		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s%.*s;, weight=%zu, startTime=%zu, objectSize=%zu, VM_ACCESS=%zu, exclusiveAccessState=%zu\n", currentThread,
+		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s%.*s;, weight=%zu, startTime=%zu, objectSize=%zu, sampleCount=%zu\n", currentThread,
 				lenClassName, className,
 				lenClassLeafName, classLeafName,
 				data->weight, data->timestamp, data->objectSize,
-				J9_PUBLIC_FLAGS_VM_ACCESS == (currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS),
-				currentThread->javaVM->exclusiveAccessState);
+				sampleCount);
 	}
 	else {
 		Trc_VM_jfrObjectAllocationSample(currentThread,
@@ -1270,18 +1271,13 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 			data->objectSize);
 
 		PORT_ACCESS_FROM_VMC(currentThread);
-		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s, weight=%zu, startTime=%zu, objectSize=%zu, VM_ACCESS=%zu, exclusiveAccessState=%zu\n", currentThread, J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass)),
-	            J9UTF8_DATA(J9ROMCLASS_CLASSNAME(data->clazz->romClass)), data->weight, data->timestamp, data->objectSize,
-				J9_PUBLIC_FLAGS_VM_ACCESS == (currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS),
-				currentThread->javaVM->exclusiveAccessState);
+		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s, weight=%zu, startTime=%zu, objectSize=%zu, sampleCount=%zu\n", currentThread, J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass)),
+	            J9UTF8_DATA(J9ROMCLASS_CLASSNAME(data->clazz->romClass)), data->weight, data->timestamp, data->objectSize, sampleCount);
 	}
 
 
-	J9JFRObjectAllocationSample *jfrEvent = NULL;
-	if (!J9ROMCLASS_IS_ARRAY(data->clazz->romClass)) {
-		jfrEvent = (J9JFRObjectAllocationSample *)reserveBufferWithStackTrace(
+	J9JFRObjectAllocationSample *jfrEvent = (J9JFRObjectAllocationSample *)reserveBufferWithStackTrace(
 			currentThread, currentThread, J9JFR_EVENT_TYPE_OBJECT_ALLOCATION_SAMPLE, sizeof(J9JFRObjectAllocationSample), 0);
-	}
 	if (NULL != jfrEvent) {
 		jfrEvent->objectClass = data->clazz;
 		jfrEvent->weight      = data->weight;
@@ -1477,6 +1473,7 @@ startJFRRecording(J9JavaVM *vm)
 	}
 
 	/* enable JFRObjectAllocationSample */
+	vm->jfrState.objectAllocationSampleCount = 0;
 	if ((0 == extensions->fixJFRObjectAllocationSampleThrottleRate)) {
 		vm->jfrState.objectAllocationSampleThrottleRate  = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
 		vm->jfrState.objectAllocationSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL;
