@@ -154,7 +154,7 @@ setJFRObjectAllocationSampleThrottle(J9VMThread *currentThread, UDATA throttle)
 		omrthread_monitor_enter(vm->jfrState.setObjectAllocationSampleIntervalMutex);
 		UDATA oldSampleInterval = vm->memoryManagerFunctions->j9gc_get_jfr_allocation_sampling_interval(vm);
 		if (UDATA_MAX != oldSampleInterval) {
-			UDATA newSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL * vm->jfrState.objectAllocationSampleThrottleRate / J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE;
+			UDATA newSampleInterval = J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_INTERVAL * J9JFR_OBJECT_ALLOCATION_SAMPLE_DEFAULT_THROTTLE_RATE / vm->jfrState.objectAllocationSampleThrottleRate;
 			if (oldSampleInterval != newSampleInterval) {
 				vm->jfrState.objectAllocationSampleInterval = newSampleInterval;
 				internalReleaseVMAccess(currentThread);
