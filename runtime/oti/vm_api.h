@@ -6099,7 +6099,7 @@ flushJavaJFRBuffer(J9VMThread *currentThread, jobject eventWriterRef, I_32 uncom
 void
 enableJFRObjectAllocationSample(J9VMThread *currentThread, BOOLEAN enable);
 
-jboolean
+void
 setJFRObjectAllocationSampleThrottle(J9VMThread *currentThread, UDATA throttle);
 
 #endif /* defined(J9VM_OPT_JFR) */

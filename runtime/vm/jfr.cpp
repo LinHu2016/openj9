@@ -141,7 +141,7 @@ enableJFRObjectAllocationSample(J9VMThread *currentThread, BOOLEAN enable)
 	omrthread_monitor_exit(vm->jfrState.setObjectAllocationSampleIntervalMutex);
 }
 
-jboolean
+void
 setJFRObjectAllocationSampleThrottle(J9VMThread *currentThread, UDATA throttle)
 {
 	J9JavaVM *vm = currentThread->javaVM;
@@ -1207,6 +1207,7 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 	MM_ObjectAllocationSamplingInternalEvent *data =
 		(MM_ObjectAllocationSamplingInternalEvent *)eventData;
 	J9VMThread *currentThread = data->currentThread;
+	J9JavaVM *javaVM = currentThread->javaVM;
 
 #if JAVA_SPEC_VERSION >= 17
 	if (!isJFREventEnabled(javaVM, JfrObjectAllocationSampleEvent)) {

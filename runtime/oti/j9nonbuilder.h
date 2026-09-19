@@ -5786,7 +5786,7 @@ typedef struct J9InternalVMFunctions {
 	U_32 (*emitStackTrace)(struct J9VMThread *currentThread, I_32 skipCount);
 	void (*flushJavaJFRBuffer)(struct J9VMThread *currentThread, jobject eventWriterRef, I_32 uncommited, I_32 needed);
 	void (*enableJFRObjectAllocationSample)(struct J9VMThread *currentThread, BOOLEAN enable);
-	jboolean (*setJFRObjectAllocationSampleThrottle)(struct J9VMThread *currentThread, UDATA throttle);
+	void (*setJFRObjectAllocationSampleThrottle)(struct J9VMThread *currentThread, UDATA throttle);
 #endif /* defined(J9VM_OPT_JFR) */
 #if defined(J9VM_OPT_SNAPSHOTS)
 	void (*initializeSnapshotClassLoaderObject)(struct J9JavaVM *javaVM, struct J9ClassLoader *classLoader, j9object_t classLoaderObject);
