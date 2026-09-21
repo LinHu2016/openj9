@@ -1662,7 +1662,7 @@ VM_JFRChunkWriter::writeObjectAllocationSampleEvent(void *anElement, void *userD
 	bufferWriter->writeLEB128(entry->stackTraceIndex);
 
 	/* Write objectClass constant-pool index */
-	bufferWriter->writeLEB128(entry->objectClassIndex);
+	bufferWriter->writeLEB128(entry->objectClass);
 
 	/* Write weight (bytes allocated since last sample) */
 	bufferWriter->writeLEB128(entry->weight);
