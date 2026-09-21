@@ -1243,9 +1243,8 @@ VM_JFRConstantPoolTypes::addMonitorWaitEntry(J9JFRMonitorWaited* threadWaitData)
 	entry->stackTraceIndex = consumeStackTrace(threadWaitData->currentThreadTID, J9JFRMonitorWaitedED_STACKTRACE(threadWaitData), threadWaitData->stackTraceSize, threadWaitData->stackTraceID);
 	if (isResultNotOKay()) goto done;
 
-	entry->monitorClass = 0;
-//	entry->monitorClass = getClassEntry(threadWaitData->monitorClass);
-//	if (isResultNotOKay()) goto done;
+	entry->monitorClass = getClassEntry(threadWaitData->monitorClass);
+	if (isResultNotOKay()) goto done;
 
 	entry->notifierThread = 0; //Need a way to find the notifiying thread
 
@@ -1276,9 +1275,8 @@ VM_JFRConstantPoolTypes::addMonitorEnterEntry(J9JFRMonitorEntered *monitorEnterD
 	entry->stackTraceIndex = consumeStackTrace(monitorEnterData->currentThreadTID, J9JFRMONITORENTERED_STACKTRACE(monitorEnterData), monitorEnterData->stackTraceSize, monitorEnterData->stackTraceID);
 	if (isResultNotOKay()) goto done;
 
-	entry->monitorClass = 0;
-//	entry->monitorClass = getClassEntry(monitorEnterData->monitorClass);
-//	if (isResultNotOKay()) goto done;
+	entry->monitorClass = getClassEntry(monitorEnterData->monitorClass);
+	if (isResultNotOKay()) goto done;
 
 	_monitorEnterCount += 1;
 
@@ -1306,9 +1304,8 @@ VM_JFRConstantPoolTypes::addThreadParkEntry(J9JFRThreadParked* threadParkData)
 	entry->stackTraceIndex = consumeStackTrace(threadParkData->currentThreadTID, J9JFRTHREADPARKED_STACKTRACE(threadParkData), threadParkData->stackTraceSize, threadParkData->stackTraceID);
 	if (isResultNotOKay()) goto done;
 
-	entry->parkedClass = 0;
-//	entry->parkedClass = getClassEntry(threadParkData->parkedClass);
-//	if (isResultNotOKay()) goto done;
+	entry->parkedClass = getClassEntry(threadParkData->parkedClass);
+	if (isResultNotOKay()) goto done;
 
 	entry->timeOut = threadParkData->timeOut;
 	entry->untilTime = threadParkData->untilTime;
@@ -1701,11 +1698,10 @@ VM_JFRConstantPoolTypes::addObjectAllocationSampleEntry(J9JFRObjectAllocationSam
 		goto done;
 	}
 
-	entry->objectClass = 0;
-//	entry->objectClass = getClassEntry(objectAllocationSampleData->objectClass);
-//	if (isResultNotOKay()) {
-//		goto done;
-//	}
+	entry->objectClassIndex = getClassEntry(objectAllocationSampleData->objectClass);
+	if (isResultNotOKay()) {
+		goto done;
+	}
 
 	_objectAllocationSampleCount += 1;
 
