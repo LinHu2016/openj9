@@ -561,14 +561,14 @@ reserveBuffer(J9VMThread *currentThread, J9VMThread *sampleThread, UDATA size)
 		/* If there isn't enough space, flush the thread buffer to global */
 		if (size > sampleThread->jfrBuffer.bufferRemaining) {
 			/* Dont flush Java buffer as it will recusrively call reserveBuffer. */
-//			bool hasExclusive = (J9_XACCESS_EXCLUSIVE == vm->exclusiveAccessState) || (J9_XACCESS_EXCLUSIVE == vm->safePointState);
-//			bool setNotAtSafePoint = J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_NOT_AT_SAFE_POINT);
-//			PORT_ACCESS_FROM_VMC(currentThread);
-//			j9tty_printf(PORTLIB, "reserveBuffer flushBufferToGlobal currentThread=%p hasExclusive=%zu, setNotAtSafePoint=%zu, sampleThread->jfrBuffer.bufferRemaining=%zu, size=%zu\n",
-//					currentThread, hasExclusive, setNotAtSafePoint, sampleThread->jfrBuffer.bufferRemaining, size);
+			bool hasExclusive = (J9_XACCESS_EXCLUSIVE == vm->exclusiveAccessState) || (J9_XACCESS_EXCLUSIVE == vm->safePointState);
+			bool setNotAtSafePoint = J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_NOT_AT_SAFE_POINT);
+			PORT_ACCESS_FROM_VMC(currentThread);
+			j9tty_printf(PORTLIB, "reserveBuffer flushBufferToGlobal currentThread=%p hasExclusive=%zu, setNotAtSafePoint=%zu, sampleThread->jfrBuffer.bufferRemaining=%zu, size=%zu\n",
+					currentThread, hasExclusive, setNotAtSafePoint, sampleThread->jfrBuffer.bufferRemaining, size);
 			bool flushRC = flushBufferToGlobal(currentThread, sampleThread, false);
-//			j9tty_printf(PORTLIB, "reserveBuffer flushBufferToGlobal end currentThread=%p setNotAtSafePoint=%zu",
-//					currentThread, setNotAtSafePoint);
+			j9tty_printf(PORTLIB, "reserveBuffer flushBufferToGlobal end currentThread=%p setNotAtSafePoint=%zu",
+					currentThread, setNotAtSafePoint);
 			if (!flushRC) {
 				goto done;
 			}
@@ -1238,7 +1238,12 @@ jfrGCHeapSummary(OMR_VMThread *omrVMThread, U_32 gcWhenID)
 	J9VMThread *currentThread = (J9VMThread *)omrVMThread->_language_vmthread;
 	J9JavaVM *javaVM = currentThread->javaVM;
 
+	PORT_ACCESS_FROM_VMC(currentThread);
+	j9tty_printf(PORTLIB, " --- jfrGCCycleStartEnd currentThread=%p, gcWhenID=%zu\n", currentThread, gcWhenID);
+
 	if (BEFORE_GC == gcWhenID) {
+//		j9tty_printf(PORTLIB, " --- flushAllThreadBuffers currentThread=%p\n", currentThread);
+//		flushAllThreadBuffers(currentThread, false);
 		jfrRecalibrateObjectAllocationSampleInterval(currentThread);
 	}
 
@@ -1298,10 +1303,6 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 
 	UDATA sampleCount = VM_AtomicSupport::add(&currentThread->javaVM->jfrState.objectAllocationSampleCount, 1);
 
-	J9JavaVM *vm = currentThread->javaVM;
-	bool hasExclusive = (J9_XACCESS_EXCLUSIVE == vm->exclusiveAccessState) || (J9_XACCESS_EXCLUSIVE == vm->safePointState);
-	bool NOT_AT_SAFE_POINT = J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_NOT_AT_SAFE_POINT);
-
 	if (J9ROMCLASS_IS_ARRAY(data->clazz->romClass)) {
 		UDATA arrayCount = VM_AtomicSupport::add(&currentThread->javaVM->jfrState.arrayAllocationSampleCount, 1);
 	    J9ArrayClass *arrayClass = (J9ArrayClass *)data->clazz;
@@ -1315,12 +1316,11 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 			data->weight,
 			data->objectSize);
 		PORT_ACCESS_FROM_VMC(currentThread);
-		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p, classname=%.*s%.*s;, weight=%zd, startTime=%zu, objectSize=%zu, arrayCount=%zu, sampleCount=%zu, hasExclusive=%zu, NOT_AT_SAFE_POINT=%zu\n", currentThread,
+		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p, classname=%.*s%.*s;, weight=%zd, startTime=%zu, objectSize=%zu, arrayCount=%zu, sampleCount=%zu\n", currentThread,
 				lenClassName, className,
 				lenClassLeafName, classLeafName,
 				data->weight, data->timestamp, data->objectSize,
-				arrayCount, sampleCount,
-				hasExclusive, NOT_AT_SAFE_POINT);
+				arrayCount, sampleCount);
 	}
 	else {
 		Trc_VM_jfrObjectAllocationSample(currentThread,
@@ -1330,8 +1330,10 @@ jfrObjectAllocationSample(J9HookInterface **hook, UDATA eventNum, void *eventDat
 			data->objectSize);
 
 		PORT_ACCESS_FROM_VMC(currentThread);
-		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s, weight=%zd, startTime=%zu, objectSize=%zu, sampleCount=%zu, hasExclusive=%zu, NOT_AT_SAFE_POINT=%zu\\n", currentThread, J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass)),
-	            J9UTF8_DATA(J9ROMCLASS_CLASSNAME(data->clazz->romClass)), data->weight, data->timestamp, data->objectSize, sampleCount, hasExclusive, NOT_AT_SAFE_POINT);
+		j9tty_printf(PORTLIB, "jfrObjectAllocationSample currentThread=%p,  classname=%.*s, weight=%zd, startTime=%zu, objectSize=%zu, sampleCount=%zu\n",
+				currentThread, J9UTF8_LENGTH(J9ROMCLASS_CLASSNAME(data->clazz->romClass)),
+	            J9UTF8_DATA(J9ROMCLASS_CLASSNAME(data->clazz->romClass)),
+				data->weight, data->timestamp, data->objectSize, sampleCount);
 	}
 
 
@@ -1748,6 +1750,7 @@ initializeEventFields(J9VMThread *currentThread, J9VMThread *sampleThread, J9JFR
 	event->startTicks = j9time_nano_time();
 	event->eventType = eventType;
 	event->currentThreadTID = getThreadTID(currentThread, sampleThread);
+	j9tty_printf(PORTLIB, "initializeEventFields currentThread=%p eventType=%zu\n",currentThread, eventType);
 }
 
 jboolean

@@ -227,7 +227,7 @@ traceAllocateIndexableObject(J9VMThread *vmThread, J9Class* clazz, uintptr_t obj
 }
 
 static J9Object *
-traceAllocateObject(J9VMThread *vmThread, J9Object * object, J9Class* clazz, uintptr_t objSize, uintptr_t numberOfIndexedFields)
+traceAllocateObject(J9VMThread *vmThread, J9Object *object, J9Class *clazz, uintptr_t objSize, uintptr_t numberOfIndexedFields)
 {
 	bool shouldTrigggerObjectAllocationSampling = false;
 	bool shouldTriggerJFRSample = false;
@@ -330,6 +330,9 @@ traceAllocateObject(J9VMThread *vmThread, J9Object * object, J9Class* clazz, uin
 				env->setTLHSamplingTop(OMR_MIN(jvmtiBytesToNext, jfrBytesToNext));
 			}
 
+			if (NULL != object) {
+				env->saveObjects((omrobjectptr_t)object);
+			}
 			TRIGGER_J9HOOK_MM_OBJECT_ALLOCATION_SAMPLING_INTERNAL(
 				extensions->hookInterface,
 				vmThread,
@@ -339,6 +342,9 @@ traceAllocateObject(J9VMThread *vmThread, J9Object * object, J9Class* clazz, uin
 				clazz,
 				objSize,
 				weight);
+			if (NULL != object) {
+				env->restoreObjects((omrobjectptr_t*)&object);
+			}
 		}
 #endif /* defined(J9VM_OPT_JFR) */
 	}
