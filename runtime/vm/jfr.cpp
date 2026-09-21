@@ -70,8 +70,7 @@ J9_DECLARE_CONSTANT_UTF8(onRetransformSigUTF8, "(JZLjava/lang/Class;[B)[B");
 J9_DECLARE_CONSTANT_NAS(onRetransformNAS, onRetransformUTF8, onRetransformSigUTF8);
 
 // TODO: allow configureable values
-//#define J9JFR_THREAD_BUFFER_SIZE (128 * 1024)
-#define J9JFR_THREAD_BUFFER_SIZE (32 * 1024)
+#define J9JFR_THREAD_BUFFER_SIZE (128 * 1024)
 #define J9JFR_GLOBAL_BUFFER_SIZE (10 * J9JFR_THREAD_BUFFER_SIZE)
 #define J9JFR_SAMPLING_RATE 10
 #define J9JFR_CLASSNAME_BUFFER_SIZE 128
@@ -371,7 +370,7 @@ allocateMemFromGlobalBuffer(J9VMThread *currentThread, UDATA size, bool *hasExcl
 	*hasExclusive = (J9_XACCESS_EXCLUSIVE == vm->exclusiveAccessState) || (J9_XACCESS_EXCLUSIVE == vm->safePointState);
 
 	if (!*hasExclusive) {
-		internalReleaseVMAccess(currentThread);
+//		internalReleaseVMAccess(currentThread);
 		omrthread_monitor_enter(vm->jfrBufferMutex);
 	}
 //
@@ -382,23 +381,23 @@ allocateMemFromGlobalBuffer(J9VMThread *currentThread, UDATA size, bool *hasExcl
 			if (!*hasExclusive) {
 //				j9tty_printf(PORTLIB, "allocateMemFromGlobalBuffer notifyForChunkRotation currentThread=%p hasExclusive=%zu, size=%zu\n", currentThread, *hasExclusive, size);
 				omrthread_monitor_exit(vm->jfrBufferMutex);
-				internalAcquireVMAccess(currentThread);
+//				internalAcquireVMAccess(currentThread);
 				notifyForChunkRotation(currentThread);
 			}
 			goto done;
 		} else {
-			if (!*hasExclusive) {
-				internalAcquireVMAccess(currentThread);
-			}
+//			if (!*hasExclusive) {
+//				internalAcquireVMAccess(currentThread);
+//			}
 //			j9tty_printf(PORTLIB, "allocateMemFromGlobalBuffer writeOutGlobalBuffer start currentThread=%p hasExclusive=%zu, vm->jfrBuffer.bufferRemaining=%zu, size=%zu\n", currentThread, *hasExclusive, vm->jfrBuffer.bufferRemaining, size);
 			bool result = writeOutGlobalBuffer(currentThread, false, false);
-			if (!*hasExclusive) {
-				internalReleaseVMAccess(currentThread);
-			}
+//			if (!*hasExclusive) {
+//				internalReleaseVMAccess(currentThread);
+//			}
 			if (!result) {
 				if (!*hasExclusive) {
 					omrthread_monitor_exit(vm->jfrBufferMutex);
-					internalAcquireVMAccess(currentThread);
+//					internalAcquireVMAccess(currentThread);
 				}
 				goto done;
 			}
@@ -462,7 +461,7 @@ flushBufferToGlobal(J9VMThread *currentThread, J9VMThread *flushThread, bool flu
 		omrthread_monitor_exit(flushThread->javaVM->jfrBufferMutex);
 ////		bool setNotAtSafePoint = J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_NOT_AT_SAFE_POINT);
 ////		j9tty_printf(PORTLIB, "flushBufferToGlobal allocateMemFromGlobalBuffer before internalAcquireVMAccess currentThread=%p, setNotAtSafePoint=%zu\n", currentThread, setNotAtSafePoint);
-		internalAcquireVMAccess(currentThread);
+//		internalAcquireVMAccess(currentThread);
 ////		setNotAtSafePoint = J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_NOT_AT_SAFE_POINT);
 ////		j9tty_printf(PORTLIB, "flushBufferToGlobal allocateMemFromGlobalBuffer after internalAcquireVMAccess currentThread=%p, setNotAtSafePoint=%zu\n", currentThread, setNotAtSafePoint);
 	}
