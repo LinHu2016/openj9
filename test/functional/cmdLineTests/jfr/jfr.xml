@@ -140,4 +140,54 @@ Assisted-by: IBM Bob
 		<output type="success" caseSensitive="yes" regex="no">delay=null</output>
 		<output type="success" caseSensitive="yes" regex="no">duration=null</output>
 	</test>
+	<test id="Test JFR ObjectAllocationSample - change enabled and throttle settings at runtime">
+		<command>$EXE$ --add-opens jdk.jfr/jdk.jfr.internal=ALL-UNNAMED -cp $RESJAR$ org.openj9.test.JFRObjectAllocationSampleTest dynamic</command>
+		<output type="success" caseSensitive="yes" regex="no">TEST PASSED</output>
+		<output type="failure" caseSensitive="yes" regex="no">TEST FAILED</output>
+		<output type="failure" caseSensitive="yes" regex="no">ERROR:</output>
+		<output type="failure" caseSensitive="yes" regex="no">Exception</output>
+		<versions>
+			<version>17+</version>
+		</versions>
+	</test>
+	<test id="Test JFR ObjectAllocationSample - cmdline enabled=false">
+		<command>$EXE$ -XX:+EnableOpenJ9ExperimentalFlightRecording -XX:StartFlightRecording:jdk.ObjectAllocationSample#enabled=false --add-opens jdk.jfr/jdk.jfr.internal=ALL-UNNAMED -cp $RESJAR$ org.openj9.test.JFRObjectAllocationSampleTest cmdline none</command>
+		<output type="success" caseSensitive="yes" regex="no">TEST PASSED</output>
+		<output type="failure" caseSensitive="yes" regex="no">TEST FAILED</output>
+		<output type="failure" caseSensitive="yes" regex="no">ERROR:</output>
+		<output type="failure" caseSensitive="yes" regex="no">Exception</output>
+		<versions>
+			<version>17+</version>
+		</versions>
+	</test>
+	<test id="Test JFR ObjectAllocationSample - cmdline throttle=0/s">
+		<command>$EXE$ -XX:+EnableOpenJ9ExperimentalFlightRecording -XX:StartFlightRecording:jdk.ObjectAllocationSample#enabled=true,jdk.ObjectAllocationSample#throttle=0/s --add-opens jdk.jfr/jdk.jfr.internal=ALL-UNNAMED -cp $RESJAR$ org.openj9.test.JFRObjectAllocationSampleTest cmdline none</command>
+		<output type="success" caseSensitive="yes" regex="no">TEST PASSED</output>
+		<output type="failure" caseSensitive="yes" regex="no">TEST FAILED</output>
+		<output type="failure" caseSensitive="yes" regex="no">ERROR:</output>
+		<output type="failure" caseSensitive="yes" regex="no">Exception</output>
+		<versions>
+			<version>17+</version>
+		</versions>
+	</test>
+	<test id="Test JFR ObjectAllocationSample - cmdline throttle=off">
+		<command>$EXE$ -XX:+EnableOpenJ9ExperimentalFlightRecording -XX:StartFlightRecording:jdk.ObjectAllocationSample#enabled=true,jdk.ObjectAllocationSample#throttle=off --add-opens jdk.jfr/jdk.jfr.internal=ALL-UNNAMED -cp $RESJAR$ org.openj9.test.JFRObjectAllocationSampleTest cmdline some</command>
+		<output type="success" caseSensitive="yes" regex="no">TEST PASSED</output>
+		<output type="failure" caseSensitive="yes" regex="no">TEST FAILED</output>
+		<output type="failure" caseSensitive="yes" regex="no">ERROR:</output>
+		<output type="failure" caseSensitive="yes" regex="no">Exception</output>
+		<versions>
+			<version>17+</version>
+		</versions>
+	</test>
+	<test id="Test JFR ObjectAllocationSample - cmdline throttle=10/s">
+		<command>$EXE$ -XX:+EnableOpenJ9ExperimentalFlightRecording -XX:StartFlightRecording:jdk.ObjectAllocationSample#enabled=true,jdk.ObjectAllocationSample#throttle=10/s --add-opens jdk.jfr/jdk.jfr.internal=ALL-UNNAMED -cp $RESJAR$ org.openj9.test.JFRObjectAllocationSampleTest cmdline some</command>
+		<output type="success" caseSensitive="yes" regex="no">TEST PASSED</output>
+		<output type="failure" caseSensitive="yes" regex="no">TEST FAILED</output>
+		<output type="failure" caseSensitive="yes" regex="no">ERROR:</output>
+		<output type="failure" caseSensitive="yes" regex="no">Exception</output>
+		<versions>
+			<version>17+</version>
+		</versions>
+	</test>
 </suite>
