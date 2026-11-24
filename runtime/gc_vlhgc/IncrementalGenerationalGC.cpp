@@ -2124,6 +2124,9 @@ MM_IncrementalGenerationalGC::exportStats(MM_EnvironmentVLHGC *env, MM_Collectio
 
 	stats->_edenFreeHeapSize = 0;
 	stats->_edenHeapSize = 0;
+	stats->_fragmentedSize = 0;
+	MM_GlobalAllocationManagerTarok *allocationmanager = (MM_GlobalAllocationManagerTarok *)_extensions->globalAllocationManager;
+	stats->_fragmentedSizeFromContext = allocationmanager->getFregmentedSize();
 
 	stats->_arrayletReferenceObjects = 0;
 	stats->_arrayletReferenceLeaves = 0;
@@ -2155,9 +2158,13 @@ MM_IncrementalGenerationalGC::exportStats(MM_EnvironmentVLHGC *env, MM_Collectio
 				if (region->containsObjects()) {
 					MM_MemoryPool *memoryPool = region->getMemoryPool();
 					Assert_MM_true(NULL != memoryPool);
+					/* free memory (excluding dark matter) in non-free, non-idle regions that contain objects (i.e. not arraylet leaves) */
+					UDATA actualFreeSize = memoryPool->getActualFreeMemorySize();
+					stats->_fragmentedSize += actualFreeSize;
+
 					/* Eden region containing objects, its age must be equal to zero */
 					if (0 == region->getAge()) {
-						UDATA size = memoryPool->getActualFreeMemorySize();
+						UDATA size = actualFreeSize;
 						stats->_edenFreeHeapSize += size;
 						usedMemory = regionSize - size;
 						allocateEdenTotal += regionSize;

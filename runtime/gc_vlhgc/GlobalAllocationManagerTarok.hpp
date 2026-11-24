@@ -81,6 +81,8 @@ public:
 	 * @return The actual free memory size of all the regions managed by the contexts under the receiver
 	 */
 	UDATA getActualFreeMemorySize();
+
+	UDATA getFregmentedSize();
 	/**
 	 * @return The approximate free memory size of all the regions managed by the contexts under the receiver
 	 */

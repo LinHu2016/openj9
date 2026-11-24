@@ -186,6 +186,10 @@ public:
 	 */
 	virtual UDATA getFreeMemorySize();
 
+	UDATA getFregmentedSize()
+	{
+		return _freeMemorySize;
+	}
 	/**
 	 * Return the number of free (empty) regions currently managed by the context.   This value is always accurate (that is, there is no time when it becomes
 	 * out of sync with the actual number of regions managed by the context).

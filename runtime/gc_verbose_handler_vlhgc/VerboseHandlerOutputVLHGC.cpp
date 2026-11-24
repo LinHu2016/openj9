@@ -352,7 +352,12 @@ MM_VerboseHandlerOutputVLHGC::outputMemoryInfoInnerStanza(MM_EnvironmentBase *en
 		writer->formatAndOutput(env, indent, "<mem type=\"eden\" free=\"%zu\" total=\"%zu\" percent=\"%zu\" />",
 				stats->_edenFreeHeapSize, stats->_edenHeapSize,
 				((UDATA)(((U_64)stats->_edenFreeHeapSize*100) / (U_64)stats->_edenHeapSize)));
+		/* _fragmentedSize is collected in the same region walk as eden stats, so it is only valid when eden stats are */
+		writer->formatAndOutput(env, indent, "<fragmented-mem size=\"%zu\" />", stats->_fragmentedSize);
 	}
+
+	writer->formatAndOutput(env, indent, "<fragmented-mem2 size=\"%zu\" />", stats->_fragmentedSizeFromContext);
+
 #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env->getOmrVM());
 	if (extensions->isVirtualLargeObjectHeapEnabled) {

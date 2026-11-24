@@ -313,6 +313,16 @@ MM_GlobalAllocationManagerTarok::getActualFreeMemorySize()
 }
 
 UDATA
+MM_GlobalAllocationManagerTarok::getFregmentedSize()
+{
+	UDATA freeMemory = 0;
+	for (UDATA i = 0; i < _managedAllocationContextCount; i++) {
+		freeMemory += ((MM_AllocationContextBalanced *)_managedAllocationContexts[i])->getFregmentedSize();
+	}
+	return freeMemory;
+}
+
+UDATA
 MM_GlobalAllocationManagerTarok::getFreeRegionCount()
 {
 	UDATA freeRegions = 0;
